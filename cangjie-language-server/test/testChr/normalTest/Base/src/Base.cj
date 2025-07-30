@@ -1,0 +1,94 @@
+
+let Int8One: Int8 = 24
+let Int16One: Int16 = 16
+let Int32One: Int32 = 16
+let Int64One: Int64 = 16
+let Uint8One: Int8 = 24.2 //err
+let Uint16One: UInt16 = 16
+let Uint32One: UInt32 = 16
+let Uint64One: UInt64 = 16
+let Float16One: Float16 = 100.1 
+let Float32One: Float32 = .8
+let Float64One: Float64 = 2.4e-1
+let boolOne: Bool = true
+let CharOne: Rune = 'c'
+let unitOne: Unit = ()
+func  funcA() : Unit{
+    
+}
+
+
+let FloatTwo: Float32 = 200
+
+//浮点数不能够自动转化为整数 所以此处会有诊断报错
+let errY: Int64 = 1.0 + 3 //err Float cannot transport to Int64
+// let errY: Int64 = 1 + 3
+let x: Float64 = 1.0 + 3
+let zzz: Float64 = 1.0 + 3
+var ans22 = errY + x + zzz
+
+
+var Character: Rune = 'a'
+var u32Number: UInt32 = 0
+var i8Number: Int8 = 127
+var i16Number: Int16 = 0
+func funcTest():Unit{
+    u32Number = UInt32(Character)
+    u32Number -= 32
+    Character = Rune(u32Number)
+    i16Number = Int64(i8Number) //err 不能跳转到括号内的定义
+    i16Number = 127
+    i8Number = Int8(i16Number)
+}
+
+
+var Character1: Rune = 'a'
+var u32Number1: UInt32 = 0
+func funcTest2():Unit{
+    u32Number1 = UInt32(Character1)
+    u32Number1 -= 32
+    Character1 = Rune(u32Number1)
+}
+
+
+var i8Number1: Int8 = 127
+var i16Number1: Int16 = 0
+func funcTest3():Unit{
+    i16Number1 = Int16(i8Number1)
+    i16Number1 = 127
+    i8Number1 = Int16(i16Number1)  //err
+    i8Number1 = i16Number1
+    i8Number1 = i16Number1 + Int16(i16Number1)  //err
+    i8Number1 = 127
+    i16Number1 = 128
+    i8Number1 = Int8(i16Number1)
+}
+
+
+func f1() {
+    let bool1: Bool = true
+    var bool2: Bool = false
+    bool2 = true // assignment
+    bool2 &&= bool1 // bool2=true
+    bool2 ||= bool1 // bool2=true
+    true == false // return false
+    true != false // return true
+    !false // logical NOT, return true
+    true && false // logical AND, return false
+    false || false // logical OR, return false
+    return 0
+}
+func f2() {
+    'A'=='A' // result: true
+    'A'!='A' // result: false
+    'A'<'a' // result: true
+    'A'<='A' // result: true
+    'A'>'a' // result: false
+    'A'>='A' // result: true
+    return 0
+}
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.
