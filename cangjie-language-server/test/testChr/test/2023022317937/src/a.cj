@@ -1,0 +1,16 @@
+struct A {
+    init() {}
+    public var a = 1
+    static func hh() {}
+}
+
+type B  = A
+
+main() {
+    var a = B().
+}
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.

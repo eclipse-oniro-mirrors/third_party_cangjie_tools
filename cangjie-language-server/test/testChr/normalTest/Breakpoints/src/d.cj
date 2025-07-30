@@ -1,0 +1,19 @@
+/*
+函数入口行：6
+函数出口行：8 10 12
+*/
+func test4() {
+    let x = -10
+    try {
+        "try"
+    } catch (name: ArithmeticException) {
+        "catch"
+    } finally {
+        "1"
+    }
+}
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.

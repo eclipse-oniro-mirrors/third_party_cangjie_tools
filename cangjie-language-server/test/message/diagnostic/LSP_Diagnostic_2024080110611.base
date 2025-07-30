@@ -1,0 +1,1 @@
+{"id":null,"jsonrpc":"2.0","method":"textDocument/extendPublishDiagnostics","params":{"diagnostics":[{"category":490,"code":490,"message":"package name supposed to be 'cangjie0801.aaa.src'","range":{"end":{"character":25,"line":0},"start":{"character":24,"line":0}},"severity":1,"source":"Cangjie"}],"uri":"file:///d%3A/projects/cangjie/1.2/projects/cangjie0801/src/aaa/src/b.cj"}}

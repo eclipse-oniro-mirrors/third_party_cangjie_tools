@@ -1,0 +1,13 @@
+package cangjieextend.direct3.pkg2
+import cangjieextend.direct3.pkg1.A
+
+extend A {
+    public func b() {}
+}
+
+let a1 = A().b() // ok
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.

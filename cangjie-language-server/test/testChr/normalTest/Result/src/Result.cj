@@ -1,0 +1,58 @@
+//enum Result<T> { Success(T) | Failure(Throwable) }
+func test() {
+    let rInt32_1 = Result<Int32>.Success(100) // The type of'rInt32_1' is 'Result<Int32>'
+    let rInt32_12 = Result<Int32>.Success(100).getOrThrow()
+    let rInt32_1_err = Result<Int32>.Success(1.1) //err
+    let rInt32_21 = Result<Int32>.Failure(Exception()) // The type of'rInt32_2' is 'Result<Int32>'
+    let rChar = Result<Rune>.Success('m') // The type of 'rChar' is 'Result<Rune>'
+    let rBool = Result<Bool>.Failure(Exception()) // The type of 'rBool' is 'Result<Bool>'
+
+
+    func resultTest1() {
+        let number1: Int32 = match (rInt32_1) {
+        case Success(num) => num // matched
+        case Failure(_) => 0
+        }
+        let number2: Int32 = match (rInt32_21) {
+        case Success(num) => num
+        case Failure(_) => 0 // matched
+        }
+        let number3: Int32 = match (rInt32_21) {
+            case Success(num) => num
+           }
+    }
+    func resultTest2() {
+        let number1 = rInt32_1.getOrThrow() // number1 = 100
+        let number2: Int32 = rInt32_21.getOrThrow() // throw Exception
+        let number3: Int32 = rInt32_21.getOrThrow({Exception("Some Error")}) //throw MyException
+    }
+    func resultTest3(): Result<Int32> {
+        /**
+        * this is a init32 var
+        */
+        var int32Var:Int32 = 10
+        let number1: Int32 = rInt32_1??int32Var // number1 = 100
+        let number2: Int32 = rInt32_21 ?? 0 // number2 = 0
+        var number3 = rInt32_1 !
+        return rInt32_1
+    }
+}
+
+func f1(): Result<String> {
+    let t: Result<String> = Result<String>.Success("123")
+    let r: String = t! // r = "ok"
+    return Result<String>.Success(r)
+}
+func f2(): Result<String> {
+    let err = Exception()
+    let t: Result<String> = Result<String>.Failure(err)
+    let r: String = t! // return Result<String>.Failure(err)
+    return Result<String>.Success(r)
+}
+
+
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.

@@ -1,0 +1,144 @@
+package enum2
+
+enum TimeUnit3<T1, T2> {
+    | Year3(T1)
+    | Month3(T1, T2)
+    | Day3(T1, T2, T2)
+    | Hour3(T1, T2, T2, T2)
+}
+
+enum TimeUnit4 {
+    | Year45
+    | Year4(Int32) // ok
+    | Year4(Float32) // error: redeclaration of 'Year'
+    | Month4(Int32, Float32) // ok
+    | Month4(Int32, Int32) // error: redeclaration of'Month'
+    | Month4(Int32) // ok
+    | Day4(Int32, Float32, Float32) // ok
+    | Day4(Float32, Float32, Float32) // error: redeclaration of'Day'
+    | Day4(Float32, Float32) // ok
+    | Hour4(Int32, Float32, Float32, Float32) // ok
+    | Hour4(Int32, Int32, Int32, Int32) // error: redeclaration of'Day'
+    | Hour4(Int32, Int32, Int32) // ok
+}
+
+enum TimeUnit5 {
+    |Year5(Int32)
+    | Month5(Int32, Float32)
+    | Day5(Int32, Float32, Float32)
+    | Hour5(Int32, Float32, Float32, Float32)
+    | Twounit5(TimeUnit5, TimeUnit5)
+}
+
+enum E1 {
+    A | B(E2)
+}
+enum E2 {
+    C(E1) | D(E1)
+}
+
+// abcd
+enum T1 {
+    Year1 | Month1 | Day1 | Hour1
+}
+enum TimeUnit2 {
+    | Year2(Float32)
+    | Month2(Float32, Float32)
+    | Day2(Float32, Float32, Float32)
+    | Hour2(Float32, Float32, Float32, Float32)
+}
+let time12 = T1.Year1
+
+func test1(): Int64 {
+   let time1 = T1.Year1
+   let time2 = TimeUnit2.Month2(1.0, 2.0)
+   let time3 = TimeUnit3<Int64,Float64>.Day3(1, 2.0, 3.0)
+
+   return 0
+}
+func test2(): Int64 {
+    let time4 = Year1 // syntax sugar of 'TimeUnit1.Year'
+    let time5 = Month2(1.0, 2.0) // syntax sugar of 'TimeUnit2.Month(1.0, 2.0)'
+    let time6 = Day3<Int64, Float64>(1, 2.0, 3.0) // syntax sugar of 'TimeUnit3<Int64, Float64>.Day(1, 2.0, 3.0)'
+
+    return 0
+}
+
+enum E {
+    | f(Int64)
+    | f(Int64, Int64, Int64)
+}
+func f(a: Int64) {}
+func f(a: Int64, b: Int64) {}
+
+enum EE<T> {
+    | A(T)
+    | B(T)
+}
+func fEE() {
+    let a = A(1) // ok, a: E<Int64>
+    let b = A<Int32>(2) // ok, b: E<Int32>
+}
+enum TimeUnit {
+| Year
+| Year(Int64)
+| Month(Int64, Int64)
+| Day(Int64, Int64, Int64)
+| Hour(Int64, Int64, Int64, Int64)
+
+}
+let oneYear = TimeUnit.Year(1)
+var howManyHours:Int64 = match (oneYear) {
+    case Year => 365
+    case Year(y) => y * 365 * 24 // matched
+    case Month(y, m) => y * 365 * 24 + m * 30 * 24
+    case Day(y, m, d) => y * 365 * 24 + m * 30 * 24 + d * 24
+    case Hour(y, m, d, h) => y * 365 * 24 + m * 30 * 24 + d * 24 + h
+}
+let twoYear = TimeUnit.Year(2)
+var howManyYears: Int64 = match (twoYear) {
+    case Year(y) | Month(y, m) => y  // error: different number of variables are introduced
+    case Year(y) | Month(x, _) => y  // error: different name of variables are introduced
+    case Year(y) | Month(y, _) => y  // ok
+//...
+}
+
+enum  enumtest1 {
+	 |Cvar1
+	 |Cvar2
+	 |Cfunc3(Int32)
+	 static func  staticFunc( )  {return 1 }
+	 static public func staticPublicFunc( )  {return 1}
+	 public func publicFunc( )  {return 1}
+     private static func privateStaticFunc( )  {return 1}
+     private  func privateFunc( )  {return 1}
+     func defaultFunc( )  {return 1}
+     mut prop varb: Int64 {
+          get() {
+              print("get")
+              return 1
+          }
+          set(value){
+             print("set")
+             let Cvar1 = value
+          }
+     }
+}
+//语法糖只补全 consturct 不补全枚举中的函数
+let  test0 = staticPublicFunc() //not support
+let  test1 =  Cvar1       // support
+let  test2 =  Cfunc3(2)   // support
+// enumtest1.Cvar1.补全  如下
+//只支持补全 有且仅仅有 public的函数  public默认自带
+let  test3 = enumtest1.Cvar1.publicFunc()
+let  test4 = enumtest1.Cvar1.staticPublicFunc( )
+let  test5 = enumtest1.Cvar1.staticFunc()
+let  test6 = enumtest1.Cvar1.privateFunc()
+let  test7 = enumtest1.Cvar1.privateStaticFunc()
+let  test8 = enumtest1.Cvar1.defaultFunc()
+let  test9 =  enumtest1.Cfunc3(2).defaultFunc()
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.

@@ -1,0 +1,29 @@
+package pkgCondition
+from std import sync.*
+
+var m1 : MultiConditionMonitor = MultiConditionMonitor()
+var cR : ConditionID = m1.newCondition()
+var flag : Bool = true
+var count : Int64 = 0
+
+
+func test4() {
+
+    spawn {
+        m1.lock()
+        while (flag) {
+            m1.wait(cR)
+        }
+        count = count + 1
+        m1.unlock()
+    }
+    m1.lock()
+    flag = false
+    m1.unlock()
+    m1.notify(cR)
+}
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.

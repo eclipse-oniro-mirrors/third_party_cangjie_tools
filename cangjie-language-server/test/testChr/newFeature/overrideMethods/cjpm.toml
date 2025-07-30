@@ -1,0 +1,21 @@
+# Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+# This source file is part of the Cangjie project, licensed under Apache-2.0
+# with Runtime Library Exception.
+#
+# See https://cangjie-lang.cn/pages/LICENSE for license information.
+[dependencies]
+ ohos_app_cangjie_entry = {path = "./ohos_app_cangjie_entry", version = "1.0.0"}
+ ohos_app_cangjie_entry_test = {path = "./ohos_app_cangjie_entry_test", version = "1.0.0"}
+
+[package]
+  cjc-version = "0.60.4"
+  name = "test"
+  description = "nothing here"
+  version = "1.0.0"
+  target-dir = ""
+  src-dir = "src"
+  output-type = "static"
+  compile-option = ""
+  override-compile-option = ""
+  link-option = ""
+  [package.package-configuration]
