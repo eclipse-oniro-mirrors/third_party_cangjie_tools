@@ -240,7 +240,7 @@ cjpm tree success
 - `-j, --jobs <N>` 用于指定并行编译的最大并发数，最终的最大并发数取 `N` 和 `2倍 CPU 核数` 的最小值
 - `-V, --verbose` 用于展示编译日志
 - `-g` 用于生成 `debug` 版本的输出产物
-- `--cfg` 指定后，能够透传 `cjpm.toml` 中的自定义 `cfg` 选项，`cjpm.toml` 中的配置可参考 [profile.customized-option](./user_guide.md##profile.customized-option) 章节
+- `--cfg` 指定后，能够透传 `cjpm.toml` 中的自定义 `cfg` 选项，`cjpm.toml` 中的配置可参考 `profile.customized-option` 章节
 - `-m, --member <value>` 仅可在工作空间下使用，可用于指定单个模块作为编译入口
 - `--target <value>` 指定后，可交叉编译代码到目标平台，`cjpm.toml` 中的配置可参考 [target](./user_guide.md#target) 章节
 - `--target-dir <value>` 用于指定输出产物的存放路径

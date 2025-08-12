@@ -266,7 +266,7 @@ Output: cjpm build success
 ```
 
 > **Note:**
-> Per Cangjie package specifications, only compliant source packages are included in compilation. Warnings like `no '.cj' file` indicate non-compliant package structures. Refer to [Cangjie Package Specifications](#cangjie-package-specifications) for directory structure requirements.
+> Per Cangjie package specifications, only compliant source packages are included in compilation. Warnings like `no '.cj' file` indicate non-compliant package structures. Refer to [Cangjie Package Specifications](#cangjie-package-management-specification) for directory structure requirements.
 
 ### run
 
@@ -1457,7 +1457,11 @@ main(): Int64 {
 After adding its directory to `PATH`, running the corresponding command will execute the executable and produce the corresponding output.
 
 ```text
-Input: cThe built-in commands of `cjpm` have higher priority, so these commands cannot be extended in this way. For example, even if there is an executable named `cjpm-build` in the system environment variables, `cjpm build` will not execute that file but will instead run `cjpm` with `build` as an argument passed to `cjpm`.
+Input: cjpm demo hello,world
+Output: Output: hello,world
+```
+
+The built-in commands of `cjpm` have higher priority, so these commands cannot be extended in this way. For example, even if there is an executable named `cjpm-build` in the system environment variables, `cjpm build` will not execute that file but will instead run `cjpm` with `build` as an argument passed to `cjpm`.
 
 ## Build Scripts
 
