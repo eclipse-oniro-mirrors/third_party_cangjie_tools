@@ -8,7 +8,7 @@ The project can be compiled into an executable named LSPServer.
 
 The system architecture diagram is as follows:
 
-![SystemArchitecture](./finger/SystemArchitecture.png)
+![SystemArchitecture](./figures/SystemArchitecture.png)
 
 ## Directory Structure
 
