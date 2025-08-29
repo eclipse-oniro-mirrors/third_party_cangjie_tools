@@ -12,7 +12,7 @@ The source code directory of `cjfmt` is shown below, with main functionalities d
 ```
 cjfmt/
 |-- build                   # Build scripts
-|-- config                  # Configuration files  
+|-- config                  # Configuration files
 |-- doc                     # Documentation
 |-- include                 # Header files
 |-- src
@@ -58,7 +58,7 @@ Local build process:
 3. Compile `cjfmt` using build scripts in `cjfmt/build`:
 
     ```shell
-    cd cangjie-tools/cjfmt/build  
+    cd cangjie-tools/cjfmt/build
     python3 build.py build -t release
     ```
 
@@ -82,7 +82,7 @@ Local build process:
     dist/
     |-- bin
         `-- cjfmt                   # Executable (cjfmt.exe on Windows)
-    |-- config  
+    |-- config
         `-- cangjie-format.toml     # Formatter config file
     ```
 
@@ -221,5 +221,5 @@ cjfmt -f a.cj -o .cj -l 10:25 // Formats only lines 10-25
 
 ## Related Repositories
 
-- [cangjie repo](https://gitcode.com/Cangjie/cangjie-compiler)
+- [cangjie repo](https://gitcode.com/Cangjie/cangjie_compiler)
 - [SDK Build](https://gitcode.com/Cangjie/cangjie_build)
