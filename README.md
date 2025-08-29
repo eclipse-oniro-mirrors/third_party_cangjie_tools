@@ -49,7 +49,7 @@ To get detailed information, please refer to the user guides in the correspondin
     - [User Guide for `lsp`](./cangjie-language-server/doc/user_guide.md)
     - [Developer Guide for `lsp`](./cangjie-language-server/doc/developer_guide.md)
 
-## Cangjie SDK Integration Construction
+## Construction Dependencies
 
 The construction of tools relies on Cangjie `SDK`. Please refer to [Cangjie SDK Integration Construction Guide](https://gitcode.com/Cangjie/cangjie_build/blob/main/README.md)
 
@@ -59,4 +59,4 @@ This project is licensed under [Apache-2.0 with Runtime Library Exception](./LIC
 
 ## Contribution
 
-We welcome you to submit Issues and participate in any form of contribution.
+We welcome contributions from developers in any form, including but not limited to code, documentation, issues, and more.

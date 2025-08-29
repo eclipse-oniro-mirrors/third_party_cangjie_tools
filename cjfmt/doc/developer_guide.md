@@ -4,7 +4,7 @@
 
 `cjfmt (Cangjie Formatter)` 仓颉格式化工具是一款基于仓颉语言编程规范开发的代码自动格式化工具。其整体技术架构如图所示：
 
-![cjfmt架构设计图](../figures/cjfmt架构.png)
+![cjfmt架构设计图](../figures/cjfmt架构.jpg)
 
 ## 目录
 
@@ -222,5 +222,5 @@ cjfmt -f a.cj -o .cj -l 10:25 // 仅格式化第10行至第25行
 
 ## 相关仓
 
-- [cangjie 仓](https://gitcode.com/Cangjie/cangjie-compiler)
+- [cangjie 仓](https://gitcode.com/Cangjie/cangjie_compiler)
 - [SDK 构建](https://gitcode.com/Cangjie/cangjie_build)

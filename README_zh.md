@@ -49,7 +49,7 @@
     - [`lsp` 用户指南](./cangjie-language-server/doc/user_guide.md)
     - [`lsp` 开发者指南](./cangjie-language-server/doc/developer_guide.md)
 
-## 仓颉 SDK 集成构建
+## 构建依赖
 
 命令行工具构建依赖于仓颉 `SDK`，请参考[仓颉 SDK 集成构建指南](https://gitcode.com/Cangjie/cangjie_build/blob/main/README_zh.md)
 
@@ -59,4 +59,4 @@
 
 ## 参与贡献
 
-欢迎给我们提交 Issue，欢迎参与任何形式的贡献。
+欢迎开发者们提供任何形式的贡献，包括但不限于代码、文档、issue 等。
