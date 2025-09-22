@@ -45,22 +45,23 @@ TARGET_SYSTEM = TARGET_SYSTEM_TYPE.NATIVE
 IS_WINDOWS = platform.system() == "Windows"
 IS_MACOS = platform.system() == "Darwin"
 IS_LINUX = platform.system() == "Linux"
-JSON_GIT = "https://gitee.com/openharmony/third_party_json.git"
-FLATBUFFER_GIT = "https://gitee.com/openharmony/third_party_flatbuffers.git"
+JSON_GIT = "https://gitcode.com/openharmony/third_party_json.git"
+FLATBUFFER_GIT = "https://gitcode.com/openharmony/third_party_flatbuffers.git"
+SQLITE_GIT = "https://gitcode.com/openharmony/third_party_sqlite.git"
 
 def resolve_path(path):
     if os.path.isabs(path):
         return path
     return os.path.abspath(path)
 def download_json():
-    cmd = ["git", "clone", "-b", "OpenHarmony-v6.0-Beta1", "--depth=1", JSON_GIT, "json-v3.11.3"]
+    cmd = ["git", "clone", "-b", "OpenHarmony-v6.0-Release", "--depth=1", JSON_GIT, "json-v3.11.3"]
     output = subprocess.Popen(cmd, cwd=THIRDPARTY_DIR, stdout=PIPE)
     for line in output.stdout:
         print(line.decode("ascii", "ignore").rstrip())
 
 
 def download_flatbuffers(args):
-    cmd = ["git", "clone", "-b", "OpenHarmony-v6.0-Beta1", "--depth=1", FLATBUFFER_GIT, "flatbuffers"]
+    cmd = ["git", "clone", "-b", "OpenHarmony-v6.0-Release", "--depth=1", FLATBUFFER_GIT, "flatbuffers"]
     output = subprocess.Popen(cmd, cwd=THIRDPARTY_DIR, stdout=PIPE)
     for line in output.stdout:
         print(line.decode("ascii", "ignore").rstrip())
@@ -75,7 +76,7 @@ def generate_flat_header():
     flatbuffers_build_dir = os.path.join(flatbuffers_dir, "build")
     if not os.path.exists(flatbuffers_build_dir):
         os.makedirs(flatbuffers_build_dir)
-    compile_cmd = ["cmake", flatbuffers_dir, "-G", "Unix Makefiles"]
+    compile_cmd = ["cmake", flatbuffers_dir, "-G", "Unix Makefiles", "-DFLATBUFFERS_BUILD_TESTS=OFF"]
     output = subprocess.Popen(compile_cmd, cwd=flatbuffers_build_dir, stdout=PIPE)
     for line in output.stdout:
         print(line.decode("ascii", "ignore").rstrip())
@@ -94,6 +95,30 @@ def generate_flat_header():
     header_path = os.path.join(flatbuffers_build_dir, "index_generated.h")
     new_header_path = os.path.join(flatbuffers_dir, "include", "index_generated.h")
     shutil.copy(header_path, new_header_path)
+
+def download_sqlite(args):
+    cmd = ["git", "clone", "-b", "OpenHarmony-v6.0-Release", "--depth=1", SQLITE_GIT, "sqlite3"]
+    output = subprocess.Popen(cmd, cwd=THIRDPARTY_DIR, stdout=PIPE)
+    for line in output.stdout:
+        print(line.decode("ascii", "ignore").rstrip())
+
+def build_sqlite_amalgamation():
+    sqlite_dir = os.path.join(THIRDPARTY_DIR, "sqlite3")
+    amalgamation_dir = os.path.join(sqlite_dir, "amalgamation")
+    if not os.path.exists(amalgamation_dir):
+        os.makedirs(amalgamation_dir)
+    shell_c_file = os.path.join(sqlite_dir, "src", "shell.c")
+    sqlite3_c_file = os.path.join(sqlite_dir, "src", "sqlite3.c")
+    sqlite3_h_file = os.path.join(sqlite_dir, "include", "sqlite3.h")
+    sqlite3ext_h_file = os.path.join(sqlite_dir, "include", "sqlite3ext.h")
+    new_shell_c_file = os.path.join(amalgamation_dir, "shell.c")
+    nwe_sqlite3_c_file = os.path.join(amalgamation_dir, "sqlite3.c")
+    nwe_sqlite3_h_file = os.path.join(amalgamation_dir, "sqlite3.h")
+    nwe_sqlite3ext_h_file = os.path.join(amalgamation_dir, "sqlite3ext.h")
+    shutil.copy(shell_c_file, new_shell_c_file)
+    shutil.copy(sqlite3_c_file, nwe_sqlite3_c_file)
+    shutil.copy(sqlite3_h_file, nwe_sqlite3_h_file)
+    shutil.copy(sqlite3ext_h_file, nwe_sqlite3ext_h_file)
 
 def prepare_cangjie(args):
     cangjie_sdk_path = resolve_path(os.getenv("CANGJIE_HOME"))

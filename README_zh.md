@@ -1,53 +1,57 @@
-# 仓颉语言命令行工具
+# 仓颉语言命令行工具链
 
 ## 简介
 
-仓颉语言为开发者提供了丰富的命令行工具以及语言服务器工具，在成功安装仓颉工具链后，即可根据手册说明使用这些工具。
+仓颉语言为开发者提供了丰富的命令行工具，在成功安装仓颉工具链后，即可根据手册说明使用这些工具。
 
 ## 开源项目介绍
 
-目前的仓颉工具如下：
+仓颉工具链的整体架构图为：
 
-- 仓颉包管理工具 `cjpm`
-- 仓颉格式化工具 `cjfmt`
-- 仓颉多语言桥接工具 `hle`
-- 仓颉语言服务器 `lsp`
+![仓颉工具链整体架构图](./figures/整体架构.jpg)
 
-与命令行工具和语言服务器工具对应的软件架构图请参考：
+如架构图所示，本仓库提供了下述的仓颉工具：
 
-- [`cjpm` 软件架构图](./cjpm/doc/developer_guide.md#开源项目介绍)
-- [`cjfmt` 软件架构图](./cjfmt/doc/developer_guide.md#开源项目介绍)
-- [`hle` 软件架构图](./hyperlangExtension/doc/developer_guide.md#开源项目介绍)
+- 仓颉包管理工具 （`cangjie package manager`，简称 `cjpm`）：用于对仓颉项目模块系统进行管理，涵盖模块初始化、依赖检查与更新等操作，提供统一的编译入口，支持增量编译、并行编译等。
+- 仓颉格式化工具 （`cangjie formatter`，简称 `cjfmt`）：基于仓颉语言编程规范开发的代码自动格式化工具。
+- 仓颉多语言桥接工具 （`HyperlangExtension`，简称 `hle`）：仓颉调用ArkTS互操作代码的模板自动生成工具。
+- 仓颉语言服务工具 （`cangjie language server`，简称 `lsp`）：在IDE上提供仓颉语言服务的服务器后端，需要搭配IDE客户端使用。
+
+## 目录
+
+```
+.
+├── cangjie-language-server
+│   ├── build                 # 构建脚本
+│   ├── doc                   # 构建指南和使用指南
+│   └── src                   # 源码
+│ 
+├── cjfmt
+│   ├── build    # 构建脚本
+│   ├── config   # 配置文件
+│   ├── doc      # 构建指南和使用指南
+│   ├── include  # 头文件
+│   └── src      # 源码
+│ 
+├── cjpm
+│   ├── build    # 构建脚本
+│   ├── doc      # 构建指南和使用指南
+│   └── src      # 源码
+│ 
+└── hyperlangExtension
+    ├── build            # 构建脚本
+    ├── doc              # 构建指南和使用指南
+    └── src              # 源码
+```
+
+若想获取详细信息，请参阅各工具 `doc` 目录下的使用指南。
+
+每个工具对应的软件架构图请参考：	
+
+- [`cjpm` 软件架构图](./cjpm/doc/developer_guide.md#开源项目介绍)	
+- [`cjfmt` 软件架构图](./cjfmt/doc/developer_guide.md#开源项目介绍)	
+- [`hle` 软件架构图](./hyperlangExtension/doc/developer_guide.md#开源项目介绍)	
 - [`lsp` 系统架构图](./cangjie-language-server/doc/developer_guide.md#开源项目介绍)
-
-对应的目录结构分别为：
-
-- [`cjpm` 目录](./cjpm/doc/developer_guide.md#目录)
-- [`cjfmt` 目录](./cjfmt/doc/developer_guide.md#目录)
-- [`hle` 目录](./hyperlangExtension/doc/developer_guide.md#目录)
-- [`lsp` 目录](./cangjie-language-server/doc/developer_guide.md#目录)
-
-工具的相关仓具体为：
-
-- [`cjpm` 相关仓](./cjpm/doc/developer_guide.md#相关仓)
-- [`cjfmt` 相关仓](./cjfmt/doc/developer_guide.md#相关仓)
-- [`hle` 相关仓](./hyperlangExtension/doc/developer_guide.md#相关仓)
-- [`lsp` 相关仓](./cangjie-language-server/doc/developer_guide.md#相关仓)
-
-若想获取详细信息，请参阅各工具 `doc` 目录下的使用指南：
-
-- `cjpm`:
-    - [`cjpm` 用户指南](./cjpm/doc/user_guide.md)
-    - [`cjpm` 开发者指南](./cjpm/doc/developer_guide.md)
-- `cjfmt`:
-    - [`cjfmt` 用户指南](./cjfmt/doc/user_guide.md)
-    - [`cjfmt` 开发者指南](./cjfmt/doc/developer_guide.md)
-- `hle`:
-    - [`hle` 用户指南](./hyperlangExtension/doc/user_guide.md)
-    - [`hle` 开发者指南](./hyperlangExtension/doc/developer_guide.md)
-- `lsp`:
-    - [`lsp` 用户指南](./cangjie-language-server/doc/user_guide.md)
-    - [`lsp` 开发者指南](./cangjie-language-server/doc/developer_guide.md)
 
 ## 构建依赖
 
@@ -56,6 +60,25 @@
 ## 开源协议
 
 本项目基于 [Apache-2.0 with Runtime Library Exception](./LICENSE)，请自由地享受和参与开源。
+
+## 相关仓
+
+- [cangjie_docs](https://gitcode.com/Cangjie/cangjie_docs/tree/main/docs/dev-guide)
+- [cangjie_runtime](https://gitcode.com/openharmony-sig/third_party_cangjie_runtime)
+- [cangjie_compiler](https://gitcode.com/openharmony-sig/third_party_cangjie_compiler)
+- [cangjie_stdx](https://gitcode.com/openharmony-sig/third_party_cangjie_stdx)
+- [cangjie_build](https://gitcode.com/Cangjie/cangjie_build)
+- [cangjie_test](https://gitcode.com/Cangjie/cangjie_test)
+
+## 使用的开源软件声明
+
+| 开源软件名称               | 开源许可协议              | 使用说明                  | 使用主体 | 使用方式         |
+|----------------------|---------------------|-----------------------|------|--------------|
+| flatbuffers          | Apache License V2.0 | 仓颉语言服务对索引数据进行序列化和反序列化 | 语言服务 | 集成到仓颉二进制发布包中 |
+| JSON for Modern C++  | MIT License         | 仓颉语言服务用于报文解析和封装       | 语言服务 | 集成到仓颉二进制发布包中 |
+| SQLite               | Public Domain       | 仓颉语言服务使用数据库存储索引数据     | 语言服务 | 集成到仓颉二进制发布包中 |
+
+构建方式参见[仓颉SDK集成构建指导书](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md)。更多软件依赖，参见[环境准备](https://gitcode.com/Cangjie/cangjie_build/blob/dev/docs/env_zh.md)。
 
 ## 参与贡献
 

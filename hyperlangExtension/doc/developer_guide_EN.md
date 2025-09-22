@@ -5,7 +5,7 @@
 `HLE (HyperlangExtension)` is an automated code template generation tool for Cangjie-ArkTS interoperability.  
 The tool takes ArkTS interface declaration files (e.g., files with `.d.ts` or `.d.ets` extensions) as input and outputs a directory containing `BUILD.gn` files and an `src` folder. The `src` folder contains generated interoperability code in `.cj` files. The tool also outputs a JSON file containing all ArkTS file information. The overall technical architecture is shown below:
 
-![HLE Architecture Diagram]()
+![HLE Architecture Diagram](../figures/HLE_eng.png)
 
 ## Directory Structure
 
@@ -189,9 +189,3 @@ Execute test cases with the following command. Output will be saved in `./tests/
 ```bash
 ${WORKDIR}/cangjie-tools/hyperlangExtension/output/hle--lib --module-name="my_module" -d ./tests/cases -o ./tests/expected/my_module/
 ```
-
-## Related Repositories
-
-- [Cangjie Repository](https://gitcode.com/Cangjie/cangjie_compiler)
-- [stdx Repository](https://gitcode.com/Cangjie/cangjie_stdx)
-- [Cangjie SDK](https://gitcode.com/Cangjie/cangjie_build)

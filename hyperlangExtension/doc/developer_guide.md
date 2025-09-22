@@ -5,7 +5,7 @@
 `HLE (HyperlangExtension)` 是一个仓颉调用ArkTS互操作代码模板自动生成工具。
 该工具的输入是ArkTS接口声明文件，例如后缀.d.ts或者.d.ets结尾的文件，输出为包含BUILD.gn文件和src文件夹。src文件夹中包含的cj文件中存放生成的互操作代码。工具也会输出包含ArkTS文件的所有信息的json文件。其整体技术架构如下图所示：
 
-![HLE架构设计图](../figures/HLE架构.png)
+![HLE架构设计图](../figures/HLE.png)
 
 ## 目录
 
@@ -189,9 +189,3 @@ Options:
 ```bash
 ${WORKDIR}/cangjie-tools/hyperlangExtension/output/hle--lib --module-name="my_module" -d ./tests/cases -o ./tests/expected/my_module/
 ```
-
-## 相关仓
-
-- [cangjie 仓](https://gitcode.com/Cangjie/cangjie_compiler)
-- [stdx 仓](https://gitcode.com/Cangjie/cangjie_stdx)
-- [cangjie SDK](https://gitcode.com/Cangjie/cangjie_build)
