@@ -2,13 +2,13 @@
 
 ## Open Source Project Introduction
 
-This project is a language server that supports IDE features for Cangjie.
+This project is a language server that supports IDE features for Cangjie, It is a backend server and must be used in conjunction with an IDE client. Developers can utilize the VSCode extension officially released by Cangjie or develop their own IDE clients compatible with the Language Server Protocol (LSP).
 
 The project can be compiled into an executable named LSPServer.
 
 The system architecture diagram is as follows:
 
-![SystemArchitecture](./figures/SystemArchitecture.png)
+![SystemArchitecture](./figures/SystemArchitecture_EN.png)
 
 ## Directory Structure
 
@@ -90,12 +90,3 @@ Additionally, `build.py` provides the following extra functions:
 ## Cangjie SDK Integration Build
 
 For Cangjie SDK integration build, refer to the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md).
-
-## Related Repositories
-
-This repository contains Cangjie tool source code. This document introduces the Cangjie language service tool. The complete component-related repositories are as follows:
-
-- [Cangjie Compiler](https://gitcode.com/Cangjie/cangjie_compiler): Provides Cangjie compiler source code.
-- [Cangjie Standard Library](https://gitcode.com/Cangjie/cangjie_runtime): Provides Cangjie standard library source code.
-- [Cangjie Runtime](https://gitcode.com/Cangjie/cangjie_runtime): Provides Cangjie runtime source code.
-- [**Cangjie Tools**](https://gitcode.com/Cangjie/cangjie_tools): Provides Cangjie tool suite source code.

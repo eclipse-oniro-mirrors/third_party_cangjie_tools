@@ -1,8 +1,8 @@
-# 仓颉语言服务器开发者指南
+# 仓颉语言服务工具开发者指南
 
 ## 开源项目介绍
 
-该项目是一个语言服务器，支持仓颉的IDE功能。
+该项目是一个语言服务工具，是在IDE上提供仓颉语言服务的服务器后端，需要搭配IDE客户端使用。开发者可以搭配仓颉发布的VSCode插件，或自行开发适配LSP协议的IDE客户端使用。
 
 这个工程可以编译成一个名为LSPServer的可执行文件。
 
@@ -90,12 +90,3 @@ python3 build.py test
 ## 仓颉 SDK 集成构建
 
 仓颉SDK集成构建，参见[仓颉SDK集成构建指导书](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md)。
-
-## 相关仓
-
-本仓为仓颉工具源码，本文档介绍的是仓颉语言服务工具，完整组件相关仓如下：
-
-- [仓颉编译器](https://gitcode.com/Cangjie/cangjie_compiler)：提供仓颉编译器源码；
-- [仓颉标准库](https://gitcode.com/Cangjie/cangjie_runtime)：提供仓颉标准库源码；
-- [仓颉运行时](https://gitcode.com/Cangjie/cangjie_runtime)：提供仓颉运行时源码；
-- [**仓颉工具**](https://gitcode.com/Cangjie/cangjie_tools)：提供仓颉工具套源码。
