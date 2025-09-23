@@ -78,7 +78,7 @@ This project is licensed under [Apache-2.0 with Runtime Library Exception](./LIC
 | JSON for Modern C++  | MIT License         | Cangjie Language Server for message parsing and encapsulation.  | LSPServer      | Integrated into the Cangjie binary release |
 | SQLite               | Public Domain       | Cangjie Language Server uses the database to store index data.  | LSPServer      | Integrated into the Cangjie binary release |
 
-For build methods, refer to the [Cangjie SDK Integration Build Guide](). For additional software dependencies, see [Environment Preparation]().
+For build methods, refer to the [Cangjie SDK Integration Build Guide](). For additional software dependencies, see [Environment Preparation](). For details on third-party dependencies, see the [Third-Party Open Source Software Documentation](./third_party/README.md)
 
 ## Contribution
 
