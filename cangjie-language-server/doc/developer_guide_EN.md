@@ -89,7 +89,7 @@ Additionally, `build.py` provides the following extra functions:
 
 ## Cangjie SDK Integration Build
 
-For Cangjie SDK integration build, refer to the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md).
+For Cangjie SDK integration build, refer to the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/main/README_zh.md).
 
 ## Related Repositories
 
