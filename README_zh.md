@@ -2,7 +2,7 @@
 
 ## 简介
 
-仓颉语言为开发者提供了丰富的命令行工具，在成功安装仓颉工具链后，即可根据手册说明使用这些工具。
+本仓提供仓颉语言命令行工具链，包含包管理工具、格式化工具、多语言桥接工具和语言服务工具。开发者可以通过命令行使用，也可以集成到Deveco客户端使用。
 
 ## 开源项目介绍
 
@@ -25,19 +25,16 @@
 │   ├── build                 # 构建脚本
 │   ├── doc                   # 构建指南和使用指南
 │   └── src                   # 源码
-│ 
 ├── cjfmt
 │   ├── build    # 构建脚本
 │   ├── config   # 配置文件
 │   ├── doc      # 构建指南和使用指南
 │   ├── include  # 头文件
 │   └── src      # 源码
-│ 
 ├── cjpm
 │   ├── build    # 构建脚本
 │   ├── doc      # 构建指南和使用指南
 │   └── src      # 源码
-│ 
 └── hyperlangExtension
     ├── build            # 构建脚本
     ├── doc              # 构建指南和使用指南
@@ -48,10 +45,10 @@
 
 每个工具对应的软件架构图请参考：	
 
-- [`cjpm` 软件架构图](./cjpm/doc/developer_guide.md#开源项目介绍)	
-- [`cjfmt` 软件架构图](./cjfmt/doc/developer_guide.md#开源项目介绍)	
-- [`hle` 软件架构图](./hyperlangExtension/doc/developer_guide.md#开源项目介绍)	
-- [`lsp` 系统架构图](./cangjie-language-server/doc/developer_guide.md#开源项目介绍)
+- [`cjpm` 软件架构图](./cjpm/doc/developer_guide_zh.md#开源项目介绍)	
+- [`cjfmt` 软件架构图](./cjfmt/doc/developer_guide_zh.md#开源项目介绍)	
+- [`hle` 软件架构图](./hyperlangExtension/doc/developer_guide_zh.md#开源项目介绍)	
+- [`lsp` 系统架构图](./cangjie-language-server/doc/developer_guide_zh.md#开源项目介绍)
 
 ## 构建依赖
 
