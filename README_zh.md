@@ -15,7 +15,7 @@
 - 仓颉包管理工具 （`cangjie package manager`，简称 `cjpm`）：用于对仓颉项目模块系统进行管理，涵盖模块初始化、依赖检查与更新等操作，提供统一的编译入口，支持增量编译、并行编译等。
 - 仓颉格式化工具 （`cangjie formatter`，简称 `cjfmt`）：基于仓颉语言编程规范开发的代码自动格式化工具。
 - 仓颉多语言桥接工具 （`HyperlangExtension`，简称 `hle`）：仓颉调用ArkTS互操作代码的模板自动生成工具。
-- 仓颉语言服务工具 （`cangjie language server`，简称 `lsp`）：在IDE上提供仓颉语言服务的服务器后端，需要搭配IDE客户端使用。
+- 仓颉语言服务工具 （`cangjie language server`，简称 `lsp`）：在DevEco上提供仓颉语言服务的服务器后端，需要搭配DevEco客户端使用。
 
 ## 目录
 
