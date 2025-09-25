@@ -17,6 +17,8 @@ As shown in the diagram, this warehouse provides the following cangjie tools:
 - Cangjie HyperLang Extension （Abbreviated as `hle`）: cangjie calls the template auto generation tool for ArkTS interoperability code.
 - Cangjie Languager Server （Abbreviated as `lsp`）: the server backend that provides Cangjie language services on the IDE needs to be used in conjunction with the IDE client.
 
+Cangjie Language CLI Toolchain currently supports the following platforms: Windows x86-64, Linux x86-64/AArch64, Mac x86/arm64. OpenHarmony platform is under development.
+
 ## Directory Structure
 
 ```
@@ -25,19 +27,16 @@ As shown in the diagram, this warehouse provides the following cangjie tools:
 │   ├── build                 # build script
 │   ├── doc                   # construction and usage guidelines
 │   └── src                   # source code
-│ 
 ├── cjfmt
 │   ├── build    # build script
 │   ├── config   # configuration file
 │   ├── doc      # construction and usage guidelines
 │   ├── include  # configuration file
 │   └── src      # source code
-│ 
 ├── cjpm
 │   ├── build    # build script
 │   ├── doc      # construction and usage guidelines
 │   └── src      # source code
-│ 
 └── hyperlangExtension
     ├── build            # build script
     ├── doc              # construction and usage guidelines
