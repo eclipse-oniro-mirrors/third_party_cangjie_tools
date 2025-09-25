@@ -10,13 +10,16 @@
 ## 目录
 
 `HLE` 源码目录如下图所示，其主要功能如注释中所描述。
+
 ```
-|-- build   # 构建脚本
-|-- doc     # 介绍文档
-|-- src     # 源码文件
-    |-- dtsparser # 解析ArkTS接口文件
-    |-- entry # ArkTS接口转换为仓颉接口
-    |-- tool # 转换过程中依赖的工具类
+hyperlangExtension/
+|-- build                       # 构建脚本
+|-- doc                         # 介绍文档
+|-- src                         # 源码文件
+    |-- dtsparser               # 解析ArkTS接口文件
+    |-- entry                   # ArkTS接口转换为仓颉接口
+    |-- tool                    # 转换过程中依赖的工具类
+|-- tests                       # 测试用例
 ```
 
 ## 安装和使用指导：

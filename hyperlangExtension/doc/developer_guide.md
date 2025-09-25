@@ -10,13 +10,16 @@ The tool takes ArkTS interface declaration files (e.g., files with `.d.ts` or `.
 ## Directory Structure
 
 The source code directory of `HLE` is structured as follows, with main functionalities described in the comments:
+
 ```
-|-- build   # Build scripts
-|-- doc     # Documentation
-|-- src     # Source code
-    |-- dtsparser # ArkTS interface file parser
-    |-- entry # ArkTS-to-Cangjie interface converter
-    |-- tool # Utility classes for the conversion process
+hyperlangExtension/
+|-- build                       # Build scripts
+|-- doc                         # Documentation
+|-- src                         # Source code
+    |-- dtsparser               # ArkTS interface file parser
+    |-- entry                   # ArkTS-to-Cangjie interface converter
+    |-- tool                    # Utility classes for the conversion process
+|-- tests                       # Test cases
 ```
 
 ## Installation and Usage Guide:
