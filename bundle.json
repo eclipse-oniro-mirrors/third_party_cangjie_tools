@@ -21,8 +21,8 @@
         "deps": {
             "components": [
                 "flatbuffers",
-                "third_party_json",
-                "SQLite"
+                "json",
+                "sqlite"
             ]
         },
         "build": {

@@ -1,6 +1,6 @@
 # HLE Tool Development Guide
 
-## Open Source Project Introduction
+## System Architecture
 
 `HLE (HyperlangExtension)` is an automated code template generation tool for Cangjie-ArkTS interoperability.  
 The tool takes ArkTS interface declaration files (e.g., files with `.d.ts` or `.d.ets` extensions) as input and outputs a directory containing `BUILD.gn` files and an `src` folder. The `src` folder contains generated interoperability code in `.cj` files. The tool also outputs a JSON file containing all ArkTS file information. The overall technical architecture is shown below:
