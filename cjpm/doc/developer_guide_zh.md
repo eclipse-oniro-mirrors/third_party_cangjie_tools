@@ -314,4 +314,4 @@ Use "cjpm [subcommand] --help" for more information about a command.
 
 除了上述命令和配置项之外，`cjpm` 还支持一些其他功能，例如构建脚本、命令扩展等。
 
-若想获取 `cjpm` 所有命令、配置项和附加功能的详细信息，请参阅[《仓颉包管理工具用户指南》](./user_guide.md)。
+若想获取 `cjpm` 所有命令、配置项和附加功能的详细信息，请参阅[《仓颉包管理工具用户指南》](./user_guide_zh.md)。
