@@ -12,13 +12,19 @@ The system architecture diagram is as follows:
 
 As shown in the architecture diagram:
 
-Protocol Interaction Management: Responsible for basic communication with the LSP protocol and message handling.
+Protocol Interaction Management: Implementing communication with the DevEco Studio client using the LSP protocol, including message encapsulation, message forwarding, and message processing.
 
 LSP Features: Implements language server features such as code completion, go to definition, and semantic token highlight.
+- CodeCompletion: Provides real-time Cangjie code suggestions and completion as developers write code, based on the input content.
+- Definition: Allows developers to jump to the definition of a specified Cangjie code symbol, such as a class name, function name and variable name.
+- Hover: Displays detailed information about the code when the developer hovers the mouse, such as the definition type and related comments
+- SemanticHighlight: Applies language server syntax highlighting to Cangjie code, using different colors to distinguish various elements like class names, function names, and variables.
+- Diagnostic: Errors or warnings are highlighted in the relevant code segments when the code violates Cangjie syntax or semantic rules.
+- Rename: Provides a code renaming capability that automatically updates both the definition and all references of the symbol.
 
 AST Management: Implements the construction and management of the AST.
 
-Symbol Index: Handles the generation and modification of symbol indexes and offers search functionality.
+Symbol Index: Implements the generation and modification of symbol indexes and offers search functionality.
 
 ## Directory Structure
 
