@@ -1,6 +1,6 @@
 # Cangjie Formatter Developer Guide
 
-## Open Source Project Introduction
+## System Architecture
 
 `cjfmt (Cangjie Formatter)` is a code formatting tool specifically designed for the Cangjie language. It strictly adheres to official programming standards, automatically adjusting code indentation, spacing, and line breaks to help developers maintain clean and consistent code style effortlessly. Its overall technical architecture is shown in the following diagram:
 

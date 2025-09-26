@@ -1,8 +1,8 @@
 # Cangjie Language Server Developer Guide
 
-## Open Source Project Introduction
+## System Architecture
 
-This project is a language server that provides Cangjie language support for DevEco Studio. It functions as the backend and must be used in conjunction with the DevEco client.
+This project is a language server that provides Cangjie language support for DevEco Studio. It functions as the backend and must be used in conjunction with the DevEco Studio client.
 
 The project can be compiled into an executable named LSPServer.
 
