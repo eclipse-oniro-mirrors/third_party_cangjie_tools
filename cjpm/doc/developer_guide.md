@@ -2,9 +2,18 @@
 
 ## System Architecture
 
-`cjpm (cangjie package manager)` is a tool for compiling Cangjie projects, implemented in the Cangjie language. It provides capabilities such as project creation, compilation, execution, and unit testing, supporting automatic dependency analysis for multi-module projects to achieve sequential builds. Its design goals are to simplify user workflows, enhance development efficiency, and offer highly customizable configuration options. The overall architecture of this tool is shown below:
+`cjpm (cangjie package manager)` is a package management tool for Cangjie project, implemented in Cangjie language. It is designed to simplify user workflows. `cjpm` provides capabilities for project creation, project building, project execution, unit testing, and more. The overall architecture of this tool is illustrated as follows:
 
 ![cjpm Architecture Diagram](../figures/cjpm-architecture.jpg)
+
+As shown in the architecture diagram, the overall structure of `cjpm` is as follows:
+
+- Command-line Argument Processing: The command-line argument processing module of `cjpm` supports project initialization, compilation and building, output execution, test case execution, dependency printing, dependency updates, output installation and uninstallation, and output cleanup via commands.
+- Configuration Management: Users can configure various settings via the `cjpm.toml` configuration file, including project information, dependency configurations, platform isolation settings, and workspace configurations. `cjpm` also performs checks to ensure the validity of these configurations.
+- Dependency Management: `cjpm` manages user-configured source dependencies, including configuration validity checks, incremental identification, configuration updates and parsing, and configuration display. It also supports configuring binary dependencies for C and Cangjie languages, along with command-line dependency printing.
+- Project Building: `cjpm` automates dependency parsing to generate package-level dependency graphs. It then invokes the Cangjie compiler to compile packages in dependency order, completing the project build. `cjpm` supports parallel and incremental compilation.
+- Project Testing: `cjpm` supports compiling test code within projects and running unit tests. It supports both single-package testing and module-level testing.
+- Compiler Integration Module: This module facilitates interaction with the Cangjie compiler, implementing imperative compiler invocation and result forwarding.
 
 ## Directory Structure
 
