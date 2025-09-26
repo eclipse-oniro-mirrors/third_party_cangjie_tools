@@ -10,6 +10,16 @@ The system architecture diagram is as follows:
 
 ![SystemArchitecture](./figures/lsp-architecture.png)
 
+As shown in the architecture diagram:
+
+Protocol Interaction Management: Responsible for basic communication with the LSP protocol and message handling.
+
+LSP Features: Implements language server features such as code completion, go to definition, and semantic token highlight.
+
+AST Management: Implements the construction and management of the AST.
+
+Symbol Index: Handles the generation and modification of symbol indexes and offers search functionality.
+
 ## Directory Structure
 
 ```text

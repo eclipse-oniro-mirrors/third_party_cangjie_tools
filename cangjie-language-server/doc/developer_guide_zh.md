@@ -2,7 +2,7 @@
 
 ## 系统架构
 
-该项目是一个语言服务工具，是在DevEco上提供仓颉语言服务的服务器后端，需要搭配DevEco客户端使用。
+该项目是一个语言服务工具，是在DevEco Studio上提供仓颉语言服务的服务器后端，需要搭配DevEco Studio客户端使用。
 
 这个工程可以编译成一个名为LSPServer的可执行文件。
 
@@ -10,7 +10,20 @@
 
 ![SystemArchitecture](./figures/lsp-架构.png)
 
+如架构图所示：
+
+Protocol交互管理：负责和LSP协议的基本通信与消息处理
+
+LSP特性：实现了代码补全，定义跳转，语法高亮等语言服务功能
+
+AST管理：实现抽象语法树（AST）的构建和管理
+
+符号索引：提供符号索引的生成和修改，提供搜索索引的功能
+
 ## 目录结构
+   
+
+
 
 ```text
 cangjie-language-server/
