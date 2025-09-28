@@ -3,25 +3,22 @@
 ## System Architecture
 
 `HLE (HyperlangExtension)` is an automated code template generation tool for Cangjie-ArkTS interoperability.  
-The tool takes ArkTS interface declaration files (e.g., files with `.d.ts` or `.d.ets` extensions) as input and outputs a directory containing `BUILD.gn` files and an `src` folder. The `src` folder contains generated interoperability code in `.cj` files. The tool also outputs a JSON file containing all ArkTS file information. The overall technical architecture is shown below:
+The input of this tool is ArkTS interface declaration files, such as files ending with .d.ts or .d.ets. The output includes a BUILD.gn file and a src folder. The src folder contains cj files where the generated interoperability code is stored. The tool also outputs a json file containing all information of the ArkTS files. To improve the ease of interoperability, DevEco Studio provides two tools: one is the ArkTS-to-Cangjie Bindings generator, which automatically generates code for ArkTS calling Cangjie and interface files on the ArkTS side through the @Interop macro expansion, and the other is the Cangjie-to-ArkTS Bindings generator (also known as the HLE tool). The overall technical architecture is shown in the figure below.
 
 ![HLE Architecture Diagram](../figures/HLE_eng.png)
 
-As shown in the architecture diagram:
-
-Interface Layer:
 
 - ArkTS Language Interface Parsing: Parses the input ArkTS interface declaration file, extracting various information about the interface, such as definition, parameters, return values, etc. This provides the basic interface metadata for subsequent generation of interoperability code, serving as the starting parsing step of the entire code generation process.
 
-Framework Layer:
-
+- Tool parameter analysis: parse each parameter of the input command.
 - Interface Abstract Description Generation: Based on the parsed ArkTS interface, the interface information is abstracted to create a unified and concise abstract description of the interface, facilitating subsequent operations like interface dependency analysis, and providing a clear abstract model for handling interface relations during the code generation process.
 - Interface Dependency Analysis: Analyzes the dependency relationships between various ArkTS interfaces, clarifying the order of calls, dependency conditions, etc., ensuring that the generated interoperability code is logically correct, can properly handle dependencies between interfaces, and guarantees the executability of the code.
-- Type Conversion: Since there may be different data type systems between Cangjie and ArkTS, this part is responsible for converting data types between the two environments, ensuring that data types correctly match when Cangjie calls ArkTS or when ArkTS returns data to Cangjie, thus avoiding errors caused by type incompatibility.
-- Exception Handling: During the interoperability process between Cangjie and ArkTS, various exceptions may occur, such as call errors or runtime errors. This function is used to capture these exceptions for error handling, ensuring the program remains stable in the event of an exception or provides appropriate error prompts.
-- Object Lifecycle Management: Manages the entire lifecycle of objects involved in interoperability, including creation, usage, and destruction, ensuring objects are managed correctly at appropriate times, avoiding memory leaks, and ensuring the efficiency and stability of memory usage in the program.
-- Runtime Management: Responsible for the relevant management of interoperability code during execution, such as configuring the runtime environment, resource scheduling during the execution process, performance monitoring, etc., ensuring that the generated interoperability code can be efficiently and stably executed in the target runtime environment.Explanation of the imported components in the architecture diagram:- cangjie_compiler: Provides the capability to compile and build HLE tools.
+- Code generation: Automatically produces Cangjie wrapper layer code based on the interoperability library.
 
+Explanation of component dependencies in the architecture diagram:
+
+- cangjie_compiler: Provides the capability to compile and build HLE tools.
+- cangjie_stdx: Provides the capability to parse JSON libraries; HLE tools use JSON as an intermediate parsing language.
 
 ## Directory Structure
 
@@ -32,9 +29,9 @@ hyperlangExtension/
 |-- build                       # Build scripts
 |-- doc                         # Documentation
 |-- src                         # Source code
-    |-- dtsparser               # ArkTS interface file parser
-    |-- entry                   # ArkTS-to-Cangjie interface converter
-    |-- tool                    # Utility classes for the conversion process
+    |-- dtsparser               # Parsing ArkTS interface files and generating intermediate JSON descriptions
+    |-- entry                   # Tool parameter analysis and saving
+    |-- tool                    # ArkTS interface to Cangjie code generator
 |-- tests                       # Test cases
 ```
 
