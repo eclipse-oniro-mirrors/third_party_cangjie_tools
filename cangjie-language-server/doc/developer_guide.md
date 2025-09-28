@@ -49,7 +49,7 @@ cangjie-language-server/
 
 ### Prerequisites
 
-The language service build depends on cjc, so before building this project, we should first complete the prerequisite build. For build methods, refer to the [Cangjie SDK Integration Build Guide](). For additional software dependencies, see [Environment Preparation]().
+The language service build depends on cjc, so before building this project, we should first complete the prerequisite build. For build methods, refer to the [Openharmony SDK Integration Build Guide](). For additional software dependencies, see [Environment Preparation]().
 
 ### Build Steps
 
@@ -65,7 +65,7 @@ git clone https://gitcode.com/Cangjie/cangjie_tools.git
 ```shell
 export CANGJIE_HOME=/path/to/cangjie    # (for Linux/macOS)
 set CANGJIE_HOME=/path/to/cangjie       # (for Windows)
-# The /path/to/cangjie should be adjusted to the actual path of Cangjie SDK (or cjc build output). For Linux cross-compiling to Windows scenarios, the Windows SDK needs to be prepared.
+# The /path/to/cangjie should be adjusted to the actual path of Openharmony SDK (or cjc build output). For Linux cross-compiling to Windows scenarios, the Windows SDK needs to be prepared.
 ```
 
 3. Compile the project using build.py in the `cangjie-language-server/build` directory with the following command:
@@ -110,6 +110,6 @@ Additionally, `build.py` provides the following extra functions:
 - `test`: Runs test cases.
 - `-h, --help`: Prints help information for `build.py`.
 
-## Cangjie SDK Integration Build
+## Openharmony SDK Integration Build
 
-For Cangjie SDK integration build, refer to the [Cangjie SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md).
+For Openharmony SDK integration build, refer to the [Openharmony SDK Integration Build Guide](https://gitcode.com/Cangjie/cangjie_build/blob/dev/README_zh.md).

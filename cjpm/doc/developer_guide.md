@@ -15,6 +15,8 @@ As shown in the architecture diagram, the overall structure of `cjpm` is as foll
 - Project Testing: `cjpm` supports compiling test code within projects and running unit tests. It supports both single-package testing and module-level testing.
 - Compiler Integration Module: This module facilitates interaction with the Cangjie compiler, implementing imperative compiler invocation and result forwarding.
 
+Note that `cjpm` is a package management tool for the Cangjie project, and its product types are static libraries, dynamic libraries, and executable binary. To complete the HAP/APP build and packaging of OpenHarmony, it is also necessary to use the DevEco Hvigor tool provided by DevEco Studio.
+
 ## Directory Structure
 
 The source code directory of `cjpm` is as follows, with main functionalities described in the comments.
@@ -34,13 +36,13 @@ cjpm/src
 
 `cjpm` requires the following tools for building:
 
-- `cangjie SDK`
-    - Developers need to download the `cangjie SDK` for the corresponding platform: To compile native platform artifacts, the `SDK` version must match the current platform; to cross-compile `Windows` platform artifacts from a `Linux` platform, the `SDK` must be the `Linux` version.
+- `Openharmony SDK`
+    - Developers need to download the `Openharmony SDK` for the corresponding platform: To compile native platform artifacts, the `SDK` version must match the current platform; to cross-compile `Windows` platform artifacts from a `Linux` platform, the `SDK` must be the `Linux` version.
     - Then, developers must execute the `envsetup` script of the corresponding `SDK` to ensure proper configuration.
-    - If using the `python` build script method, developers can use a self-compiled `cangjie SDK`. Refer to [cangjie SDK](https://gitcode.com/Cangjie/cangjie_build) for compiling `cangjie SDK` from source.
-- `stdx` binary library compatible with `cangjie SDK`
+    - If using the `python` build script method, developers can use a self-compiled `Openharmony SDK`. Refer to [Openharmony SDK](https://gitcode.com/Cangjie/cangjie_build) for compiling `Openharmony SDK` from source.
+- `stdx` binary library compatible with `Openharmony SDK`
     - Developers need to download the `stdx` binary library for the target platform or compile it from `stdx` source code: To compile native platform artifacts, the `stdx` library must match the current platform; to cross-compile `Windows` platform artifacts from a `Linux` platform, the `stdx` library must be the `Windows` version.
-    - Then, developers must configure the `stdx` binary library path in the environment variable `CANGJIE_STDX_PATH`. If downloading pre-built `stdx` binaries, the path is the `static/stdx` directory under the extracted library directory; if compiling from `stdx` source, the path is the `static/stdx` directory under the corresponding platform directory in the `target` output directory (e.g., `target/linux_x86_64_cjnative/static/stdx` for `Linux-x86`). Refer to [stdx Repository](https://gitcode.com/Cangjie/cangjie_stdx) for compiling `stdx` from source.
+    - Then, developers must configure the `stdx` binary library path in the environment variable `CANGJIE_STDX_PATH`. If downloading pre-built `stdx` binaries, the path is the `static/stdx` directory under the extracted library directory; if compiling from `stdx` source, the path is the `static/stdx` directory under the corresponding platform directory in the `target` output directory (e.g., `target/linux_x86_64_cjnative/static/stdx` for `Linux-x86`). Refer to [stdx Repository](https://gitcode.com/openharmony-sig/third_party_cangjie_stdx) for compiling `stdx` from source.
     - Additionally, if developers want to use `stdx` dynamic libraries as binary dependencies, they can replace `static` with `dynamic` in the above path configuration. `cjpm` compiled this way cannot run independently; to enable standalone execution, the same `stdx` library path must be added to the system dynamic library environment variables.
 - If using the `python` build script method, install `python3`.
 
@@ -48,7 +50,7 @@ cjpm/src
 
 #### Build Method 1: Using `cjpm` for Compilation
 
-The `cjpm` source code itself is a `cjpm` module. Therefore, the `cjpm` in `cangjie SDK` can be used to compile `cjpm` source code. After configuring the `SDK` and `stdx`, developers can compile using the following command:
+The `cjpm` source code itself is a `cjpm` module. Therefore, the `cjpm` in `Openharmony SDK` can be used to compile `cjpm` source code. After configuring the `SDK` and `stdx`, developers can compile using the following command:
 
 ```
 cd ${WORKDIR}/cangjie-tools/cjpm
@@ -87,7 +89,7 @@ cjpm/target/x86_64-w64-mingw32/release/bin
 
 #### Build Method 2: Using Build Script for Compilation
 
-Developers can use the build script `build.py` in the `build` directory to compile `cjpm`. To use `build.py`, developers can either configure `cangjie SDK` and `stdx` libraries or use self-compiled `cangjie SDK` and `stdx`.
+Developers can use the build script `build.py` in the `build` directory to compile `cjpm`. To use `build.py`, developers can either configure `Openharmony SDK` and `stdx` libraries or use self-compiled `Openharmony SDK` and `stdx`.
 
 The build process is as follows:
 
@@ -121,9 +123,9 @@ The build process is as follows:
 > **Note:**
 >
 > On `Linux/macOS` systems, developers can configure the `runtime` dynamic library path in `rpath` so that the compiled `cjpm` can locate the `runtime` dynamic library without relying on system dynamic library environment variables:
-> - When using `cjpm` for compilation, add the `--set-runtime-rpath` compile option to `cjc` to ensure the compiled `cjpm` can locate the `runtime` dynamic library of the current `cangjie SDK`. Add this option to the `compile-option` field in `cjpm.toml` to apply it to the `cjc` compile command.
+> - When using `cjpm` for compilation, add the `--set-runtime-rpath` compile option to `cjc` to ensure the compiled `cjpm` can locate the `runtime` dynamic library of the current `Openharmony SDK`. Add this option to the `compile-option` field in `cjpm.toml` to apply it to the `cjc` compile command.
 > - When using the `build.py` script, specify the `rpath` path with the `--set-rpath RPATH` parameter.
-> - In `cangjie SDK`, the `runtime` dynamic library directory is located under `$CANGJIE_HOME/runtime/lib`, divided into subdirectories by platform. Use the corresponding platform's library directory for `rpath` configuration.
+> - In `Openharmony SDK`, the `runtime` dynamic library directory is located under `$CANGJIE_HOME/runtime/lib`, divided into subdirectories by platform. Use the corresponding platform's library directory for `rpath` configuration.
 
 ### Additional Build Options
 

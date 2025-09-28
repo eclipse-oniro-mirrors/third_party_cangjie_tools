@@ -48,10 +48,10 @@ Below is a build guide for Ubuntu 22 environment.
 
 `HLE` requires the following tools for building:
 
-- `Cangjie SDK`
-    - Developers need to download the `Cangjie SDK` for the target platform: For compiling native platform artifacts, use the SDK version matching the current platform; for cross-compiling Windows artifacts from Linux, use the Linux version of the SDK.
+- `Openharmony SDK`
+    - Developers need to download the `Openharmony SDK` for the target platform: For compiling native platform artifacts, use the SDK version matching the current platform; for cross-compiling Windows artifacts from Linux, use the Linux version of the SDK.
     - Then, execute the `envsetup` script of the corresponding SDK to ensure proper configuration.
-- `stdx` binary library compatible with the `Cangjie SDK`
+- `stdx` binary library compatible with the `Openharmony SDK`
     - Download the `stdx` binary library for the target platform. For cross-compiling Windows artifacts from Linux, use the Windows version of `stdx`.
     - Configure the `stdx` binary library path to the environment variable `CANGJIE_STDX_PATH`, pointing to the `static/stdx` directory under the extracted library.
     - Alternatively, to use `stdx` dynamic libraries as dependencies, replace `static` with `dynamic` in the path configuration. Note that `HLE` compiled this way cannot run independently unless the same `stdx` library path is added to the system's dynamic library environment variables.

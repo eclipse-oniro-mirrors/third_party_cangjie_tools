@@ -6,7 +6,7 @@ The `Cangjie Language Server` provides language service functionalities such as 
 
 ## Usage Instructions
 
-To use the Cangjie Language Server, it must be combined with the Cangjie SDK. Ensure that the `tools/bin` directory of the SDK contains the LSPServer binary for the Cangjie language service. Additionally, the DevEco Studio client is required.
+To use the Cangjie Language Server, it must be combined with the Openharmony SDK. Ensure that the `tools/bin` directory of the SDK contains the LSPServer binary for the Cangjie language service. Additionally, the DevEco Studio client is required.
 
 The startup parameters for `Cangjie Language Server` are as follows:
 

@@ -15,6 +15,8 @@
 - 项目测试：`cjpm` 支持编译项目中的测试代码并运行单元测试，`cjpm` 支持运行单包测试，也支持模块级的测试。
 - 编译器对接模块：用于与仓颉编译器交互的模块，实现了命令式编译器调用和调用结果转发。
 
+注意，`cjpm` 是仓颉项目的包管理工具，它的产物类型是静态库、动态库和可执行二进制。如需完成 OpenHarmony 的 HAP/APP 构建打包，还需要配合 DevEco Studio 提供的 `DevEco Hvigor` 工具使用。
+
 ## 目录
 
 `cjpm` 源码目录如下所示，其主要功能如注释中所描述。
@@ -34,13 +36,13 @@ cjpm/src
 
 `cjpm` 需要以下工具来构建：
 
-- `cangjie SDK`
-    - 开发者需要下载对应平台的 `cangjie SDK`：若想要编译本地平台产物，则需要的 `SDK` 为当前平台对应的版本；若想要从 `Linux` 平台交叉编译获取 `Windows` 平台的产物，则需要的 `SDK` 为 `Linux` 版本。
-    - 然后，开发者需要执行对应 `SDK` 的 `envsetup` 脚本，确保 `SDK` 被正确配置。
-    - 若使用 `python` 构建脚本方式编译，可以使用自行编译的 `cangjie SDK`。请参阅 [cangjie SDK](https://gitcode.com/Cangjie/cangjie_build) 了解源码编译 `cangjie SDK` 的方法。
-- 与 `cangjie SDK` 配套的 `stdx` 二进制库
+- `Openharmony SDK`
+    - 开发者需要下载对应平台的 `Openharmony SDK`：若想要编译本地平台产物，则需要的 `SDK` 为当前平台对应的版本；若想要从 `Linux` 平台交叉编译获取 `Windows` 平台的产物，则需要的 `SDK` 为 `Linux` 版本。
+    - 然后，开发者需要执行对应 `SDK` 的 `envsetup` 脚本，确保 `SDK` 中的仓颉环境变量被正确配置。
+    - 若使用 `python` 构建脚本方式编译，可以使用自行编译的 `Openharmony SDK`。请参阅 [cangjie_compiler](https://gitcode.com/openharmony-sig/third_party_cangjie_compiler) 获取源码编译方法。
+- 与 `Openharmony SDK` 配套的 `cangjie stdx` 二进制库
     - 开发者需要下载目标平台的 `stdx` 二进制库，或通过 `stdx` 源码编译出对应的 `stdx` 二进制库：若想要编译本地平台产物，则需要的 `stdx` 库为当前平台对应的版本；若想要从 `Linux` 平台交叉编译获取 `Windows` 平台的产物，则需要的 `stdx` 库为 `Windows` 版本。
-    - 然后，开发者需要将 `stdx` 二进制库路径配置到环境变量 `CANGJIE_STDX_PATH` 中。若开发者直接下载 `stdx` 二进制库，则路径为解压得到的库目录下的 `static/stdx` 目录；若开发者通过 `stdx` 源码编译，则路径为 `stdx` 编译产物目录 `target` 下对应平台目录下的 `static/stdx` 目录，例如 `Linux-x86` 下为 `target/linux_x86_64_cjnative/static/stdx`。请参阅 [stdx 仓](https://gitcode.com/Cangjie/cangjie_stdx) 获取源码编译 `stdx` 库的方法。
+    - 然后，开发者需要将 `stdx` 二进制库路径配置到环境变量 `CANGJIE_STDX_PATH` 中。若开发者直接下载 `stdx` 二进制库，则路径为解压得到的库目录下的 `static/stdx` 目录；若开发者通过 `stdx` 源码编译，则路径为 `stdx` 编译产物目录 `target` 下对应平台目录下的 `static/stdx` 目录，例如 `Linux-x86` 下为 `target/linux_x86_64_cjnative/static/stdx`。请参阅 [stdx 仓](https://gitcode.com/openharmony-sig/third_party_cangjie_stdx) 获取源码编译 `stdx` 库的方法。
     - 此外，如果开发者想使用 `stdx` 动态库作为二进制库依赖，可以将上述路径配置中的 `static` 改为 `dynamic`。以此方式编译的 `cjpm` 无法独立运行，若想让其能够独立运行，需要将相同的 `stdx` 库路径配置到系统动态库环境变量中。
 - 若使用 `python` 构建脚本方式编译，请安装 `python3`
 
@@ -48,7 +50,7 @@ cjpm/src
 
 #### 构建方式一：使用 `cjpm` 编译
 
-`cjpm` 源码本身是一个 `cjpm` 模块。因此，可以使用 `cangjie SDK` 中的 `cjpm` 编译 `cjpm` 源码。配置完 `SDK` 和 `stdx` 后，开发者可以通过如下命令编译：
+`cjpm` 源码本身是一个 `cjpm` 模块。因此，可以使用 `Openharmony SDK` 中的 `cjpm` 编译 `cjpm` 源码。配置完 `SDK` 和 `stdx` 后，开发者可以通过如下命令编译：
 
 ```
 cd ${WORKDIR}/cangjie-tools/cjpm
@@ -88,7 +90,7 @@ cjpm/target/x86_64-w64-mingw32/release/bin
 
 #### 构建方式二：使用构建脚本编译
 
-开发者可以使用 `build` 目录下的构建脚本 `build.py` 进行 `cjpm` 构建。若想使用 `build.py` 构建，开发者可以配置 `cangjie SDK` 和 `stdx` 库，也可以使用自行编译的 `cangjie SDK` 和 `stdx`。
+开发者可以使用 `build` 目录下的构建脚本 `build.py` 进行 `cjpm` 构建。若想使用 `build.py` 构建，开发者可以配置 `Openharmony SDK` 和 `stdx` 库，也可以使用自行编译的 `Openharmony SDK` 和 `stdx`。
 
 构建流程如下：
 
@@ -122,9 +124,9 @@ cjpm/target/x86_64-w64-mingw32/release/bin
 > **注意：**
 >
 > `Linux/macOS` 系统中，开发者可以将 `runtime` 动态库的路径配置到 `rpath` 中，以使编译出来的 `cjpm` 可以不通过系统动态库环境变量就能找到 `runtime` 动态库：
-> - 使用 `cjpm` 编译时，可以通过给 `cjc` 添加编译选项 `--set-runtime-rpath` 使编译出来的 `cjpm` 可以找到当前使用的 `cangjie SDK` 的 `runtime` 动态库。请在 `cjpm.toml` 中将这一编译选项添加到 `compile-option` 配置项中，从而使该编译选项应用于 `cjc` 编译命令中。
+> - 使用 `cjpm` 编译时，可以通过给 `cjc` 添加编译选项 `--set-runtime-rpath` 使编译出来的 `cjpm` 可以找到当前使用的 `Openharmony SDK` 的 `runtime` 动态库。请在 `cjpm.toml` 中将这一编译选项添加到 `compile-option` 配置项中，从而使该编译选项应用于 `cjc` 编译命令中。
 > - 使用构建脚本 `build.py` 编译时，可以通过添加参数 `--set-rpath RPATH` 配置 `rpath` 的路径。
-> - `cangjie SDK` 中，`runtime` 动态库目录位于 `$CANGJIE_HOME/runtime/lib` 目录，基于运行平台划分成若干子目录，可以使用对应运行平台的库目录用于配置 `rpath`。
+> - `Openharmony SDK` 中，`runtime` 动态库目录位于 `$CANGJIE_HOME/runtime/lib` 目录，基于运行平台划分成若干子目录，可以使用对应运行平台的库目录用于配置 `rpath`。
 
 ### 更多构建选项
 
