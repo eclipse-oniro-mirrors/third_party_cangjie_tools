@@ -57,10 +57,10 @@ hyperlangExtension/
 
 `HLE` 需要以下工具来构建：
 
-- `cangjie SDK`
-    - 开发者需要下载对应平台的 `cangjie SDK`：若想要编译本地平台产物，则需要的 `SDK` 为当前平台对应的版本；若想要从 `Linux` 平台交叉编译获取 `Windows` 平台的产物，则需要的 `SDK` 为 `Linux` 版本。
+- `Openharmony SDK`
+    - 开发者需要下载对应平台的 `Openharmony SDK`：若想要编译本地平台产物，则需要的 `SDK` 为当前平台对应的版本；若想要从 `Linux` 平台交叉编译获取 `Windows` 平台的产物，则需要的 `SDK` 为 `Linux` 版本。
     - 然后，开发者需要执行对应 `SDK` 的 `envsetup` 脚本，确保 `SDK` 被正确配置。
-- 与 `cangjie SDK` 配套的 `stdx` 二进制库
+- 与 `Openharmony SDK` 配套的 `stdx` 二进制库
     - 开发者需要下载目标平台的 `stdx` 二进制库，若想要从 `Linux` 平台交叉编译获取 `Windows` 平台的产物，则需要的 `stdx` 库为 `Windows` 版本。
     - 然后，开发者需要将 `stdx` 二进制库路径配置到环境变量 `CANGJIE_STDX_PATH` 中，路径为解压得到的库目录下的 `static/stdx` 目录。
     - 此外，如果开发者想使用 `stdx` 动态库作为二进制库依赖，可以将上述路径配置中的 `static` 改为 `dynamic`。以此方式编译的 `HLE` 无法独立运行，若想让其能够独立运行，需要将相同的 `stdx` 库路径配置到系统动态库环境变量中。
