@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Cangjie language provides a rich set of command line tools and language server tool for developers. After successfully installing the Cangjie toolchain, you can use these tools according to the manual instructions.
+This warehouse provides the Cangjie language command-line toolchain, which includes project management tools, formatting tools, multilingual bridging tools, and language service tools. Developers can use it through the command line or integrate it into DevEco Studio.
 
 ## System Architecture
 
@@ -12,7 +12,7 @@ The overall architecture diagram of the Cangjie toolchain is as follows:
 
 As shown in the diagram, this warehouse provides the following cangjie tools:
 
-- Cangjie Package Manager （Abbreviated as `cjpm`）：used for managing the module system of Cangjie project, covering module initialization, dependency checking and updating operations, providing a unified compilation entry point, supporting incremental compilation, parallel compilation, etc.
+- Cangjie Project Manager （Abbreviated as `cjpm`）：used for managing the module system of Cangjie project, covering module initialization, dependency checking and updating operations, providing a unified compilation entry point, supporting incremental compilation, parallel compilation, etc.
 - Cangjie Formatter （Abbreviated as `cjfmt`）: a code automatic formatting tool developed based on the Cangjie programming specification.
 - Cangjie HyperLang Extension （Abbreviated as `hle`）: cangjie calls the template auto generation tool for ArkTS interoperability code.
 - Cangjie Languager Server （Abbreviated as `lsp`）: the server backend that provides Cangjie language services on the DevEco Studio needs to be used in conjunction with the DevEco Studio client.
