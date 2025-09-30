@@ -1,8 +1,8 @@
-# Cangjie Package Manager User Guide
+# Cangjie Project Manager User Guide
 
 ## Overview
 
-`CJPM (Cangjie Package Manager)` is the official package management tool for the Cangjie language, designed to manage and maintain module systems in Cangjie projects. It supports operations such as module initialization, dependency checking, and updates. The tool provides a unified compilation entry point with features including incremental compilation, parallel compilation, and support for custom compilation commands.
+`cjpm` is the official project management tool for the Cangjie language, designed to manage and maintain module systems in Cangjie projects. It supports operations such as module initialization, dependency checking, and updates. The tool provides a unified compilation entry point with features including incremental compilation, parallel compilation, and support for custom compilation commands.
 
 ## Usage Instructions
 
