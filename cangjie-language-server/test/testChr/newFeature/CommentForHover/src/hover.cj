@@ -64,3 +64,5 @@ func LSP_Hover_Comment_Line_Block_Doc_001(param1: Int64, param2222222222222222: 
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.

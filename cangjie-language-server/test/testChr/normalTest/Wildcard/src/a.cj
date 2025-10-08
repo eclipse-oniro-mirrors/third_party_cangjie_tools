@@ -5,3 +5,5 @@ let ad2:(p1:Int64,p2:Int64)->Int64 ={n,_ => n}
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.

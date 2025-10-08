@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include "../json-rpc/StdioTransport.h"
 #include "../languageserver/ArkLanguageServer.h"
 #include "../languageserver/logger/CrashReporter.h"

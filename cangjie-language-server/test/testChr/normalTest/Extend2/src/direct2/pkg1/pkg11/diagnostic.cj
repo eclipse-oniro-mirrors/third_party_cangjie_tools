@@ -16,3 +16,5 @@ let a5 = A2<Int64>().fooPrivate33() // not ok, the private method cannot be acce
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.

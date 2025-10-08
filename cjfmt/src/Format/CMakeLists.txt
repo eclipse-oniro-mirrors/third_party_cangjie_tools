@@ -4,5 +4,7 @@
 #
 # See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+# The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 file(GLOB FORMAT_SRC "*.cpp" "NodeFormatter/Decl/*.cpp" "NodeFormatter/Node/*.cpp" "NodeFormatter/Pattern/*.cpp" "NodeFormatter/Expr/*.cpp" "NodeFormatter/Type/*.cpp"  "DocProcessor/*.cpp")
 add_library(CangjieFormat OBJECT ${FORMAT_SRC} ${AUTODIFF_SRC})

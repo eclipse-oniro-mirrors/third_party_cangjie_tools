@@ -47,3 +47,5 @@ public func public_pkgB_func(public_pkgB_funca2: Int64,public_pkgB_funcb2!:Float
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
