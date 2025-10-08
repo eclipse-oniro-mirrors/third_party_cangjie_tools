@@ -146,3 +146,5 @@ let sum_hover = (a: int32, b: int32): int32 => {a + b}
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.

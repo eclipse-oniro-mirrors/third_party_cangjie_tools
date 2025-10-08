@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #ifndef LSPSERVER_DEPENDENCY_GRAPH_H
 #define LSPSERVER_DEPENDENCY_GRAPH_H
 

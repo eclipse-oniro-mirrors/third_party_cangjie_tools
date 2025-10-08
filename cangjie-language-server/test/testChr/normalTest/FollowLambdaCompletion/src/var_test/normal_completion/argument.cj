@@ -9,3 +9,5 @@ func func3(arg1: Int64, cc: (aaa: Int64, callback1: (bbb: Int64, ccc: (Int64, St
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
