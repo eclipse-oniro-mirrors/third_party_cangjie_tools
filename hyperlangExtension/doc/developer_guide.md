@@ -48,10 +48,10 @@ Below is a build guide for Ubuntu 22 environment.
 - `Openharmony SDK`
     - Developers need to download the `Openharmony SDK` for the target platform: For compiling native platform artifacts, use the SDK version matching the current platform; for cross-compiling Windows artifacts from Linux, use the Linux version of the SDK.
     - Then, execute the `envsetup` script of the corresponding SDK to ensure proper configuration.
-- `stdx` binary library compatible with the `Openharmony SDK`
-    - Download the `stdx` binary library for the target platform. For cross-compiling Windows artifacts from Linux, use the Windows version of `stdx`.
-    - Configure the `stdx` binary library path to the environment variable `CANGJIE_STDX_PATH`, pointing to the `static/stdx` directory under the extracted library.
-    - Alternatively, to use `stdx` dynamic libraries as dependencies, replace `static` with `dynamic` in the path configuration. Note that `HLE` compiled this way cannot run independently unless the same `stdx` library path is added to the system's dynamic library environment variables.
+- `stdx` binary library compatible with `Openharmony SDK`
+    - Developers need to download the `stdx` binary library for the target platform or compile it from `stdx` source code: To compile native platform artifacts, the `stdx` library must match the current platform; to cross-compile `Windows` platform artifacts from a `Linux` platform, the `stdx` library must be the `Windows` version.
+    - Then, developers must configure the `stdx` binary library path in the environment variable `CANGJIE_STDX_PATH`. If downloading pre-built `stdx` binaries, the path is the `static/stdx` directory under the extracted library directory; if compiling from `stdx` source, the path is the `static/stdx` directory under the corresponding platform directory in the `target` output directory (e.g., `target/linux_x86_64_cjnative/static/stdx` for `Linux-x86`). Refer to [stdx Repository](https://gitcode.com/Cangjie/cangjie_stdx) for compiling `stdx` from source.
+    - Additionally, if developers want to use `stdx` dynamic libraries as binary dependencies, they can replace `static` with `dynamic` in the above path configuration. `HLE` compiled this way cannot run independently; to enable standalone execution, the same `stdx` library path must be added to the system dynamic library environment variables.
 - For building with `python` scripts, install `python3`.
 
 2. This tool requires Node.js for execution:
