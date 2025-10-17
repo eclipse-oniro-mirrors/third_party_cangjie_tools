@@ -58,11 +58,24 @@ struct LookupRequest {
     std::unordered_set<SymbolID> ids;
 };
 
+struct PkgSymsRequest {
+   std::string fullPkgName;
+};
+
 struct RefsRequest {
     std::unordered_set<SymbolID> ids;
     RefKind filter = RefKind::ALL;
     std::optional<uint32_t> limit;
 };
+
+struct FileRefsRequest {
+    unsigned int fileID;
+    std::string fileUri;
+    std::string fullPkgName;
+    RefKind filter = RefKind::ALL;
+    std::optional<uint32_t> limit;
+};
+
 
 struct RelationsRequest {
     SymbolID id;
@@ -91,7 +104,14 @@ public:
 
     virtual void Lookup(const LookupRequest &req, std::function<void(const Symbol &)> callback) const = 0;
 
+    virtual void FindPkgSyms(const PkgSymsRequest &req, std::function<void(const Symbol &)> callback) const = 0;
+
     virtual void Refs(const RefsRequest &req, std::function<void(const Ref &)> callback) const = 0;
+
+    virtual void GetExportSID(IDArray array, std::function<void(const CrossSymbol &)> callback) const = 0;
+
+    virtual void FileRefs(const FileRefsRequest &req,
+        std::function<void(const Ref &ref, const SymbolID symId)> callback) const = 0;
 
     virtual void Callees(const std::string &pkgName, const SymbolID &declId,
         std::function<void(const SymbolID &, const Ref &)> callback) const = 0;
@@ -140,7 +160,14 @@ public:
 
     void Lookup(const LookupRequest &req, std::function<void(const Symbol &)> callback) const override;
 
+    void FindPkgSyms(const PkgSymsRequest &req, std::function<void(const Symbol &)> callback) const override;
+
+    void GetExportSID(IDArray array, std::function<void(const CrossSymbol &)> callback) const override;
+
     void Refs(const RefsRequest &req, std::function<void(const Ref &)> callback) const override;
+
+    void FileRefs(const FileRefsRequest &req,
+        std::function<void(const Ref &ref, const SymbolID symId)> callback) const override;
 
     void Callees(const std::string &pkgName, const SymbolID &declId,
         std::function<void(const SymbolID &, const Ref &)> callback) const override;

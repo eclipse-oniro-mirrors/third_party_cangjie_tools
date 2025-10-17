@@ -54,6 +54,12 @@ enum class CommentKind {
 
 std::string GetString(const Cangjie::AST::Ty &ty);
 
+std::string ReplaceTuple(const std::string &type);
+
+void MatchBracket(const std::string &type, size_t &index, int &count);
+
+std::string GetVarDeclType(Ptr<VarDecl> decl, SourceManager *sourceManager);
+
 std::string PrintTypeArgs(std::vector<Ptr<Cangjie::AST::Ty>> tyArgs, const std::pair<bool, int> isVarray = {false, 0});
 
 CommentKind GetCommentKind(const std::string &comment);
@@ -350,5 +356,13 @@ std::optional<std::string> GetSysCap(const Expr& e);
 std::string GetSysCapFromDecl(const Decl &decl);
 
 TokenKind FindPreFirstValidTokenKind(const ark::ArkAST &input, int index);
+
+Position FindLastImportPos(const File &file);
+
+std::vector<std::string> Split(const std::string &str, const std::string &pattern = "\n");
+
+std::vector<std::string> GetAllFilePathUnderCurrentPath(
+    const std::string& path, const std::string& extension,
+    bool shouldSkipTestFiles = false, bool shouldSkipRegularFiles = false);
 }
 #endif // LSPSERVER_UTILS_H

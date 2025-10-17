@@ -275,6 +275,69 @@ std::string GetString(const Ty &ty)
     return ty.name.empty() ? ty.String() : ty.name + PrintTypeArgs(ty.typeArgs, isVArray);
 }
 
+std::string ReplaceTuple(const std::string &type)
+{
+    std::string result;
+    std::string searchText = "Tuple<";
+    size_t searchLen = 6;
+    for (size_t i = 0; i < type.length();) {
+        if (i + searchLen <= type.length() && type.substr(i, searchLen) == searchText) {
+            size_t start = i;
+            i += searchLen;
+            int count = 1;
+            size_t innerStart = i;
+            MatchBracket(type, i, count);
+            if (count == 0) {
+                std::string inner = type.substr(innerStart, i - 1 - innerStart);
+                std::string replacedInner = ReplaceTuple(inner);
+                result += "(" + replacedInner + ")";
+            } else {
+                result += type.substr(start, i - start);
+            }
+        } else {
+            result += type[i];
+            i++;
+        }
+    }
+    return result;
+}
+
+void MatchBracket(const std::string &type, size_t &index, int &count)
+{
+    while (index < type.length() && count > 0) {
+        if (type[index] == '<') {
+            count++;
+        } else if (type[index] == '>') {
+            count--;
+        }
+        index++;
+    }
+}
+
+std::string GetVarDeclType(Ptr<VarDecl> decl, SourceManager *sourceManager)
+{
+    std::string type;
+    if ((!decl->ty || GetString(*decl->ty) == "UnknownType") && decl->type) {
+        type = sourceManager->GetContentBetween(decl->type->begin, decl->type->end);
+        std::string realType = ReplaceTuple(type);
+        type = realType.empty() ? type : realType;
+        return type;
+    }
+    if (!decl->ty) {
+        return type;
+    }
+    if (decl->ty->kind == TypeKind::TYPE_FUNC) {
+        ItemResolverUtil::GetDetailByTy(decl->ty, type, true);
+        std::string realType = ReplaceTuple(type);
+        type = realType.empty() ? type : realType;
+        return type;
+    }
+    type = GetString(*decl->ty);
+    std::string realType = ReplaceTuple(type);
+    type = realType.empty() ? type : realType;
+    return type;
+}
+
 bool IsZeroPosition(Ptr<const Node> node) { return node && node->end.line == 0 && node->end.column == 0; }
 
 bool ValidExtendIncludeGenericParam(Ptr<const Decl> decl)
@@ -1427,5 +1490,59 @@ TokenKind FindPreFirstValidTokenKind(const ark::ArkAST &input, int index)
         }
     }
     return TokenKind::INIT;
+}
+
+Position FindLastImportPos(const File &file)
+{
+    int lastImportLine = 0;
+    for(const auto &import : file.imports) {
+        if (!import) 
+        {
+            continue;
+        }
+        lastImportLine = std::max(import->content.rightCurlPos.line, std::max(import->importPos.line, lastImportLine));
+    }
+    Position pkgPos = file.package->packagePos;
+    if (lastImportLine == 0 && pkgPos.line > 0) {
+        lastImportLine = pkgPos.line;
+    }
+    return {pkgPos.fileID, lastImportLine + 1, 1};
+}
+
+std::vector<std::string> Split(const std::string &str, const std::string &pattern)
+{
+    std::vector<std::string> result;
+    if (str.empty())
+        return result;
+    std::string strs = str + pattern;
+    size_t pos = strs.find(pattern);
+
+    while (pos != std::string::npos) {
+        std::string temp = strs.substr(0, pos);
+        result.push_back(temp);
+        strs = strs.substr(pos + 1, strs.size());
+        pos = strs.find(pattern);
+    }
+    return result;
+}
+
+std::vector<std::string> GetAllFilePathUnderCurrentPath(const std::string& path, const std::string& extension,
+    bool shouldSkipTestFiles, bool shouldSkipRegularFiles)
+{
+    std::vector<std::string> allFiles;
+    auto files = FileUtil::GetAllFilesUnderCurrentPath(path, extension,
+        shouldSkipTestFiles, shouldSkipRegularFiles);
+    std::for_each(files.begin(), files.end(), [&allFiles, &path](const std::string &fileName) {
+        allFiles.emplace_back(NormalizePath(FileUtil::JoinPath(path, fileName)));
+    });
+    auto dirs = FileUtil::GetAllDirsUnderCurrentPath(path);
+    std::for_each(dirs.begin(), dirs.end(), [&](const std::string &dir) {
+        auto files = FileUtil::GetAllFilesUnderCurrentPath(dir, extension,
+            shouldSkipTestFiles, shouldSkipRegularFiles);
+        std::for_each(files.begin(), files.end(), [&allFiles, &dir](const std::string &fileName) {
+            allFiles.emplace_back(NormalizePath(FileUtil::JoinPath(dir, fileName)));
+        });
+    });
+    return allFiles;
 }
 } // namespace ark

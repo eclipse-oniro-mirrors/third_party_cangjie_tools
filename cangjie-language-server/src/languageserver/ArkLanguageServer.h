@@ -94,9 +94,15 @@ private:
 
     void OnFileReference(const DocumentLinkParams &params, nlohmann::json id);
 
+    void OnFileRefactor(const FileRefactorReqParams &params, nlohmann::json id);
+
     void OnGoToDefinition(const TextDocumentPositionParams &params, nlohmann::json id);
 
     void OnCrossLanguageGoToDefinition(const CrossLanguageJumpParams &params, nlohmann::json id);
+
+    void OnCrossLanguageRegister(const CrossLanguageJumpParams &params, nlohmann::json id);
+
+    void OnExportsName(const ExportsNameParams &params, nlohmann::json id);
 
     void OnSignatureHelp(const SignatureHelpParams &params, nlohmann::json id);
 
@@ -139,6 +145,8 @@ private:
     void OnDidChangeWatchedFiles(const DidChangeWatchedFilesParam &params);
 
     bool CheckFileInCangjieProject(const std::string &filePath, bool ignoreMacro = true) const;
+
+    bool CheckPkgInCangjieProject(const std::string &pkgPath) const;
 
     bool CheckIsDirectory(const std::string &dirPath, bool isDelete = false) const;
 

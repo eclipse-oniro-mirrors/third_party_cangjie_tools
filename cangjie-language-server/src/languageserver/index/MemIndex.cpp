@@ -54,6 +54,17 @@ void MemIndex::Lookup(const LookupRequest &req, std::function<void(const Symbol 
     }
 }
 
+void MemIndex::FindPkgSyms(const PkgSymsRequest &req, std::function<void(const Symbol &)> callback) const
+{
+    auto it = pkgSymsMap.find(req.fullPkgName);
+    if(it == pkgSymsMap.end()) {
+        return;
+    }
+    for(const auto &sym : it->second) {
+        callback(sym);
+    }
+}
+
 void MemIndex::Refs(const RefsRequest &req, std::function<void(const Ref &)> callback) const
 {
     for (const auto &id : req.ids) {
@@ -66,8 +77,29 @@ void MemIndex::Refs(const RefsRequest &req, std::function<void(const Ref &)> cal
                 if (!static_cast<int>(req.filter & sym.kind)) {
                     continue;
                 }
-                callback(sym);
+                if (!sym.isSuper) {
+                    callback(sym);
+                }
             }
+        }
+    }
+}
+
+void MemIndex::FileRefs(const FileRefsRequest &req,
+    std::function<void(const Ref &ref, const SymbolID symId)> callback) const
+{
+    auto it = pkgRefsMap.find(req.fullPkgName);
+    if (it == pkgRefsMap.end())
+    {
+        return;
+    }
+    auto pkgRefs = it->second;
+    for (const auto &refs : pkgRefs) {
+        for (const auto &ref : refs.second) {
+            if (!static_cast<int>(req.filter & ref.kind) || ref.location.begin.fileID != req.fileID) {
+                continue;
+            }
+            callback(ref, refs.first);
         }
     }
 }
@@ -341,6 +373,8 @@ void MemIndex::FindCrossSymbolByName(const std::string &packageName, const std::
             callback(crs);
         }
     }
+}
+void MemIndex::GetExportSID(IDArray array, std::function<void(const CrossSymbol &)> callback) const {
 }
 } // namespace lsp
 } // namespace ark

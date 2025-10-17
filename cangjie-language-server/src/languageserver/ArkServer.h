@@ -28,6 +28,7 @@
 #include "capabilities/codeLens/CodeLensImpl.h"
 #include "capabilities/overrideMethods/FindOverrideMethodsImpl.h"
 #include "capabilities/refactor/Tweak.h"
+#include "capabilities/fileRefactor/FileMove.h"
 #include "selection/SelectionTree.h"
 
 namespace ark {
@@ -69,10 +70,21 @@ public:
     void FindReferences(const std::string &file, const TextDocumentPositionParams &params,
                         const Callback<ValueOrError> &reply) const;
 
+    void ApplyFileRefactor(const std::string &file,
+        const std::string &selectedElement,
+        const std::string &target,
+        bool &isTest,
+        const Callback<ValueOrError> &reply) const;
+
     void FindFileReferences(const std::string &file, const Callback<ValueOrError> &reply) const;
 
     void LocateSymbolAt(const std::string &file, const TextDocumentPositionParams &params,
                         const Callback<ValueOrError> &reply) const;
+
+    void GetExportsName(const std::string &file, const ExportsNameParams &params,
+                        const Callback<ValueOrError> &reply) const;
+
+    void LocateRegisterCrossSymbolAt(const CrossLanguageJumpParams &params, const Callback<ValueOrError> &reply) const;
 
     void LocateCrossSymbolAt(const CrossLanguageJumpParams &params, const Callback<ValueOrError> &reply) const;
 
