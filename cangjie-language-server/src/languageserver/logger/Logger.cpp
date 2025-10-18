@@ -19,7 +19,7 @@ const int Logger::messageQueueSize = 50;
 std::unordered_map<std::thread::id, std::vector<ark::KernelLog>> Logger::kernelLog;
 std::mutex Logger::logMtx;
 std::string Logger::pathBuf;
-bool Logger::enableLog = true;
+bool Logger::enableLog = false;
 
 std::string Logger::LogInfo(MessageType type, const std::string &message)
 {
@@ -175,8 +175,10 @@ void Logger::HandleNewLog(size_t infoSize)
             outToFile.close();
             outToFile.clear();
         }
-        (void)rename(oldName.c_str(), newName.c_str());
-        RemoveRedundantLogFile();
+        if (rename(oldName.c_str(), newName.c_str()) == 0) {
+            logQueue.emplace(name);
+            RemoveRedundantLogFile();
+        }
         // open file
         outToFile.open(logPath, std::ios_base::app | std::ios_base::binary);
     }

@@ -34,6 +34,7 @@ public class CommonInfo {
     public var scriptDependencies: HashMap<String, DepInfo> = HashMap<String, DepInfo>()
     public var replaceDeps: HashMap<String, DepInfo> = HashMap<String, DepInfo>()
     public var ffi: ForeignInterfaces = ForeignInterfaces()
+    public var crossFfi: ForeignInterfaces = ForeignInterfaces()
     public var targetConfigMap: HashMap<String, TargetConfig> = HashMap<String, TargetConfig>()
     public var collectCjoPlatName: HashSet<String> = HashSet<String>()
     public var localPkgMap: HashMap<String, RequiresPackagesInfo> = HashMap<String, RequiresPackagesInfo>()
@@ -45,8 +46,8 @@ public class CommonInfo {
         }
         var targetInfo: TargetInfo = this.targetConfigMap[targetName].commonTargetInfo
         if (isDebug) {
-            if (!replaceTargetInfo(path, targetInfo, this.targetConfigMap[targetName].debugTargetInfo, targetName,
-                false)) {
+            if (!replaceTargetInfo(path, targetInfo, this.targetConfigMap[targetName].debugTargetInfo,
+                targetName, false)) {
                 return false
             }
         } else {
@@ -60,8 +61,7 @@ public class CommonInfo {
         return true
     }
 
-    public func replaceTargetInfo(path: String, targetName: String, isDebug!: Bool = false,
-        isTest!: Bool = false): Bool {
+    public func replaceTargetInfo(path: String, targetName: String, isDebug!: Bool = false, isTest!: Bool = false): Bool {
         if (this.isReplaced) {
             return true
         }
@@ -131,8 +131,8 @@ public class WorkSpace <: Serializable<WorkSpace> {
         }
         var result = WorkSpace()
         result.members = ArrayList<String>.deserialize((dms.get("members") as DataModelSeq) ?? DataModelSeq())
-        result.buildMembers = ArrayList<String>.deserialize(
-            (dms.get("build-members") as DataModelSeq) ?? DataModelSeq())
+        result.buildMembers = ArrayList<String>.deserialize((dms.get("build-members") as DataModelSeq) ??
+            DataModelSeq())
         result.testMembers = ArrayList<String>.deserialize((dms.get("test-members") as DataModelSeq) ?? DataModelSeq())
         result.compileOption = String.deserialize((dms.get(COMPILE_OPTION) as DataModelString) ?? DataModelString(""))
         result.overrideCompileOption = String.deserialize(
@@ -200,7 +200,12 @@ public func checkForWorkspace(rootPath: String, tomlInfo: TomlInfo, memberModule
     }
     COMMON_INFO.scriptDependencies = tomlInfo.scriptDependencies
     COMMON_INFO.replaceDeps = tomlInfo.replaceDeps
-    COMMON_INFO.ffi = tomlInfo.ffi
+    if (buildCheckFfi(tomlInfo, targetConfigName, tomlInfo.ffi.cLibs, isDebug)) {
+        COMMON_INFO.ffi = tomlInfo.ffi
+    }
+    if (buildCheckFfi(tomlInfo, crossCompileTarget, tomlInfo.crossFfi.cLibs, isDebug)) {
+        COMMON_INFO.crossFfi = tomlInfo.crossFfi
+    }
 
     COMMON_INFO.targetConfigMap = tomlInfo.targetConfigMap
     if (crossCompileTarget.isEmpty()) {
@@ -209,7 +214,6 @@ public func checkForWorkspace(rootPath: String, tomlInfo: TomlInfo, memberModule
     if (!COMMON_INFO.replaceTargetInfo(rootPath, crossCompileTarget, isDebug: isDebug, isTest: isTest)) {
         return false
     }
-
     return COMMON_INFO.getNativeOverrideOption(rootPath, targetConfigName, isDebug)
 }
 
@@ -339,4 +343,25 @@ public func searchModuleFromWorkspace(tomlInfo: TomlInfo, rootPkgName: String, p
         }
     }
     return ""
+}
+
+public func buildCheckFfi(tomlInfo: TomlInfo, targetName: String, cLibs: HashMap<String, String>, isDebug: Bool): Bool {
+    if (!tomlInfo.targetConfigMap.contains(targetName)) {
+        return true
+    }
+
+    var targetFfiCLibsMap = tomlInfo.targetConfigMap[targetName].commonTargetInfo.ffi.cLibs
+    for ((k, v) in targetFfiCLibsMap) {
+        cLibs.add(k, v)
+    }
+    if (isDebug) {
+        targetFfiCLibsMap = tomlInfo.targetConfigMap[targetName].debugTargetInfo.ffi.cLibs
+    } else {
+        targetFfiCLibsMap = tomlInfo.targetConfigMap[targetName].releaseTargetInfo.ffi.cLibs
+    }
+    for ((k, v) in targetFfiCLibsMap) {
+        cLibs.add(k, v)
+    }
+
+    return true
 }

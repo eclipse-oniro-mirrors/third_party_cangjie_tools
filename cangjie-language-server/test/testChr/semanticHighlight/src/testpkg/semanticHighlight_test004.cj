@@ -1,10 +1,3 @@
-package testpkg
-
-func semanticHighlight_test004(){
-    var a:int32 = one
-    var b:int32 = testpkgFunc()
-
-}
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // This source file is part of the Cangjie project, licensed under Apache-2.0
 // with Runtime Library Exception.
@@ -12,3 +5,11 @@ func semanticHighlight_test004(){
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
+package testpkg
+
+func semanticHighlight_test004(){
+    var a:int32 = one
+    var b:int32 = testpkgFunc()
+
+}

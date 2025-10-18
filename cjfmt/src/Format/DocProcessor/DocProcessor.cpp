@@ -62,6 +62,9 @@ int DocProcessor::CalculateDocLen(Doc& doc)
     int len = 0;
     len += static_cast<int>(DisplayWidth(doc.value));
     for (auto& member : doc.members) {
+        if (member.type == DocType::LINE) {
+            return len;
+        }
         len += CalculateDocLen(member);
     }
     return len;

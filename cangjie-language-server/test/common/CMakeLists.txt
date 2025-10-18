@@ -7,7 +7,8 @@
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 set(TEST_SRC
-    common.cpp)
+    common.cpp
+    TestUtils.cpp)
 
 add_library(Common OBJECT ${TEST_SRC})
 

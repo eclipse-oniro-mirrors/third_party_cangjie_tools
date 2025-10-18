@@ -9,7 +9,6 @@
 package cjpm.implement
 
 import std.fs.*
-import std.process.*
 import std.collection.*
 import std.env.*
 import cjpm.config.*
@@ -65,6 +64,6 @@ public func checkExpandedCmd(arguments: ArrayList<String>): Bool {
         arguments[0] = filePath
         return runExpandedCmd(arguments)
     }
-    eprintln("Error: unknow command '${arguments[0]}' for cjpm")
+    eprintln("Error: unknown command '${arguments[0]}' for cjpm")
     return false
 }

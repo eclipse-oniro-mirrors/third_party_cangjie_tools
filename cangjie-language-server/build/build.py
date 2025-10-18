@@ -162,6 +162,9 @@ def prepare_build(args):
     if not os.path.exists(os.path.join(THIRDPARTY_DIR, "flatbuffers")):
         download_flatbuffers(args)
         generate_flat_header()
+    if not os.path.exists(os.path.join(THIRDPARTY_DIR, "sqlite3")):
+        download_sqlite(args)
+        build_sqlite_amalgamation()
 
 def get_generator():
     generator = "Unix Makefiles"
@@ -248,6 +251,7 @@ def clean(args):
     output build-lsp
     third_party/json-v3.11.3
     third_party/flatbuffers
+    third_party/sqlite3
     src/lib
     """
     print("start clean")
@@ -258,7 +262,7 @@ def clean(args):
             delete_folder(os.path.join(HOME_DIR, folder))
     if os.path.exists(THIRDPARTY_DIR):
         delete_folder(THIRDPARTY_DIR)
-    third_party_folders = ["json-v3.11.3", "flatbuffers"]
+    third_party_folders = ["json-v3.11.3", "flatbuffers", "sqlite3"]
     for folder in third_party_folders:
         folder = os.path.join(THIRDPARTY_DIR, folder)
         if os.path.exists(folder):
@@ -292,11 +296,12 @@ def get_run_test_command(cangjie_sdk_path):
         env_file = "envsetup.bat"
         gtest_file = "gtest_LSPServer_test.exe"
     env_path = os.path.join(resolve_path(cangjie_sdk_path), env_file)
-    test_path = os.path.join(OUTPUT_DIR, gtest_file)  
+    test_path = os.path.join(OUTPUT_DIR, gtest_file)
     result = []
     if not IS_WINDOWS:
         result.extend(["bash", "-c", "source " + env_path + " && " + test_path])
-    result.extend([env_path, "&&", test_path])
+    else:
+        result.extend([env_path, "&&", test_path])
     return result
 
 def test(args):
@@ -312,6 +317,10 @@ def test(args):
     output = subprocess.Popen(commands, cwd=OUTPUT_DIR, stdout=PIPE)
     for line in output.stdout:
         print(line.decode("ascii", "ignore").rstrip())
+    output.wait()
+    if output.returncode != 0:
+        print("test failed with return code:", output.returncode)
+        exit(1)
     print("end run test")
 
 def main():
@@ -358,7 +367,7 @@ def main():
         help="set installation path"
     )
     parser_install.set_defaults(func=install)
-    
+
     parser_test = subparsers.add_parser("test", help="run test case")
     parser_test.set_defaults(func=test)
 

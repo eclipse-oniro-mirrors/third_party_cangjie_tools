@@ -1,10 +1,3 @@
-import testpkgerror.pkg
-
-func documentHighlight_test053() :unit{
-    var value:pkg = pkg(1)
-    var b = value.add53(1,2)
-    var c = value.add53(1,2)
-}
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // This source file is part of the Cangjie project, licensed under Apache-2.0
 // with Runtime Library Exception.
@@ -12,3 +5,11 @@ func documentHighlight_test053() :unit{
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
+import testpkgerror.pkg
+
+func documentHighlight_test053() :unit{
+    var value:pkg = pkg(1)
+    var b = value.add53(1,2)
+    var c = value.add53(1,2)
+}

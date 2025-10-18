@@ -1,3 +1,11 @@
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 // e is T 是一个用于类型检查的表达式，e is T 的类型是Bool。其中e 可以是任何类型的表达式，T 可
 // 以是任何类型。
 // 当e 的运行时类型R 是T 的子类型时，e is T 的值为true，否则值为false。
@@ -41,10 +49,3 @@ func test(): Int64 {
     let riss = Base() as Base
     return 0
 }
-// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
-// This source file is part of the Cangjie project, licensed under Apache-2.0
-// with Runtime Library Exception.
-//
-// See https://cangjie-lang.cn/pages/LICENSE for license information.
-
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.

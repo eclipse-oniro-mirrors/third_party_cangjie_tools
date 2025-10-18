@@ -8,6 +8,7 @@
 
 #include "FindReferencesImpl.h"
 #include "../../CompilerCangjieProject.h"
+#include "../../index/Symbol.h"
 
 using namespace Cangjie;
 using namespace Cangjie::AST;
@@ -75,7 +76,7 @@ void FindReferencesImpl::FindReferences(const ArkAST &ast, ReferencesResult &res
         CompilerCangjieProject::GetInstance()->SubmitTasksToPool(tasks);
     }
 
-    auto index = ark::CompilerCangjieProject::GetInstance()->GetMemIndex();
+    lsp::SymbolIndex *index = ark::CompilerCangjieProject::GetInstance()->GetIndex();
     if (!index) {
         return;
     }
@@ -93,6 +94,7 @@ void FindReferencesImpl::FindReferences(const ArkAST &ast, ReferencesResult &res
         if (id == lsp::INVALID_SYMBOL_ID) {
             continue;
         }
+
         std::unordered_set<lsp::SymbolID> ids;
         lsp::SymbolID topId = id;
         index->FindRiddenUp(id, ids, topId);
@@ -112,7 +114,7 @@ void FindReferencesImpl::FindReferences(const ArkAST &ast, ReferencesResult &res
             if (EndsWith(realPath, ".macrocall")) {
                 return;
             }
-            if (FindReferencesImpl::IsInvalidRef(ref, pos, curIdx, ast)) {
+            if (IsInvalidRef(ref, pos, curIdx, ast)) {
                 return;
             }
             CompilerCangjieProject::GetInstance()->GetRealPath(realPath);
@@ -130,6 +132,15 @@ void FindReferencesImpl::FindReferences(const ArkAST &ast, ReferencesResult &res
                 result.References.erase(it);
             }
         }
+    }
+}
+
+void FindReferencesImpl::FindFileReferences(const ArkAST &ast, ReferencesResult &result)
+{
+    Logger &logger = Logger::Instance();
+    logger.LogMessage(MessageType::MSG_LOG, "FindReferencesImpl::FindFileReferences in.");
+    for (auto& decl: ast.file->decls) {
+        FindReferences(ast, result, decl->GetIdentifierPos() + DEFAULT_POSITION);
     }
 }
 

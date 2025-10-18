@@ -19,11 +19,12 @@ func appendNativeData(buildConfig: BuildConfig, data: ModuleResolve): Unit {
     }
 
     for (item in data.resolves) {
-        if (!buildConfig.macroPkgList.contains(item.fullName) && buildConfig.pkgRequireByMacro.contains(item.fullName)) {
+        if (!buildConfig.packageList.macros.contains(item.fullName) &&
+            buildConfig.pkgRequireByMacro.contains(item.fullName)) {
             item.nativePlatform = true
             continue
         }
-        if (buildConfig.macroPkgList.contains(item.fullName)) {
+        if (buildConfig.packageList.macros.contains(item.fullName)) {
             item.nativePlatform = true
             if (!buildConfig.targetMacroMods.contains(item.rootPkgName) &&
                 !buildConfig.targetMacroPkgs.contains(item.fullName)) {

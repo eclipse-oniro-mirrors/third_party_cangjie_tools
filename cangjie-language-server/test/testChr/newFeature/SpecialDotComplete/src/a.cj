@@ -1,6 +1,3 @@
-import aaa.{aa2}
-from std import math.{s as a , s}
-import aaa.{a}
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // This source file is part of the Cangjie project, licensed under Apache-2.0
 // with Runtime Library Exception.
@@ -8,3 +5,7 @@ import aaa.{a}
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
+import aaa.{aa2}
+from std import math.{s as a , s}
+import aaa.{a}

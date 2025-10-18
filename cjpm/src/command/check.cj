@@ -59,7 +59,7 @@ func parseOptions(arguments: Array<String>): (Bool, String, Bool) {
         }
     }
     if (unparseArgs.size != 0) {
-        eprintln("Error: unknow command '${unparseArgs[0]}' for cjpm check")
+        eprintln("Error: unknown command '${unparseArgs[0]}' for cjpm check")
         return (false, memberModule, testCheck)
     }
     testCheck = !getBoolOption(argMap, "--no-tests")

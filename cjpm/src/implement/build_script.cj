@@ -10,20 +10,21 @@ package cjpm.implement
 
 import std.collection.*
 import std.fs.*
-import stdx.encoding.json.*
-import stdx.serialization.serialization.*
 import cjpm.config.*
+import cjpm.util.Result
 
-public func runScript(scriptConfig: ScriptConfig, step: String, command: String): Bool {
+public func runScript(scriptConfig: ScriptConfig, step: BuildScriptStep, command: String): Bool {
     if (scriptConfig.isEmpty()) {
         return true
     }
 
-    if ((step == BUILD_SCRIPT_STEP_PRE) && !scriptConfig.isRelocated && !buildScriptExe(scriptConfig)) {
+    if (step == Pre && !scriptConfig.isRelocated && !buildScriptExe(scriptConfig)) {
         return false
     }
 
-    return runScriptExe(scriptConfig, step + command)
+    let commandArg = "${step}-${command}"
+
+    return runScriptExe(scriptConfig, commandArg)
 }
 
 public func makeScriptConfigByToml(rootPath: String, modulePath: String, tomlInfo: TomlInfo, debug: Bool,
@@ -54,10 +55,7 @@ public func makeScriptConfigByToml(rootPath: String, modulePath: String, tomlInf
     scriptConfig.isVerbose = verbose
     scriptConfig.moduleName = moduleName
     scriptConfig.modulePath = getCanonicalPath(modulePath)
-    var srcDir = tomlInfo.pkg.srcDir
-    if (srcDir.isEmpty()) {
-        srcDir = "src"
-    }
+    var srcDir = tomlInfo.pkg.srcDir.value
     scriptConfig.moduleSrcPath = getPath(scriptConfig.modulePath, replaceEnvVars(srcDir))
     scriptConfig.scriptPath = Path(scriptConfig.modulePath).join(BUILD_SCRIPT_NAME).toString()
 
@@ -144,7 +142,7 @@ func runScriptExe(scriptConfig: ScriptConfig, commandArg: String): Bool {
 public func runMultiScriptPost(globalConfig: GlobalConfig): Bool {
     globalConfig.scriptList.reverse()
     for (scriptConfig in globalConfig.scriptList) {
-        if (!runScript(scriptConfig, BUILD_SCRIPT_STEP_POST, globalConfig.resolveType)) {
+        if (!runScript(scriptConfig, Post, globalConfig.resolveType)) {
             return false
         }
     }
@@ -155,7 +153,7 @@ func getDepPath(modulePath: String, depName: String, depInfo: DepInfo): Option<S
     if (let Some(depPath) <- depInfo.path) {
         return getPath(modulePath, depPath)
     }
-    return getOnlineDepPath(depName, depInfo)
+    return getOnlineDepPath(modulePath, depName, depInfo)
 }
 
 func getScriptDeps(scriptConfig: ScriptConfig): HashMap<String, DepInfo> {
@@ -266,25 +264,15 @@ func relocateScript(scriptConfig: ScriptConfig): Bool {
 }
 
 func getScriptDepLink(modulePath: String, buildConfig: BuildConfig): Option<ArrayList<String>> {
-    var arguments = ArrayList<String>(["-p", modulePath, "--scan-dependency"])
-    let (scanFlag, outInfo, errInfo) = execWithOutput(COMPILE_TOOL, arguments)
-    let scanDepCmd: String = COMPILE_TOOL + " " + String.join(arguments.toArray(), delimiter: " ")
-    if (!scanFlag) {
-        eprintln(errInfo)
-        eprintln("Error: failed to obtain package import information, please execute '${scanDepCmd}' to check")
-        return Option.None
+    let scanDepRes = scanDependency(Path(modulePath))
+    var res = match (scanDepRes) {
+        case Err(e) =>
+            eprintln(e)
+            return Option.None
+        case Ok(t) => t
     }
 
-    var res = RequiresPackages()
-    try {
-        res = RequiresPackages.deserialize(DataModel.fromJson(JsonValue.fromStr(outInfo)))
-    } catch (e: Exception) {
-        eprintln("Error: failed to parse package import information, please execute '${scanDepCmd}' to check")
-        println(outInfo)
-        return Option.None
-    }
-
-    var allPackageSet: HashSet<String> = HashSet<String>(buildConfig.allPackages)
+    var allPackageSet: HashSet<String> = HashSet<String>(buildConfig.packageList.all)
     var requires: HashSet<String> = HashSet<String>()
     for (fullName in res.dependencies) {
         for (importInfo in fullName.importsList) {
@@ -311,7 +299,7 @@ func getScriptDepLink(modulePath: String, buildConfig: BuildConfig): Option<Arra
 
     var resolveConfig: ResolveConfig = ResolveConfig()
     resolveConfig.fullName = "build-script"
-    resolveConfig.outputType = EXE_TYPE
+    resolveConfig.outputType = Exe
     resolveConfig.requirePkgs = requires
     resolveConfig.stdRequirePkgs = stdRequires
     buildConfig.requiresMap.add(resolveConfig.fullName, requires)
@@ -405,7 +393,7 @@ func makeScriptExe(scriptConfig: ScriptConfig, buildConfig: BuildConfig): Bool {
     }
 
     let (envs, args) = getCompileArgs(scriptConfig, buildConfig) ?? return false
-    let (flag, outInfo, errInfo) = execWithOutput(COMPILE_TOOL, args, envMap: envs)
+    let (flag, outInfo, errInfo) = execWithOutput(COMPILE_TOOL, args, envMap: envs, spawnForScript: true)
 
     if (!outInfo.isEmpty()) {
         println(outInfo)

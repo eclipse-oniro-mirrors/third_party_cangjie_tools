@@ -44,7 +44,7 @@ Available options:
                 eprintln("Error: the '--target-dir' option needs a value")
                 return false
             }
-            eprintln("Error: unknow command '${unparseArgs[0]}' for cjpm clean")
+            eprintln("Error: unknown command '${unparseArgs[0]}' for cjpm clean")
             return false
         }
 

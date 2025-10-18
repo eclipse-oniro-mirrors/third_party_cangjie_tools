@@ -1,3 +1,11 @@
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 func semanticHighlight_test053(): unit {
     var a1: int8 = 10
     var a2: int16 = 10
@@ -16,10 +24,3 @@ func semanticHighlight_test053(): unit {
     var a15: char = 'a'
 }
 
-// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
-// This source file is part of the Cangjie project, licensed under Apache-2.0
-// with Runtime Library Exception.
-//
-// See https://cangjie-lang.cn/pages/LICENSE for license information.
-
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.

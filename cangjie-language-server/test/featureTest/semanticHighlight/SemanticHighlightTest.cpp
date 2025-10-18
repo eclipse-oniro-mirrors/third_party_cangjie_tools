@@ -6,13 +6,14 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+#include "gtest/gtest.h"
+
 #include<string>
+#include<thread>
 #include<vector>
 
-#include "gtest/gtest.h"
-#include<thread>
-#include<common.h>
-#include<SingleInstance.h>
+#include "common.h"
+#include "SingleInstance.h"
 
 using namespace test::common;
 
@@ -36,7 +37,7 @@ namespace TestLspSemanticHighlight {
             BuildDynamicBinary(p->pathBuildScript);
         }
         /* Wait until the task is complete. The join blocking mode is not used. */
-        StartLspServer();
+        StartLspServer(SingleInstance::GetInstance()->useDB);
 
         /* Check the test case result. */
         nlohmann::json expLines = ReadExpectedResult(param.baseFile);

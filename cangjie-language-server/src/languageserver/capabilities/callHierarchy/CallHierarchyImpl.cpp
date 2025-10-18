@@ -72,6 +72,31 @@ CallHierarchyItem DeclToCallHierarchyItem(Ptr<const Decl> decl)
     return result;
 }
 
+void DealAnonymousConstructorRange(Range& range, const lsp::Symbol&containerSym)
+{
+    if (!containerSym.location.IsZeroLoc() || containerSym.name != "init") {
+        return;
+    }
+ 
+    auto index = CompilerCangjieProject::GetInstance()->GetIndex();
+    if (!index) {
+        return;
+    }
+    
+    lsp::SymbolID outerId = 0;
+    index->Relations({containerSym.id, lsp::RelationKind::CONTAINED_BY},
+                    [&outerId](const lsp::Relation& rel) {
+                        outerId = rel.object;
+                    });
+    if (outerId) {
+        lsp::Symbol outer;
+        index->Lookup({{outerId}}, [&outer](const lsp::Symbol& sym) {
+            outer = sym;
+        });
+        range = {outer.location.begin, outer.location.end};
+    }
+}
+
 CallHierarchyItem DeclToCallHierarchyItem(const lsp::Symbol&containerSym)
 {
     CallHierarchyItem result;
@@ -95,13 +120,15 @@ CallHierarchyItem DeclToCallHierarchyItem(const lsp::Symbol&containerSym)
     } else {
         result.name = containerSym.signature + ":" + containerSym.returnType;
     }
-    result.range = TransformFromChar2IDE({containerSym.location.begin, containerSym.location.end});
-    result.selectionRange = TransformFromChar2IDE({containerSym.location.begin, containerSym.location.end});
+    Range range = {containerSym.location.begin, containerSym.location.end};
+    DealAnonymousConstructorRange(range, containerSym);
+    result.range = TransformFromChar2IDE(range);
+    result.selectionRange = TransformFromChar2IDE(range);
     result.symbolId = containerSym.id;
     return result;
 }
 
-void DealCallee(const std::pair<lsp::SymbolID, std::vector<lsp::Ref>>& callee, lsp::MemIndex *index,
+void DealCallee(const std::pair<lsp::SymbolID, std::vector<lsp::Ref>>& callee, lsp::SymbolIndex *index,
     vector<CallHierarchyOutgoingCall>& result)
 {
     std::unordered_set<lsp::SymbolID> declSymIds;
@@ -138,7 +165,7 @@ void DealCallee(const std::pair<lsp::SymbolID, std::vector<lsp::Ref>>& callee, l
     (void) result.emplace_back(callHierarchyOutgoingCall);
 }
 
-void DealCaller(const std::pair<lsp::SymbolID, std::vector<lsp::Ref>>& caller, lsp::MemIndex *index,
+void DealCaller(const std::pair<lsp::SymbolID, std::vector<lsp::Ref>>& caller, lsp::SymbolIndex *index,
                 vector<CallHierarchyIncomingCall>& result)
 {
     std::unordered_set<lsp::SymbolID> containerIds;
@@ -168,7 +195,7 @@ void DealCaller(const std::pair<lsp::SymbolID, std::vector<lsp::Ref>>& caller, l
     (void) result.emplace_back(callHierarchyIncomingCall);
 }
 
-void FindFuncDeclCaller(lsp::SymbolID id, lsp::MemIndex *index, vector <CallHierarchyIncomingCall> &result)
+void FindFuncDeclCaller(lsp::SymbolID id, lsp::SymbolIndex *index, vector <CallHierarchyIncomingCall> &result)
 {
     if (id == lsp::INVALID_SYMBOL_ID) {
         return;
@@ -242,7 +269,7 @@ void CallHierarchyImpl::FindOnOutgoingCallsImpl(vector <CallHierarchyOutgoingCal
     if (declSymId == lsp::INVALID_SYMBOL_ID) {
         return;
     }
-    const auto index = CompilerCangjieProject::GetInstance()->GetMemIndex();
+    auto index = ark::CompilerCangjieProject::GetInstance()->GetIndex();
     if (!index) {
         return;
     }
@@ -289,7 +316,7 @@ void CallHierarchyImpl::FindOnIncomingCallsImpl(vector <CallHierarchyIncomingCal
     if (callHierarchyItem.symbolId == lsp::INVALID_SYMBOL_ID) {
         return;
     }
-    const auto index = CompilerCangjieProject::GetInstance()->GetMemIndex();
+    auto index = CompilerCangjieProject::GetInstance()->GetIndex();
     if (!index) {
         return;
     }

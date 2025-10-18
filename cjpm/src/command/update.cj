@@ -44,7 +44,7 @@ Available options:
 public func parseSkipScript(arguments: Array<String>): Bool {
     let (_, unparseArgs) = getParseOption(arguments, "", ["skip-script"])
     if (unparseArgs.size != 0) {
-        eprintln("Error: unknow command '${unparseArgs[0]}' for cjpm update")
+        eprintln("Error: unknown command '${unparseArgs[0]}' for cjpm update")
         return false
     }
     return true
