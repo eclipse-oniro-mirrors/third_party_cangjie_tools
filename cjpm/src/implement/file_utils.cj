@@ -12,28 +12,6 @@ import std.fs.exists as fs_exists
 import std.collection.*
 import std.fs.*
 
-func fileExists(path: String): Bool {
-    if (!exists(path)) {
-        return false
-    } else if (FileInfo(path).isRegular()) {
-        return true
-    } else if (FileInfo(path).isSymbolicLink()) {
-        return FileInfo(canonicalize(path)).isRegular()
-    }
-    return false
-}
-
-func fileExists(path: Path): Bool {
-    if (!exists(path)) {
-        return false
-    } else if (FileInfo(path).isRegular()) {
-        return true
-    } else if (FileInfo(path).isSymbolicLink()) {
-        return FileInfo(canonicalize(path)).isRegular()
-    }
-    return false
-}
-
 func directoryExists(path: String): Bool {
     if (!exists(path)) {
         return false

@@ -13,6 +13,7 @@ import std.fs.*
 import stdx.serialization.serialization.*
 
 let BIN_DEPENDENCIES: String = "bin-dependencies"
+let FFI: String = "ffi"
 const PATH_OPTION = "path-option"
 const PACKAGE_OPTION = "package-option"
 public const COMPILE_TARGET_MACROS: String = "compile-macros-for-target"
@@ -51,6 +52,7 @@ public class TargetInfo <: Serializable<TargetInfo> {
     public var binDependencies: BinDependencies = BinDependencies()
     public var someTargetMacros: ArrayList<String> = ArrayList<String>() // used by cross compile
     public var allTargetMacros: String = "" // used by cross compile
+    public var ffi: ForeignInterfaces = ForeignInterfaces()
 
     // Serialize of toml is useless.
     public func serialize(): DataModel {
@@ -74,9 +76,10 @@ public class TargetInfo <: Serializable<TargetInfo> {
         result.scriptDependencies = HashMap<String, DepInfo>.deserialize(
             (dms.get(SCRIPT_DEPENDENCIES) as DataModelStruct) ?? DataModelStruct())
         result.replaceDeps = HashMap<String, DepInfo>.deserialize(
-            (dms.get(REPLACE) as DataModelStruct) ?? DataModelStruct())
+            (dms.get(REPLACE_DEP) as DataModelStruct) ?? DataModelStruct())
         result.binDependencies = BinDependencies.deserialize(
             (dms.get(BIN_DEPENDENCIES) as DataModelStruct) ?? DataModelStruct())
+        result.ffi = ForeignInterfaces.deserialize((dms.get(FFI) as DataModelStruct) ?? DataModelStruct())
         return result
     }
 
@@ -112,6 +115,9 @@ public class TargetInfo <: Serializable<TargetInfo> {
 
         for ((k, v) in this.binDependencies.packageOption) {
             this.binDependencies.packageOption[k] = replaceEnvVars(v)
+        }
+        for ((k, v) in this.ffi.cLibs) {
+            this.ffi.cLibs[k] = replaceEnvVars(v)
         }
     }
 
@@ -181,9 +187,11 @@ public class TargetConfig <: Serializable<TargetConfig> {
         result.commonTargetInfo.scriptDependencies = HashMap<String, DepInfo>.deserialize(
             (dms.get(SCRIPT_DEPENDENCIES) as DataModelStruct) ?? DataModelStruct())
         result.commonTargetInfo.replaceDeps = HashMap<String, DepInfo>.deserialize(
-            (dms.get(REPLACE) as DataModelStruct) ?? DataModelStruct())
+            (dms.get(REPLACE_DEP) as DataModelStruct) ?? DataModelStruct())
         result.commonTargetInfo.binDependencies = BinDependencies.deserialize(
             (dms.get(BIN_DEPENDENCIES) as DataModelStruct) ?? DataModelStruct())
+        result.commonTargetInfo.ffi = ForeignInterfaces.deserialize((dms.get(FFI) as DataModelStruct) ??
+            DataModelStruct())
         result.debugTargetInfo = TargetInfo.deserialize((dms.get("debug") as DataModelStruct) ?? DataModelStruct())
         result.releaseTargetInfo = TargetInfo.deserialize((dms.get("release") as DataModelStruct) ?? DataModelStruct())
         return result
@@ -204,8 +212,7 @@ public class TargetConfig <: Serializable<TargetConfig> {
     }
 }
 
-public func replaceTargetInfo(path: String, oriInfo: TargetInfo, newInfo: TargetInfo, targetName: String,
-    isTest: Bool): Bool {
+public func replaceTargetInfo(path: String, oriInfo: TargetInfo, newInfo: TargetInfo, targetName: String, isTest: Bool): Bool {
     oriInfo.compileOption = combineOptionString(oriInfo.compileOption, newInfo.compileOption)
     oriInfo.overrideCompileOption = combineOptionString(oriInfo.overrideCompileOption, newInfo.overrideCompileOption)
     oriInfo.linkOption = combineOptionString(oriInfo.linkOption, newInfo.linkOption)
@@ -265,6 +272,9 @@ func verifyTargetInfo(targetInfo: TargetInfo, path: String, configFilePath: Stri
     }
     if (!verifyDependencyConfig(targetInfo.replaceDeps,
         "'target.${targetInfo.targetName}.replace' field at ${configFilePath}", path)) {
+        return false
+    }
+    if (!verifyCLibConfig(targetInfo.ffi.cLibs, path, configFilePath, targetString: "target.${targetInfo.targetName}.")) {
         return false
     }
 

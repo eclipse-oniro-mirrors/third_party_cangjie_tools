@@ -40,6 +40,19 @@ public func doTree(treeConfig: TreeConfig): Bool {
     return startTree(treeConfig)
 }
 
+private func printMultiplatformSourceLocations(packageDepMap: HashMap<String, ResolveItem>, features: Iterable<Feature>): Unit {
+    var first = true
+    for ((name, v) in packageDepMap) {
+        if (v.isMultiplatform) {
+            if (first) {
+                print('\n');
+                first = false
+            }
+            println(SourceLocationsPrinter(v.packagePath, features, project: name))
+        }
+    }
+}
+
 func startTree(treeConfig: TreeConfig): Bool {
     treeConfig.globalConfig.isTest = !treeConfig.noTest
     let (dataModel, flag, _) = resolve(treeConfig.globalConfig)
@@ -59,6 +72,7 @@ func startTree(treeConfig: TreeConfig): Bool {
             return false
         }
         printDependencyTree(treeConfig, treeConfig.defaultPkg, 0)
+        printMultiplatformSourceLocations(dataModel.packageDepMap, treeConfig.globalConfig.features)
         return true
     }
 
@@ -68,6 +82,7 @@ func startTree(treeConfig: TreeConfig): Bool {
             return false
         }
         printInvertTree(treeConfig, treeConfig.invertPkg, 0)
+        printMultiplatformSourceLocations(dataModel.packageDepMap, treeConfig.globalConfig.features)
         return true
     }
 
@@ -78,6 +93,7 @@ func startTree(treeConfig: TreeConfig): Bool {
         printDependencyTree(treeConfig, name, 0)
     }
 
+    printMultiplatformSourceLocations(dataModel.packageDepMap, treeConfig.globalConfig.features)
     return true
 }
 
@@ -133,7 +149,7 @@ func printTreeStr(treeConfig: TreeConfig, name: String, level: Int32): Unit {
         if (!version.isEmpty()) {
             print(" ${version}")
         }
-        let packagePath: String = treeConfig.deps[name].packagePath
+        let packagePath: String = treeConfig.deps[name].packagePath.allPaths[0].toString()
         if (!packagePath.isEmpty()) {
             print(" (${packagePath})")
         }

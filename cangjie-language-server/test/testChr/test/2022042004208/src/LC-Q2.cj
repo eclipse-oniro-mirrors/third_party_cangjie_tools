@@ -1,3 +1,11 @@
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 public class LinkedListNode {
     var val: Int64
     var next: ?LinkedListNode
@@ -42,10 +50,3 @@ func add(l1: ?LinkedListNode, l2: ?LinkedListNode, carry: Int64): ?LinkedListNod
     node.next = add(n1, n2, num / 10)
     return node
 }
-// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
-// This source file is part of the Cangjie project, licensed under Apache-2.0
-// with Runtime Library Exception.
-//
-// See https://cangjie-lang.cn/pages/LICENSE for license information.
-
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.

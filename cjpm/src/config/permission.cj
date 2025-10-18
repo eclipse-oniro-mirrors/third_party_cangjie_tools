@@ -8,6 +8,7 @@
 
 package cjpm.config
 
+@When[os == "Linux" || os == "macOS"]
 import std.fs.*
 
 @When[os == "Linux" || os == "macOS"]

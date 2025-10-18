@@ -1,3 +1,11 @@
+// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+// This source file is part of the Cangjie project, licensed under Apache-2.0
+// with Runtime Library Exception.
+//
+// See https://cangjie-lang.cn/pages/LICENSE for license information.
+
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 struct Test89 {
     let width: int32 = 2
     let length: int32 = 5
@@ -28,10 +36,3 @@ func documentHighlight_test0089() {
     var value:Test89 = Test89(1, 2)
     var a = value.area()
 }
-// Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
-// This source file is part of the Cangjie project, licensed under Apache-2.0
-// with Runtime Library Exception.
-//
-// See https://cangjie-lang.cn/pages/LICENSE for license information.
-
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.

@@ -39,6 +39,19 @@ bool IsAllParamInitial(FuncDecl &fd)
     }
     return paramNum == count;
 }
+
+bool noComplete(Ptr<Cangjie::AST::Node> node, const ark::SyscapCheck& syscap, bool isCompleteFunction)
+{
+    if (node == nullptr) {
+        return true;
+    }
+    bool hasAPILevel = false;
+    bool result = syscap.CheckSysCap(node, hasAPILevel);
+    if (hasAPILevel) {
+        return !result;
+    }
+    return (isCompleteFunction && node->astKind != ASTKind::FUNC_DECL);
+};
 }
 
 namespace ark {
@@ -131,6 +144,9 @@ void CompletionEnv::DealClassDecl(Ptr<Node> node, const Position pos)
         if (!classMember) {
             continue;
         }
+        if (classMember->astKind == ASTKind::MACRO_EXPAND_DECL && classMember->identifier == "APILevel") {
+            continue;
+        }
         CompleteNode(classMember.get());
         if (Contain(classMember.get(), pos)) {
             innerDecl = classMember.get();
@@ -164,6 +180,9 @@ void CompletionEnv::DealStructDecl(Ptr<Node> node, const Position pos)
         if (!structMember) {
             continue;
         }
+        if (structMember->astKind == ASTKind::MACRO_EXPAND_DECL && structMember->identifier == "APILevel") {
+            continue;
+        }
         CompleteNode(structMember.get());
         if (Contain(structMember.get(), pos)) {
             innerDecl = structMember.get();
@@ -192,6 +211,10 @@ void CompletionEnv::DealInterfaceDecl(Ptr<Node> node, const Position pos)
     }
     Ptr<Decl> innerDecl = nullptr;
     for (auto &memberDecl : pInterfaceDecl->GetMemberDecls()) {
+        if (!memberDecl || (memberDecl->astKind == ASTKind::MACRO_EXPAND_DECL &&
+                            memberDecl->identifier == "APILevel")) {
+            continue;
+        }
         CompleteNode(memberDecl.get());
         if (Contain(memberDecl.get(), pos)) {
             innerDecl = memberDecl.get();
@@ -364,6 +387,15 @@ void CompletionEnv::DealVarDecl(Ptr<Node> node, const Position pos)
     if (!pVarDecl) { return; }
     if (Contain(pVarDecl->initializer.get(), pos)) {
         DeepComplete(pVarDecl->initializer.get(), pos);
+    }
+}
+
+void CompletionEnv::DealVarWithPatternDecl(Ptr<Node> node, const Position pos)
+{
+    auto pVarWithPatternDecl = dynamic_cast<VarWithPatternDecl*>(node.get());
+    if (!pVarWithPatternDecl) { return; }
+    if (Contain(pVarWithPatternDecl->initializer.get(), pos)) {
+        DeepComplete(pVarWithPatternDecl->initializer.get(), pos);
     }
 }
 
@@ -661,6 +693,8 @@ void CompletionEnv::InitMap() const
     NormalMatcher::GetInstance().RegFunc(ASTKind::EXTEND_DECL, &ark::CompletionEnv::DealExtendDecl);
     NormalMatcher::GetInstance().RegFunc(ASTKind::ENUM_DECL, &ark::CompletionEnv::DealEnumDecl);
     NormalMatcher::GetInstance().RegFunc(ASTKind::VAR_DECL, &ark::CompletionEnv::DealVarDecl);
+    NormalMatcher::GetInstance().RegFunc(
+        ASTKind::VAR_WITH_PATTERN_DECL, &ark::CompletionEnv::DealVarWithPatternDecl);
     NormalMatcher::GetInstance().RegFunc(ASTKind::PROP_DECL, &ark::CompletionEnv::DealPropDecl);
     NormalMatcher::GetInstance().RegFunc(
         ASTKind::LET_PATTERN_DESTRUCTOR, &ark::CompletionEnv::DealLetPatternDestructor);
@@ -711,6 +745,9 @@ void CompletionEnv::SetValue(FILTER kind, bool value)
 
 void CompletionEnv::DotAccessible(Decl &decl, const Decl &parentDecl, bool isSuperOrThis)
 {
+    if (!syscap.CheckSysCap(decl)) {
+        return;
+    }
     // use signature to unique
     SourceManager *temp = parserAst == nullptr ? nullptr : parserAst->sourceManager;
     std::string signature = ItemResolverUtil::ResolveSignatureByNode(decl, temp);
@@ -739,6 +776,7 @@ void CompletionEnv::DotAccessible(Decl &decl, const Decl &parentDecl, bool isSup
         // if decl is deprecated
         MarkDeprecated(decl, initCompletion);
         AddCompletionItem(signature, signature, initCompletion);
+        CompleteFollowLambda(decl, parserAst->sourceManager, initCompletion, replaceString);
         return;
     }
     bool show = true;
@@ -786,6 +824,10 @@ void CompletionEnv::AddItem(Decl &decl, const std::string &signature, bool show)
     completion.insertText = ItemResolverUtil::ResolveInsertByNode(decl);
     completion.show = show;
     AddCompletionItem(signature, signature, completion);
+    if (completion.kind == CompletionItemKind::CIK_VARIABLE) {
+        CompleteParamListFuncTypeVarDecl(decl, parserAst->sourceManager, completion);
+    }
+    CompleteFollowLambda(decl, parserAst->sourceManager, completion);
 }
 
 void CompletionEnv::AddVArrayItem()
@@ -855,7 +897,7 @@ void CompletionEnv::InvokedAccessible(Ptr<Node> node,
         AddCompletionItem(completion.name, completion.name, completion);
     }
     // complete class_decl and struct_decl init func_decl
-    if (completion.kind == CompletionItemKind::CIK_CLASS) {
+    if (completion.kind == CompletionItemKind::CIK_CLASS || completion.kind == CompletionItemKind::CIK_STRUCT) {
         CompleteInitFuncDecl(node, "");
     }
 }
@@ -874,20 +916,26 @@ void CompletionEnv::DealParentDeclByName(std::string parentClassLikeName)
 
     // find the ParentClassLikeName in this package
     if (idMap.find(parentClassLikeName) != idMap.end()) {
-        CompleteInParseCache(parentClassLikeName);
-        return;
+        if (!CompleteInParseCache(parentClassLikeName)) {
+            return;
+        }
     }
 
     // find the ParentClassLikeName in the last semaCache
     CompleteInSemaCache(parentClassLikeName);
 }
 
-void CompletionEnv::CompleteInParseCache(const std::string &parentClassLikeName)
+bool CompletionEnv::CompleteInParseCache(const std::string &parentClassLikeName)
 {
+    bool hasAPILevel = false;
     for (auto item : idMap[parentClassLikeName]) {
         if (item == nullptr) { continue; }
         for (auto &memberDecl : item->GetMemberDecls()) {
             if (!memberDecl) {
+                continue;
+            }
+            if (memberDecl->astKind == ASTKind::MACRO_EXPAND_DECL && memberDecl->identifier == "APILevel") {
+                hasAPILevel = true;
                 continue;
             }
             if (!memberDecl->TestAttr(Cangjie::AST::Attribute::PRIVATE)) {
@@ -899,6 +947,7 @@ void CompletionEnv::CompleteInParseCache(const std::string &parentClassLikeName)
             CompleteInheritedTypes(memberDecl.get());
         }
     }
+    return hasAPILevel;
 }
 
 void CompletionEnv::CompleteInSemaCache(const std::string &parentClassLikeName)
@@ -968,7 +1017,9 @@ void CompletionEnv::DealClassOrInterfaceDeclByName(T &decl)
 void CompletionEnv::CompleteNode(
     Ptr<Node> node, bool isImport, bool isInScope, bool isSameName, const std::string &container)
 {
-    if (node == nullptr) { return; }
+    if (noComplete(node, syscap, isCompleteFunction)) {
+        return;
+    }
     DeclVarWithTuple(node, isImport, isInScope, isSameName);
     if (!IsMatchingCompletion(prefix, ItemResolverUtil::ResolveNameByNode(*node)) && !CheckIsRawIdentifier(node)) {
         return;
@@ -978,7 +1029,10 @@ void CompletionEnv::CompleteNode(
     if (signature.empty()) { return; }
     auto itemSignature = signature;
     (void) itemSignature.erase(remove_if(itemSignature.begin(), itemSignature.end(), ::isspace), itemSignature.end());
-    if (isSameName && IsSignatureInItems(itemSignature, itemSignature)) { return; }
+    bool abort = isSameName && node->astKind != ASTKind::FUNC_DECL && IsSignatureInItems(itemSignature, itemSignature);
+    if (abort) {
+        return;
+    }
     bool show = true;
     CodeCompletion completion;
     completion.itemDepth = scopeDepth;
@@ -1016,6 +1070,8 @@ void CompletionEnv::CompleteNode(
         return;
     }
     AddCompletionItem(itemSignature, itemSignature, completion);
+    // complete follow lambda for func_decl
+    CompleteFollowLambda(*node, parserAst->sourceManager, completion);
     bool isRawIdentifier = CheckIsRawIdentifier(node);
     if (isRawIdentifier) {
         auto rawCompletion = completion;
@@ -1030,6 +1086,22 @@ void CompletionEnv::CompleteNode(
         AddCompletionItem(rawSignature, rawSignature, rawCompletion);
     }
     // complete function name
+    CompleteFunctionName(completion, isRawIdentifier);
+    // complete class_decl and struct_decl init func_decl
+    if (completion.kind == CompletionItemKind::CIK_CLASS || completion.kind == CompletionItemKind::CIK_STRUCT) {
+        CompleteInitFuncDecl(node, "", false, isInScope);
+        // for curPackage typeAlias
+        if (node->astKind == ASTKind::TYPE_ALIAS_DECL) {
+            DealTypeAlias(node);
+        }
+    }
+    if (completion.kind == CompletionItemKind::CIK_VARIABLE) {
+        CompleteParamListFuncTypeVarDecl(*node, parserAst->sourceManager, completion);
+    }
+}
+
+void CompletionEnv::CompleteFunctionName(CodeCompletion &completion, bool isRawIdentifier)
+{
     if (completion.kind == CompletionItemKind::CIK_METHOD) {
         completion.label = completion.insertText = completion.name;
         completion.detail = "";
@@ -1043,14 +1115,6 @@ void CompletionEnv::CompleteNode(
             rawCompletion.detail = "";
             rawCompletion.name = rawName;
             AddCompletionItem(rawName, rawName, rawCompletion);
-        }
-    }
-    // complete class_decl and struct_decl init func_decl
-    if (completion.kind == CompletionItemKind::CIK_CLASS) {
-        CompleteInitFuncDecl(node, "", false, isInScope);
-        // for curPackage typeAlias
-        if (node->astKind == ASTKind::TYPE_ALIAS_DECL) {
-            DealTypeAlias(node);
         }
     }
 }
@@ -1106,16 +1170,27 @@ void CompletionEnv::DealTypeAlias(Ptr<Cangjie::AST::Node> node)
 
 void CompletionEnv::DeepComplete(Ptr<Node> node, const Position pos)
 {
-    if (node == nullptr) { return; }
+    if (node == nullptr || visitedNodes.count(node)) { return; }
+    visitedNodes.insert(node);
     auto func = NormalMatcher::GetInstance().GetFunc(node->astKind);
     if (func != nullptr) {
         (this->*(func))(node, pos);
     }
 }
 
-void CompletionEnv::CompleteAliasItem(Ptr<Node> node, const std::string &aliasName, bool isImport)
+void CompletionEnv::SemaCacheComplete(Ptr<Node> node, const Position pos)
 {
     if (node == nullptr) {
+        return;
+    }
+    isCompleteFunction = true;
+    DeepComplete(node, pos);
+    isCompleteFunction = false;
+}
+
+void CompletionEnv::CompleteAliasItem(Ptr<Node> node, const std::string &aliasName, bool isImport)
+{
+    if (node == nullptr || !syscap.CheckSysCap(node)) {
         return;
     }
     if (auto ED = DynamicCast<EnumDecl *>(node)) {
@@ -1164,7 +1239,7 @@ void CompletionEnv::CompleteAliasItem(Ptr<Node> node, const std::string &aliasNa
     }
     AddCompletionItem(completion.label, completion.label, completion);
     // complete class_decl and struct_decl init func_decl
-    if (completion.kind == CompletionItemKind::CIK_CLASS) {
+    if (completion.kind == CompletionItemKind::CIK_CLASS || completion.kind == CompletionItemKind::CIK_STRUCT) {
         CompleteInitFuncDecl(node, aliasName);
     }
 }
@@ -1207,6 +1282,36 @@ void CompletionEnv::CompleteInitFuncDecl(Ptr<Node> node, const std::string &alia
             CompleteInitFuncDecl(targetDecl, decl->identifier, true);
         }
     }
+}
+
+void CompletionEnv::CompleteFollowLambda(const Cangjie::AST::Node &node,
+    Cangjie::SourceManager *sourceManager, CodeCompletion &completion, const std::string &initFuncReplace)
+{
+    std::string signature = ItemResolverUtil::ResolveFollowLambdaSignature(node, sourceManager, initFuncReplace);
+    if (signature.empty()) {
+        return;
+    }
+    std::string insert = ItemResolverUtil::ResolveFollowLambdaInsert(node, sourceManager, initFuncReplace);
+    if (insert.empty()) {
+        return;
+    }
+    completion.label = signature;
+    completion.insertText = insert;
+    AddCompletionItem(signature, signature, completion);
+}
+
+void CompletionEnv::CompleteParamListFuncTypeVarDecl(const Cangjie::AST::Node &node,
+    Cangjie::SourceManager *sourceManager, CodeCompletion &completion)
+{
+    std::string signature;
+    std::string insertText;
+    ItemResolverUtil::ResolveParamListFuncTypeVarDecl(node, signature, insertText, sourceManager);
+    if (signature.empty() || insertText.empty()) {
+        return;
+    }
+    completion.label = signature;
+    completion.insertText = insertText;
+    AddCompletionItem(signature, signature, completion);
 }
 
 template<typename T>
@@ -1261,6 +1366,8 @@ void CompletionEnv::CompleteClassOrStructDecl(const T &decl, const std::string &
             completion.insertText = insertText;
             completion.show = true;
             AddCompletionItem(replaceString, signature, completion, false);
+            // complete follow lambda for func_decl
+            CompleteFollowLambda(*it.get(), parserAst->sourceManager, completion, replaceString);
         }
     }
 }
@@ -1498,5 +1605,10 @@ void CompletionEnv::AddCompletionItem(
             signatureMap[signature] = completion;
         }
     }
+}
+
+void CompletionEnv::SetSyscap(const std::string &moduleName)
+{
+    this->syscap.SetIntersectionSet(moduleName);
 }
 }

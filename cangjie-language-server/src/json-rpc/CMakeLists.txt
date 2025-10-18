@@ -6,12 +6,11 @@
 
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-file(GLOB_RECURSE JSON_RPC_SRC  
+file(GLOB_RECURSE JSON_RPC_SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
 )
 
-# 打印找到的所有源文件  
 message(STATUS "Found source files:")
 foreach(file ${JSON_RPC_SRC})
     message(STATUS "${file}")

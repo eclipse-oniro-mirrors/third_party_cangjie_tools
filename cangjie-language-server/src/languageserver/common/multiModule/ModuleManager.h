@@ -34,7 +34,6 @@ public:
 
     void SetPackageRequires(const nlohmann::json &jsonData, const std::string &modulePath);
 
-
     void SetRequireAllPackages();
 
     std::string GetExpectedPkgName(const Cangjie::AST::File &file);

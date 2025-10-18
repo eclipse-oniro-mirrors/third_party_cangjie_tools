@@ -78,7 +78,7 @@ public:
             ExecuteCompilerApi("PerformMacroExpand", &CompilerInstance::PerformMacroExpand, this);
         return ret;
     }
-    
+
     static std::vector<std::string> GetTopologySort();
 
     static void SetCjoPathInModules(const std::string &cangjieHome, const std::string &cangjiePath);
@@ -143,7 +143,7 @@ public:
     bool CompileAfterParse(
         const std::unique_ptr<ark::CjoManager> &cjoManager, const std::unique_ptr<ark::DependencyGraph> &graph);
 
-    void UpdateUpstreamPkgs();
+    std::unordered_map<std::string, ark::EdgeType> UpdateUpstreamPkgs();
 
     void UpdateDepGraph(bool isIncrement = true, const std::string &prePkgName = "");
 

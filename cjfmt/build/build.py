@@ -139,7 +139,7 @@ def build(args):
                             stdout=PIPE)
         log_output(output)
         output = subprocess.Popen(
-                ['make', '-j' + str(THREADS_NUM)],
+                ['make', '-j' + str(args.jobs)],
                 cwd=CMAKE_BUILD_DIR,
                 stdout=PIPE)
         log_output(output)
@@ -149,11 +149,11 @@ def build(args):
     if os.path.exists(CMAKE_BUILD_DIR):
         if IS_WINDOWS:
             output = subprocess.Popen(
-                ['mingw32-make', '-j' + str(THREADS_NUM)],
+                ['mingw32-make', '-j' + str(args.jobs)],
                 cwd=CMAKE_BUILD_DIR,
                 stdout=PIPE)
         else:
-            output = subprocess.Popen(['ninja'],
+            output = subprocess.Popen(['ninja', '-j', str(args.jobs)],
                                       cwd=CMAKE_BUILD_DIR,
                                       stdout=PIPE)
         log_output(output)
@@ -170,11 +170,11 @@ def build(args):
         log_output(output)
         if IS_WINDOWS:
             output = subprocess.Popen(
-                ['mingw32-make', '-j' + str(THREADS_NUM)],
+                ['mingw32-make', '-j' + str(args.jobs)],
                 cwd=CMAKE_BUILD_DIR,
                 stdout=PIPE)
         else:
-            output = subprocess.Popen(['ninja'],
+            output = subprocess.Popen(['ninja', '-j', str(args.jobs)],
                                       cwd=CMAKE_BUILD_DIR,
                                       stdout=PIPE)
         log_output(output)
@@ -248,6 +248,11 @@ def main():
                             default='native',
                             choices=['native', 'windows-x86_64'],
                             help='Specify the target platform (default: native).')
+    parser_build.add_argument("-j",
+                              "--jobs",
+                              type=int,
+                              default=THREADS_NUM,
+                              help="number of parallel jobs to run")
     parser_build.add_argument('cmake_args',
                               nargs=argparse.REMAINDER,
                               help='other arguments directly passed to CMake, '

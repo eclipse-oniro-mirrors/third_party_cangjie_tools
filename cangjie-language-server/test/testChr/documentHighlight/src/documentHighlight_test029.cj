@@ -1,9 +1,3 @@
-import testpkg.testiner.pkginer
-
-func pkg_test029(): int32 {
-    var p2:pkginer = pkginer(1)
-    return 1
-}
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // This source file is part of the Cangjie project, licensed under Apache-2.0
 // with Runtime Library Exception.
@@ -11,3 +5,10 @@ func pkg_test029(): int32 {
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
+import testpkg.testiner.pkginer
+
+func pkg_test029(): int32 {
+    var p2:pkginer = pkginer(1)
+    return 1
+}

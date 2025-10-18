@@ -1,9 +1,3 @@
-package A 
-
-class C8 <: I1 & I2 {
-    public func ff2(): Unit {}
-    public func ff5(): Unit {}
-}
 // Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
 // This source file is part of the Cangjie project, licensed under Apache-2.0
 // with Runtime Library Exception.
@@ -11,3 +5,10 @@ class C8 <: I1 & I2 {
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
+package A 
+
+class C8 <: I1 & I2 {
+    public func ff2(): Unit {}
+    public func ff5(): Unit {}
+}
