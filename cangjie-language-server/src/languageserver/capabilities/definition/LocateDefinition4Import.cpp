@@ -47,6 +47,9 @@ namespace ark {
 Ptr<Decl> LocateDefinition4Import::getDecl(const ArkAST &ast, Position pos, File *fileNode)
 {
     for (auto &fileImport : fileNode->imports) {
+        if (fileImport.get()->IsImportMulti()) {
+            continue;
+        }
         auto importContent = fileImport.get()->content;
         if (fileImport.get()->IsImportSingle() &&
             pos <= importContent.identifier.End() &&
@@ -57,14 +60,6 @@ Ptr<Decl> LocateDefinition4Import::getDecl(const ArkAST &ast, Position pos, File
             (pos <= importContent.identifier.End() && pos >= importContent.identifier.Begin() ||
              pos <= importContent.aliasName.End() && pos >= importContent.aliasName.Begin())) {
             return ProcSingleImport(ast, fileNode, importContent);
-        }
-        if (fileImport.get()->IsImportMulti()) {
-            auto packagePrefix = GetPackagePrefixWithPaths(importContent.prefixPaths);
-            for (auto &item : importContent.items) {
-                if (pos > item.identifier.End() || pos < item.identifier.Begin())
-                    continue;
-                return ProcSingleImport(ast, fileNode, item, packagePrefix);
-            }
         }
     }
     return Ptr<Decl>();

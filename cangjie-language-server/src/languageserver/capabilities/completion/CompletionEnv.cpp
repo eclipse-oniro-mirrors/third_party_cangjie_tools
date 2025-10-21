@@ -647,6 +647,21 @@ void CompletionEnv::DealCallExpr(Ptr<Node> node, const Position pos)
     }
 }
 
+void CompletionEnv::DealBinaryExpr(Ptr<Node> node, const Position pos)
+{
+    auto pBinaryExpr = dynamic_cast<BinaryExpr*>(node.get());
+    if (!pBinaryExpr) {
+        return;
+    }
+    if (pBinaryExpr->leftExpr && Contain(pBinaryExpr->leftExpr, pos)) {
+        DeepComplete(pBinaryExpr->leftExpr, pos);
+        return;
+    }
+    if (pBinaryExpr->rightExpr && Contain(pBinaryExpr->rightExpr, pos)) {
+        DeepComplete(pBinaryExpr->rightExpr, pos);
+    }
+}
+
 void CompletionEnv::DealMemberAccess(Ptr<Node> node, const Position pos)
 {
     auto ma = dynamic_cast<MemberAccess*>(node.get());
@@ -723,6 +738,7 @@ void CompletionEnv::InitMap() const
     NormalMatcher::GetInstance().RegFunc(ASTKind::SPAWN_EXPR, &ark::CompletionEnv::DealSpawnExpr);
     NormalMatcher::GetInstance().RegFunc(ASTKind::MEMBER_ACCESS, &ark::CompletionEnv::DealMemberAccess);
     NormalMatcher::GetInstance().RegFunc(ASTKind::REF_EXPR, &ark::CompletionEnv::DealRefExpr);
+    NormalMatcher::GetInstance().RegFunc(ASTKind::BINARY_EXPR, &ark::CompletionEnv::DealBinaryExpr);
 }
 
 CompletionEnv::CompletionEnv()

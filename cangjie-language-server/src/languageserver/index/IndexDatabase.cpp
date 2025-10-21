@@ -190,8 +190,15 @@ void PopulateCrossSymbol(const sqldb::Result &row, CrossSymbol &crs)
     std::string pkgName;
 
     row.store(pkgName, idArray, crs.name, containerIdArray, crs.containerName,
-        crs.crossType, crs.location.fileUri, Line(crs.location.begin), Column(crs.location.begin),
-        Line(crs.location.end), Column(crs.location.end));
+        crs.crossType, crs.location.fileUri,
+        Line(crs.location.begin),
+        Column(crs.location.begin),
+        Line(crs.location.end),
+        Column(crs.location.end),
+        Line(crs.declaration.begin),
+        Column(crs.declaration.begin),
+        Line(crs.declaration.end),
+        Column(crs.declaration.end));
     crs.id = GetIDFromArray(idArray);
     crs.container = GetIDFromArray(containerIdArray);
 }
@@ -467,6 +474,38 @@ dberr_no IndexDatabase::GetSymbolByID(IDArray id, std::function<bool(const Symbo
     return true;
 }
 
+dberr_no IndexDatabase::GetCrossSymbolByID(IDArray id, std::function<void(const CrossSymbol &sym)> callback)
+{
+    try {
+        Use(sql::SelectCrossSymbolByID).execute(sqldb::with(id), [&](sqldb::Result Row) {
+            CrossSymbol crs;
+            PopulateCrossSymbol(Row, crs);
+            callback(crs);
+            return true;
+        });
+    } catch (std::exception &ex) {
+        std::cerr << "GetCrossSymbolByID fail due to " << ex.what() << "\n";
+    }
+    return true;
+}
+
+dberr_no IndexDatabase::GetPkgSymbols(std::string pkgName, std::function<bool(const Symbol &sym)> callback)
+{
+    try {
+        std::string scopePrefix = pkgName + ":";
+        Use(sql::SelectSymbolsByPkgName).execute(sqldb::with(pkgName, scopePrefix),
+            [&](sqldb::Result Row) {
+            Symbol resSym;
+            PopulateSymbol(Row, resSym);
+            callback(resSym);
+            return true;
+        });
+    } catch(std::exception &ex) {
+        std::cerr << "getsymbol fail due to " << ex.what() << "\n";
+    }
+    return true;
+}
+
 dberr_no IndexDatabase::GetSymbolsAndCompletions(const std::string &prefix,
     std::function<void(const Symbol &sym, const CompletionItem &completion)> callback)
 {
@@ -616,6 +655,20 @@ dberr_no IndexDatabase::GetReferences(const SymbolID &id, RefKind kind,
             SymbolID symId;
             PopulateRef(row, ref, symId);
             callback(ref);
+            return true;
+        });
+    return true;
+}
+
+dberr_no IndexDatabase::GetFileReferences(const std::string &fileUri, RefKind kind,
+    std::function<bool(const Ref &ref, const SymbolID symId)> callback) 
+{
+    Use(sql::SelectFileReference)
+        .execute(sqldb::with(fileUri, kind), [&](sqldb::Result row) {
+            Ref ref;
+            SymbolID symId;
+            PopulateRef(row, ref, symId);
+            callback(ref, symId);
             return true;
         });
     return true;
@@ -786,7 +839,7 @@ dberr_no IndexDatabase::DBUpdate::InsertSymbol(const Symbol &sym)
         try {
             db.Use(sql::InsertSymbol)
                 .execute(sqldb::with(
-                    (insertSym.idArray), insertSym.kind, insertSym.symInfo.subKind, insertSym.symInfo.lang,
+                    (GetArrayFromID(insertSym.id)), insertSym.kind, insertSym.symInfo.subKind, insertSym.symInfo.lang,
                     insertSym.symInfo.properties, insertSym.name, insertSym.scope, insertSym.location.fileUri,
                     insertSym.location.begin.line, insertSym.location.begin.column,
                     insertSym.location.end.line, insertSym.location.end.column,
@@ -1238,9 +1291,11 @@ dberr_no IndexDatabase::DBUpdate::InsertCrossSymbol(const std::string &curPkgNam
 {
     try {
         db.Use(sql::InsertCrossSymbol)
-            .execute(sqldb::with(curPkgName, crsSym.id, crsSym.name, crsSym.container, crsSym.containerName,
-                crsSym.crossType, crsSym.location.fileUri, crsSym.location.begin.line, crsSym.location.begin.column,
-                crsSym.location.end.line, crsSym.location.end.column));
+            .execute(sqldb::with(curPkgName, GetArrayFromID(crsSym.id), crsSym.name, GetArrayFromID(crsSym.container),
+                    crsSym.containerName, crsSym.crossType, crsSym.location.fileUri, crsSym.location.begin.line,
+                    crsSym.location.begin.column, crsSym.location.end.line, crsSym.location.end.column,
+                    crsSym.declaration.begin.line, crsSym.declaration.begin.column, crsSym.declaration.end.line,
+                    crsSym.declaration.end.column));
     } catch (const std::exception &e) {
         Trace::Log("err in insert crossSymbol: ", e.what());
     }

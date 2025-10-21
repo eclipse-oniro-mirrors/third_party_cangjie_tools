@@ -87,6 +87,28 @@ bool FromJSON(const nlohmann::json &params, OverrideMethodsParams &reply)
     return true;
 }
 
+bool FromJSON(const nlohmann::json &params, ExportsNameParams &reply)
+{
+    if (!params["textDocument"].is_object() || !params["position"].is_object()) {
+        return false;
+    }
+
+    nlohmann::json textDocument = params["textDocument"];
+    if (textDocument["uri"].is_null()) {
+        return false;
+    }
+    reply.textDocument.uri.file = textDocument.value("uri", "");
+
+    nlohmann::json position = params["position"];
+    if (!position.is_object() || position["line"].is_null() || position["character"].is_null()) {
+        return false;
+    }
+    reply.position.line = position.value("line", -1);
+    reply.position.column = position.value("character", -1);
+    reply.packageName = params["packageName"];
+    return true;
+}
+
 bool FromJSON(const nlohmann::json &params, SignatureHelpContext &reply)
 {
     if (!params.contains("triggerKind") || params["triggerKind"].is_null()) {
@@ -827,10 +849,12 @@ bool FromJSON(const nlohmann::json &params, CodeActionContext &reply)
         FromJSON(item, diag);
         reply.diagnostics.push_back(std::move(diag));
     }
-    nlohmann::json only = params["only"];
-    if (!only.is_null() && only.is_array()) {
-        for (const auto &item : only) {
-            reply.only->push_back(item);
+    if (params.contains("only")) {
+        nlohmann::json only = params["only"];
+        if (!only.is_null() && only.is_array()) {
+            for (const auto &item : only) {
+                reply.only->push_back(item);
+            }
         }
     }
     return true;
@@ -884,6 +908,41 @@ bool ToJSON(const ApplyWorkspaceEditParams &params, nlohmann::json &reply)
         nlohmann::json edit;
         ToJSON(params.edit, edit);
         reply["edit"] = edit;
+    }
+    return true;
+}
+
+bool FromJSON(const nlohmann::json &params, FileRefactorReqParams &reply)
+{
+    if (!FromJSON(params["file"], reply.file)) {
+        return false;
+    }
+    if (!FromJSON(params["targetPath"], reply.targetPath)) {
+        return true;
+    }
+    if (!FromJSON(params["selectedElement"], reply.selectedElement)) {
+        return false;
+    }
+    return true;
+}
+
+bool ToJSON(const FileRefactorRespParams &item, nlohmann::json &reply)
+{
+    for (const auto &change : item.changes) {
+        const std::string &uri = change.first;
+        const std::set<FileRefactorChange> &refactors = change.second;
+        nlohmann::json items;
+        for (const auto &refactor : refactors) {
+            nlohmann::json temp;
+            temp["type"] = static_cast<int>(refactor.type);
+            temp["range"]["start"]["line"] = refactor.range.start.line;
+            temp["range"]["start"]["character"] = refactor.range.start.column;
+            temp["range"]["end"]["line"] = refactor.range.end.line;
+            temp["range"]["end"]["character"] = refactor.range.end.column;
+            temp["content"] = refactor.content;
+            items.push_back(temp);
+        }
+        reply["changes"][uri] = items;
     }
     return true;
 }

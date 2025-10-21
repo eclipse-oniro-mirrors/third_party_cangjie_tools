@@ -235,6 +235,15 @@ void BackgroundIndexDB::RefsFindReference(const RefsRequest &req,
     }
 }
 
+void BackgroundIndexDB::FileRefs(const FileRefsRequest &req,
+    std::function<void(const Ref &ref, const SymbolID symId)> callback) const
+{
+    db.GetFileReferences(req.fileUri, req.filter, [&](const Ref &ref, const SymbolID symId) {
+        callback(ref, symId);
+        return true;
+    });
+}
+
 void BackgroundIndexDB::Lookup(const LookupRequest &req,
     std::function<void(const Symbol &)> callback) const
 {
@@ -245,6 +254,20 @@ void BackgroundIndexDB::Lookup(const LookupRequest &req,
             return true;
         });
     }
+}
+
+void BackgroundIndexDB::GetExportSID(IDArray array,
+                                     std::function<void(const CrossSymbol &)> callback) const
+{
+    db.GetCrossSymbolByID(array, callback);
+}
+
+void BackgroundIndexDB::FindPkgSyms(const PkgSymsRequest &req, std::function<void(const Symbol &)> callback) const
+{
+    db.GetPkgSymbols(req.fullPkgName, [&](Symbol sym) {
+        callback(sym);
+        return true;
+    });
 }
 
 void BackgroundIndexDB::Relations(const RelationsRequest &req,
