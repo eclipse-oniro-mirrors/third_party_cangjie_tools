@@ -6,18 +6,5 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-package my_module
 
-import ohos.ark_interop.*
-import ohos.ark_interop_helper.*
-import ohos.base.*
-/***********IMPORT***********/
-/*FIXME: Import details need to be verified and rewritten by user.*/
-/*common*/
-
-/*FIXME: Import details need to be verified and rewritten by user.*/
-/*ohos.buffer*/
-
-/*FIXME: Import details need to be verified and rewritten by user.*/
-/*g/h*/
-
+type TB700 = Record<string, string | number> | null;
