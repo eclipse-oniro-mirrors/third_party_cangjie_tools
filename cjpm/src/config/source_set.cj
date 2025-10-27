@@ -310,7 +310,7 @@ public open class ConfigParserVisitor <: CjpmConfigVisitor {
     }
 
     // Check whether source set declaration is DataModelStruct
-    // 
+    //
     // Check `common/other` source set declaration not containing nested source sets and illegal fields field
     private func verifySpecialSourceSetDM(dm: DataModel): ?DataModelStruct {
         let dms = checkTable(dm) ?? return None
@@ -333,33 +333,33 @@ public open class ConfigParserVisitor <: CjpmConfigVisitor {
     }
 
     // Parsing of source set declaration which specifies a source set containing nested source sets
-    // 
+    //
     // Source set declaration is identified as grouping one if it's table contains any key, different from the reserved one.
-    // 
+    //
     // NOTE: Value of such non-reserved keys are obliged to be source set declaration
-    // 
+    //
     // Example syntax:
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
-    // 
+    //
     // 1. Intented syntax
-    // 
+    //
     // [source-set.socketSelection]
     //   src-dir = "src/net/select"
-    // 
+    //
     // // From this now on: socketSelection is interpreted as grouping source set
     // [source-set.socketSelection.epoll]
     //   src-dir = "src/net/select/epoll"
     //   condition = [ "feature.os.epoll" ]
-    // 
+    //
     // [source-set.socketSelection.kqueue]
     //   src-dir = "src/net/select/kqueue"
     //   condition = [ "feature.os.kqueue" ]
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
-    // 
+    //
     // 2. Syntax, which TOML also allows
-    // 
+    //
     // [source-set.socketSelection]
     //   src-dir = "src/net/select"
     //   epoll = {
@@ -370,9 +370,9 @@ public open class ConfigParserVisitor <: CjpmConfigVisitor {
     //     src-dir = "src/net/select/kqueue",
     //     condition = [ "feature.os.kqueue" ]
     //   }
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
-    // 
+    //
     // NOTE: source set, which contains any nested source sets cannot have more than one `src-dir`
     protected open func visitGroupConfig(dms: DataModelStruct): ?GroupConfig {
         let paths = visitField(dms, SOURCE_SET_SRC_DIR_TOML, visitGroupConfigSourceDirectories)
@@ -425,7 +425,7 @@ public open class ConfigParserVisitor <: CjpmConfigVisitor {
         GroupConfig(pathsRes, conditions ?? return None, commonSet ?? return None, otherSet ?? return None, nestedSets)
     }
 
-    private func generateOtherCommon(path: String, otherDms: Option<DataModelStruct>, commonDms: Option<DataModelStruct>): (Option<SourceSet>, 
+    private func generateOtherCommon(path: String, otherDms: Option<DataModelStruct>, commonDms: Option<DataModelStruct>): (Option<SourceSet>,
         Option<SourceSet>) {
         var defaultOther = [field(SOURCE_SET_SRC_DIR_TOML, "${path}/${SOURCE_SET_OTHER_NAME}")] |> collectDataModelStruct
         var defaultCommon = [field(SOURCE_SET_SRC_DIR_TOML, "${path}/${SOURCE_SET_COMMON_NAME}")] |>
@@ -459,25 +459,25 @@ public open class ConfigParserVisitor <: CjpmConfigVisitor {
     }
 
     // Parsing of source set declaration which specifies a source set NOT containing any other
-    // 
+    //
     // Example syntax:
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
-    // 
+    //
     // /** This is grouping source set **/
     // [source-set.socketSelection]
     //   src-dir = "src/net/select"
-    // 
+    //
     // /** This is source set with `*.cj` files **/
     // [source-set.socketSelection.epoll]
     //   src-dir = "src/net/select/epoll"
     //   condition = [ "feature.os.epoll" ]
-    // 
+    //
     // /** Also this on is source set with `.*cj` files **/
     // [source-set.socketSelection.kqueue]
     //   src-dir = "src/net/select/kqueue"
     //   condition = [ "feature.os.kqueue" ]
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
     protected open func visitSourceConfig(dms: DataModelStruct): ?SourceConfig {
         let srcDirs = visitField(dms, SOURCE_SET_SRC_DIR_TOML, visitSourceDirectories)
@@ -487,36 +487,36 @@ public open class ConfigParserVisitor <: CjpmConfigVisitor {
     }
 
     // Parsing of `conditions` field in source set declaration which specifies enable constrains on source set
-    // 
+    //
     // If source set declaration doesn't contain `condition` field - no constraints are put
-    // 
+    //
     // Possible syntax:
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
-    // 
+    //
     // 1. Array literal of strings - e.g. AND (&&)
-    // 
+    //
     // All features should be satisfied for source set to be enabled
-    // 
+    //
     // [source-set.${source set fully qualified name}]
     //   condition = ["feature.arch.little", "feature.env.ohos", "feature.os.linux"]
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
-    // 
+    //
     // 2. Table of array literals - e.g. OR (||)
-    // 
+    //
     // Source set should match with at least one array literal in the table.
     // key of `condition` table can be any alphanumeric identifier
-    // 
+    //
     // [source-set.${source set fully qualified name}]
     //   condition.1     = ["feature.arch.little"]
     //   condition.alpha = ["feature.env.ohos"]
     //   condition.beta  = ["feature.os.linux", "feature.os.posix"]  // Has to satisfy both features
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
-    // 
+    //
     // NOTE: All string literals represent valid feature identifiers
-    // 
+    //
     // NOTE: This field is forbidden to be mentioned for `common/other` source sets
     protected open func visitConditions(dm: DataModel): ?Conditions {
         match (dm) {
@@ -575,27 +575,27 @@ public open class ConfigParserVisitor <: CjpmConfigVisitor {
     }
 
     // Parsing of `src-dir` field in source set declaration which specifies path to directories
-    // 
+    //
     // Possible syntax:
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
-    // 
+    //
     // 1. String literal
-    // 
+    //
     // Plain and simple
-    // 
+    //
     // [source-set.${source set fully qualified name}]
     //   src-dir = "./src/linux/common"
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
-    // 
+    //
     // 2. Array literal of strings
-    // 
+    //
     // All resources or specified directories will be collected as single compilation unit as if it was single directory
-    // 
+    //
     // [source-set.${source set fully qualified name}]
     //   src-dir = ["./src/linux/dirA", "./src/linux/dirB"]
-    // 
+    //
     // --------------------------------------------------------------------------------------------------------
     protected func visitSourceDirectories(dm: DataModel): ?SourceDirectories {
         match (dm) {
@@ -715,7 +715,7 @@ protected enum SourceSet {
 }
 
 // Representation of source-sets which contain some nested source-set in them
-// 
+//
 // source-set is automatically considered for grouping if non-reserved key is used in configuration
 protected struct GroupConfig {
     GroupConfig(
@@ -728,7 +728,7 @@ protected struct GroupConfig {
 }
 
 // Representation of source-sets which contain `.cj` files
-// 
+//
 // source-set is automatically considered for grouping if non-reserved key is used in configuration
 protected struct SourceConfig {
     SourceConfig(
@@ -750,7 +750,7 @@ public struct SourceSetsConfiguration {
 
     // @param path     System path to project root folder, which stores cjpm.toml
     // @param features List of features, used to filter out and select source sets
-    // 
+    //
     // @return A pair of of folder groups behaving as a single folder (see. CMPSource & CopycatDir)
     public func selectSourceSets(path: String, features: ReadOnlyList<Feature>): CMPSource {
         let result = ArrayList<(String, SourceDirectories)>()
@@ -903,11 +903,11 @@ public enum CopycatInode {
 }
 
 // Behaves like single directory while storing an Array<Path> of directories under the hood
-// 
+//
 // @Field paths: Array<Path>
-// 
+//
 // Example:
-// 
+//
 // [CopycatDirRoot]
 // ├── dirA
 // ├── dirB
@@ -916,19 +916,19 @@ public enum CopycatInode {
 // └── dirC
 //     ├── pkg1
 //     └── pkg2
-// 
+//
 // Let's say the set of directories {dirA, dirB, dirC} forms CopycatDir
-// 
+//
 // Then, after entering directory `pkg2` we get:
-// 
+//
 // [CopycatDirRoot]
 // ├── dirB/pkg2
 // │   └── pkg3
 // └── dirC/pkg2
-// 
+//
 // And can access files of all of the following directories
 // As if they are located in the same directory
-// 
+//
 // Note: files are still different inspite having same names
 public struct CopycatDir <: Iterable<CopycatInode> & Serializable<CopycatDir> {
     public static const empty: CopycatDir = CopycatDir()

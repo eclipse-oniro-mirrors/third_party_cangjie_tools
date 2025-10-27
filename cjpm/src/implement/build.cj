@@ -1095,7 +1095,7 @@ func getLtoCombineBuildArgs(resolveConfig: ResolveConfig, buildConfig: BuildConf
     }
     appendCLibLinkStr(buildConfig, cLibNameList, res, buildConfig.isCrossCompile && !isNativeForCross)
     res.add("--lto=${buildConfig.ltoValue}")
-    
+
     return res
 }
 
