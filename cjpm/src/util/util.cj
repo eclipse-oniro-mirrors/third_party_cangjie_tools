@@ -13,16 +13,16 @@ import std.deriving.Derive
 import stdx.serialization.serialization.*
 
 // Checks whether full-qualified name of the package represents some subpackage
-// 
+//
 // According to Cangjie Language grammar, package name cannot contain
 // backtick (`) character, making parsing straightforward. Thus if we meet dot (.)
 // not being enclosed in backticks - it should be subpackage.
-// 
+//
 // @param fqname  CORRECT full-qualified name of package
-// 
+//
 // @return true  - subpackage
 //         false - root package
-// 
+//
 public func isSubpackage(fqname: String): Bool {
     var quoted = false
     for (character in fqname.runes()) {
@@ -41,7 +41,7 @@ public enum Result<T, E> {
 }
 
 // Structure which represents full-qualified package name parsed from the String literal
-// 
+//
 // If struct is tried to be constructed from incorrect one (missing backticks '`' when necessary)
 // Will attempt to place them in some way for package name to be valid
 @Derive[Hashable, Equatable]
