@@ -1629,6 +1629,9 @@ bool CompilerCangjieProject::FileHasSemaCache(const std::string &fileName)
 bool CompilerCangjieProject::CheckNeedCompiler(const std::string &fileName)
 {
     std::string fullPkgName = GetFullPkgName(fileName);
+    if (!cjoManager->CheckStatus({fullPkgName}).empty()) {
+        return true;
+    }
     if (pkgInfoMap.find(fullPkgName) != pkgInfoMap.end()) {
         return pkgInfoMap[fullPkgName]->needReCompile;
     }
