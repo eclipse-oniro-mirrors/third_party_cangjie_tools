@@ -656,6 +656,7 @@ void SymbolCollector::DealRegisterClass(const FuncArg &registerIdentify, const F
             crossSym.name = remove_quotes(registerIdentify.ToString());
             crossSym.crossType = CrossType::ARK_TS_WITH_REGISTER;
             crossSym.location = {registerTarget.begin, registerTarget.begin + 1, registerTarget.curFile->filePath};
+            crossSym.declaration = {registerIdentify.begin, registerIdentify.end, registerTarget.curFile->filePath};
             (void) crsSymsMap.emplace_back(crossSym);
             UpdateCrossScope(*lambdaExpr->funcBody->body, CrossRegisterType::CLASS_REGISTER,
                 registerIdentify.ToString());
