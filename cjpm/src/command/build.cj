@@ -165,11 +165,11 @@ class BuildCommand <: Handle {
             if (buildConfig.isCrossCompile) {
                 match (Triple.fromString(crossCompileTarget)) {
                     case Ok(triple) => featureDeducer = featureDeducer.deduceTargetFeatures(triple)
-                    case Err(errmsg) =>
+                    case Err(errmsg) => 
                         eprintln(errmsg)
                         return false
                 }
-
+                
             } else {
                 featureDeducer = featureDeducer
                     .deduceTargetFeatures(state.cjcInfo.target)

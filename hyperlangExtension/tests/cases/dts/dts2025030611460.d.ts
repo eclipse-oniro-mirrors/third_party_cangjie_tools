@@ -5,8 +5,6 @@
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
-
-
 type TB230<V = string, W extends 'abc' | 'def' = 'abc'> = (arg: V) => W;
 type TB300 = Promise<number>;
 type TB310 = Promise<boolean>[];

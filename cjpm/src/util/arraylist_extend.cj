@@ -15,7 +15,7 @@ public interface ArrayListExtends<T> {
     func addIfSome(all!: Iterable<Option<T>>): Unit
 }
 
-extend <T> ArrayList<T> <: ArrayListExtends<T> {
+extend <T> ArrayList<T> <: ArrayListExtends<T> { 
     public func addIfSome(element: Option<T>): Unit {
         if (let Some(v) <- element) {
             this.add(v)

@@ -48,7 +48,7 @@ public class EnvironmentBuilder {
 
     @When [ os == "Windows" ]
     private func beforeFinish(env: Collection<(String, String)>): HashMap<String, String> {
-        // Because macro expansion is using linux runtime, environment variables are
+        // Because macro expansion is using linux runtime, environment variables are 
         // interpreted as case sensitive at macro expansion stage.
         // While at all other moments they interpreted as case insensitive.
         //
@@ -67,7 +67,7 @@ public class EnvironmentBuilder {
 
 
     public init() { }
-
+    
     public func prepend(_name: String, value: String): Unit {
         let name = adjustForCaseSensitivity(_name)
         if (!operations.contains(name)) {
@@ -137,7 +137,7 @@ public class EnvironmentBuilder {
                     case Prepend(val) => addEnvVar(env); prependValue(result.entryView(env), val)
                     case Append(val) => addEnvVar(env); appendValue(result.entryView(env), val)
                     case Replace(val) => result[env] = val
-                    case Absent(val) =>
+                    case Absent(val) => 
                         if (!originalEnvMap.contains(env)) {
                             result[env] = val
                         }
