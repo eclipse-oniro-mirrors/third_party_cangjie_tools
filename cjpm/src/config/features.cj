@@ -17,7 +17,7 @@ import cjpm.util.{CliFailError, Result}
 private let logger = getGlobalLogger()
 
 // Struct which stores information about used 'cjc' binary
-//
+// 
 // Use this structure instead of @When to implement platform depentent functionality
 public struct CjcInfo {
     private static let versionPrefix = "Cangjie Compiler: "

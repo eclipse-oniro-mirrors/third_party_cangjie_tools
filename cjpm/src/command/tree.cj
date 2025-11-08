@@ -85,7 +85,7 @@ class TreeCommand <: Handle {
 
         match (handleCrossTarget(argMap)) {
             case None => return false
-            case Some(true) =>
+            case Some(true) => 
                 match (Triple.fromString(crossCompileTarget)) {
                     case Ok(triple) => featureDeducer = featureDeducer.deduceTargetFeatures(triple)
                     case Err(errmesg) => eprintln(errmesg); return false

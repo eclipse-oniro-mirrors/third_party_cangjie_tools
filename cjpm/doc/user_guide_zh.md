@@ -296,17 +296,17 @@ cjpm build success
 
 ```text
 输入: cjpm run
-输出: cjpm run success
+输出: cjpm run finished
 ```
 
 ```text
 输入: cjpm run -g // 此时会默认执行 cjpm build -i -g 命令
-输出: cjpm run success
+输出: cjpm run finished
 ```
 
 ```text
 输入: cjpm run --build-args="-s -j16" --run-args="a b c"
-输出: cjpm run success
+输出: cjpm run finished
 ```
 
 ### test
@@ -903,7 +903,7 @@ src
 
 在满足上述配置条件后，该模块会按照如下方式编译：
 
-- 除该模块 `root` 包以外的所有包（该模块下的所有子包，以及该模块直接、间接依赖的其它模块的包含 `root` 包的所有包），会以 `LTO` 优化编译模式编译成 `.bc` 文件；
+- 除该模块 `root` 包以外的所有包（该模块下的所有子包，以及该模块直接、间接依赖的其他模块的包含 `root` 包的所有包），会以 `LTO` 优化编译模式编译成 `.bc` 文件；
 - 该模块的 `root` 包会被编译成动态库，并且链入上述所有 `.bc` 文件，无论对应的包是否被该 `root` 包导入。
 
 ### "workspace"
