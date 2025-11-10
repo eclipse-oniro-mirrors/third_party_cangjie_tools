@@ -12,7 +12,7 @@ import ohos.base.*
 import std.collection.{ HashMap }
 /***********IMPORT***********/
 /*FIXME: Import details need to be verified and rewritten by user.*/
-/*ohos.base*/
+/*import { Callback } from '@ohos.base';*/
 
 
 /*class ExportKeyword DeclareKeyword PushReporter {
@@ -27,7 +27,7 @@ public class PushReporter {
     /**
 	 * @brief getTags(t12: Callback<Record<string, any>>): void
 	 */
-    public static func getTags(t12: Callback<HashMap<String, Any>>): Unit {
+    public static func getTags(t12: Callback<HashMap<String, JSValue/* FIXME: `any` */>>): Unit {
         jsObjApiCall < Unit >(getClassConstructorObj("my_module_test", "PushReporter"),  "getTags", { ctx =>[t12.toJSValue(ctx)] })
     }
     

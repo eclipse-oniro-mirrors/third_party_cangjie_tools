@@ -12,7 +12,7 @@ import ohos.base.*
 import tpc.AbilityKit.common
 /***********IMPORT***********/
 /*FIXME: Import details need to be verified and rewritten by user.*/
-/*superInterface*/
+/*import {p29} from "./superInterface"*/
 
 /***********OBJECT***********/
 
