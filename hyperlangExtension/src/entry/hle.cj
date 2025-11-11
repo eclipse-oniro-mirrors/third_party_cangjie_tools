@@ -22,8 +22,7 @@ let fileHead = """
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
-
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file."""
+"""
 let mtx = Mutex()
 
 public class A2CJ {
@@ -227,6 +226,18 @@ public class A2CJ {
         handleUseBigInt(gconfig, out)
         handleUseContext(gconfig, out)
         handleHashMap(gconfig, out)
+        handleTypeImport(gconfig, out)
+    }
+
+    public func handleTypeImport(gconfig: GlobalConfig, out: Tokens): Unit {
+
+        if (!gconfig.moduleMeta.importInfo.isEmpty()) {
+            out.append(addComment("**********IMPORT**********"))
+            for (i in gconfig.moduleMeta.importInfo) {
+                out.append(addComment("FIXME: Import details need to be verified and rewritten by user."))
+                out.append(addComment(i) + nl)
+            }
+        }
     }
 
     public func handleThirdParty(gconfig: GlobalConfig, out: Tokens): Unit {
