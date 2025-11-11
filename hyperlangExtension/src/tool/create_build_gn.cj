@@ -20,7 +20,6 @@ public func createBuildGn(gconfig: GlobalConfig): String {
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 import("//build/ohos.gni")
 import("//third_party/cangjie/build/cjc.gni")
 

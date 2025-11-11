@@ -15,7 +15,7 @@ import std.math.numeric.*
 import std.collection.{ HashMap }
 /***********IMPORT***********/
 /*FIXME: Import details need to be verified and rewritten by user.*/
-/*exportAlias*/
+/*import { MyStringEnum, MyNumericEnum } from './exportAlias';*/
 
 /***********OBJECT***********/
 
