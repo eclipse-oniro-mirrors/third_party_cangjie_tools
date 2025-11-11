@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
-type TB230<V = string, W extends 'abc' | 'def' = 'abc'> = (arg: V) => W;
-type TB300 = Promise<number>;
-type TB310 = Promise<boolean>[];
+type Callback<T> = (arg: T) => void;
+
+class CM {
+    static f01(x: (obj: IM, cb: Callback<EMStr>) => void): void
+}
