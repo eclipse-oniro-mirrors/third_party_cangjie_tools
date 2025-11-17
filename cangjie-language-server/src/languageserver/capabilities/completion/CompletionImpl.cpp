@@ -438,7 +438,7 @@ void CompletionImpl::NormalParseImpl(
 
 int CompletionImpl::GetChainedPossibleBegin(const ArkAST &input, int firstTokIdxInLine)
 {
-    if (firstTokIdxInLine >= input.tokens.size()) {
+    if (firstTokIdxInLine >= input.tokens.size() || firstTokIdxInLine < 0) {
         return firstTokIdxInLine;
     }
     if (input.tokens[firstTokIdxInLine].kind != TokenKind::DOT) {
