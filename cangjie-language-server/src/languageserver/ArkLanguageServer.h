@@ -42,8 +42,6 @@ public:
 
     void UpdateDiagnostic(std::string file, DiagnosticToken diagToken) override;
 
-    void RemoveDiagnostic(std::string file, DiagnosticToken diagToken) override;
-
     std::string GetContentsByFile(const std::string &file) override;
 
     std::int64_t GetVersionByFile(const std::string &file) override;
