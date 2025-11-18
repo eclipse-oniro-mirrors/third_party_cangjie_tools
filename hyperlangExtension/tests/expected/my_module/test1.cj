@@ -6,4 +6,8 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-type MyUnion8 = (string | number)[] | { key: string };
+package my_module
+
+import ohos.ark_interop.*
+import ohos.ark_interop_helper.*
+import ohos.base.*
