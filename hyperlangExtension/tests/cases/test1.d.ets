@@ -6,4 +6,8 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-type MyUnion8 = (string | number)[] | { key: string };
+type Callback<T> = (arg: T) => void;
+
+class CM {
+    static f01(x: (obj: IM, cb: Callback<EMStr>) => void): void
+}
