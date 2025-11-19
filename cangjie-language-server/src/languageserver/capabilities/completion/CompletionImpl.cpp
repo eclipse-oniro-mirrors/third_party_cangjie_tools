@@ -391,6 +391,11 @@ void CompletionImpl::NormalParseImpl(
         beforePrefixKind = input.tokens[static_cast<unsigned int>(index - 1)].kind;
     }
 
+    // if package name has org name, check beforePrefixKind and change token position
+    if (beforePrefixKind == TokenKind::DOUBLE_COLON && index > 2) {
+        beforePrefixKind = input.tokens[static_cast<unsigned int>(index - 3)].kind;
+    }    
+
     auto &importManager =
         needImport ? input.packageInstance->importManager : input.semaCache->packageInstance->importManager;
     NormalCompleterByParse normalCompleter(result, &importManager, *(input.semaCache->packageInstance->ctx), prefix);
@@ -511,7 +516,7 @@ std::string CompletionImpl::GetChainedNameComplex(const ArkAST &input, int start
         if (!quoteStack.empty()) {
             continue;
         }
-        if (!hasDot && input.tokens[i].kind == TokenKind::DOT) {
+        if (!hasDot && (input.tokens[i].kind == TokenKind::DOT || input.tokens[i].kind == TokenKind::DOUBLE_COLON)) {
             hasDot = true;
             (void)chainedName.insert(zeroPos, input.tokens[i].Value());
         } else if (hasDot && identifier.find(input.tokens[i].kind) != identifier.end()) {
