@@ -119,9 +119,9 @@ private:
     void CollectNamedParam(Ptr<const Decl> parent, Ptr<const Decl> member);
 
     // Only for global or member decl.
-    void CreateBaseSymbol(const Decl& decl, const std::string& filePath);
+    void CreateBaseSymbol(const Decl& decl, const std::string& filePath, AccessLevel pkgAccess);
 
-    void CreateBaseOrExtendSymbol(const Decl &decl, const std::string &filePath);
+    void CreateBaseOrExtendSymbol(const Decl &decl, const std::string &filePath, AccessLevel pkgAccess);
 
     void CreateRef(const NameReferenceExpr& ref, const std::string& filePath);
 
