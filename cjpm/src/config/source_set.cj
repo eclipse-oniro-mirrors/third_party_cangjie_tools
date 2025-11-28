@@ -190,47 +190,14 @@ public open class ConfigParserVisitor <: CjpmConfigVisitor {
             case _ => throw CliFailError("Field `${ctx.fieldFqName}` should be table")
         }
 
-        assertion(
-            {=> !(dms.get("package") is DataModelNull)},
-            {
-                => "Source sets are supported only for packages. Please, make sure [package] field is always present in `cjpm.toml`"
-            }
-        )
         // Used only to update VisitorContext on the presence of `src-dir` field
         visitField(dms, "package", visitPackage)
 
-        if (!(dms.get(SOURCE_SET_CONFIG) is DataModelNull) && !state.isExperimental) {
-            throw CliFailError(
-                "Error: `[source-set]` is part of experimental Cangjie Multiplatform feature, please enable `experimental = true` in cjpm.toml of this project"
-            )
-        }
-        let res = if (let Some(sourceSetField) <- visitOptionalField(dms, SOURCE_SET_CONFIG,
-            visitSourceSetsConfiguration)) {
-            if (vstate.packageSrcDir.isSet) {
-                errors.add("Only one of `package.${SRC_DIR}` and `[${SOURCE_SET_CONFIG}]` fields should be specified")
-                Option<SourceSetsConfiguration>.None
-            } else {
-                sourceSetField
-            }
-        } else {
-            SourceSetsConfiguration(vstate.packageSrcDir.value)
-        }
-
-        if (!errors.isEmpty()) {
-            throw CliFailError(errors)
-        }
+        let res: ?SourceSetsConfiguration = SourceSetsConfiguration(vstate.packageSrcDir.value)
 
         if (let Some(sscfg) <- res) {
-            assertion(
-                {=> errors.isEmpty()},
-                {=> "Errors are present while didn't manage to parse DataModel"}
-            )
             return sscfg
         } else {
-            assertion(
-                {=> !errors.isEmpty()},
-                {=> "Didn't manage to parse DataModel but didn't find errors"}
-            )
             throw CliFailError(errors)
         }
     }
