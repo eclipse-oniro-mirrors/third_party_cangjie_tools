@@ -522,6 +522,8 @@ private:
 
     void StorePackageCache(const std::string& pkgName);
 
+    void ReleaseMemoryAsync();
+
     std::string modulesHome;
     std::string stdLibPath;
     std::string cangjiePath;
