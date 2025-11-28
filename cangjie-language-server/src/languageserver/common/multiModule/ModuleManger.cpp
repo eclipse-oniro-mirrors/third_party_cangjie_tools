@@ -53,6 +53,9 @@ void ModuleManager::WorkspaceModeParser(const std::string &workspace)
             auto srcPath = value.value(SRC_PATH, "");
             moduleInfoMap[path].srcPath = FileStore::NormalizePath(URI::Resolve(srcPath));
         }
+        if (value.contains(COMBINED)) {
+            combinedMap[name] = value.value(COMBINED, false);
+        }
         (void)requirePackages[name].insert(name);
 
         SetPackageRequires(value, path);
