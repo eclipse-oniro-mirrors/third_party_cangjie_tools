@@ -286,6 +286,7 @@ void CompilerCangjieProject::IncrementCompile(const std::string &filePath, const
         Trace::Elog("InitCache Failed");
     }
 
+    ReportCombinedCycles();
     if (cycles.second) {
         ReportCircularDeps(cycles.first);
     }
@@ -1327,13 +1328,7 @@ bool CompilerCangjieProject::Compiler(const std::string &moduleUri,
         lsp::CjdIndexer::InitInstance(callback, stdCjdPathOption, ohosCjdPathOption, cjdCachePathOption);
     }
     FullCompilation();
-    auto taskId = GenTaskId("delete_cjd_indexer");
-    auto deleteTask = [this, taskId]() {
-        thrdPool->TaskCompleted(taskId);
-        lsp::CjdIndexer::DeleteInstance();
-    };
-    thrdPool->AddTask(taskId, {}, deleteTask);
-    lsp::IndexDatabase::ReleaseMemory();
+    ReleaseMemoryAsync();
     Logger::Instance().CleanKernelLog(std::this_thread::get_id());
     // init fileCache packageInstance
     for (const auto &item : pLRUCache->GetMpKey()) {
@@ -1341,11 +1336,33 @@ bool CompilerCangjieProject::Compiler(const std::string &moduleUri,
             return false;
         }
     }
+    ReportCombinedCycles();
     auto cycles = graph->FindCycles();
     if (cycles.second) {
         ReportCircularDeps(cycles.first);
     }
     return true;
+}
+
+void CompilerCangjieProject::ReleaseMemoryAsync() {
+    auto taskId = GenTaskId("delete_cjd_indexer");
+    auto deleteTask = [this, taskId]() {
+        thrdPool->TaskCompleted(taskId);
+        lsp::CjdIndexer::DeleteInstance();
+        lsp::IndexDatabase::ReleaseMemory();
+        for (auto& pkgCI: CIMap) {
+            pkgCI.second.reset();
+        }
+        for (auto& pkgNotInSrcCI: CIMapNotInSrc) {
+            pkgNotInSrcCI.second.reset();
+        }
+#ifdef __linux__
+        (void) malloc_trim(0);
+#elif __APPLE__
+        (void) malloc_zone_pressure_relief(malloc_default_zone(), 0);
+#endif  
+    };
+    thrdPool->AddTask(taskId, {}, deleteTask);
 }
 
 CompilerCangjieProject *CompilerCangjieProject::GetInstance()
@@ -1459,6 +1476,43 @@ void CompilerCangjieProject::ReportCircularDeps(const std::vector<std::vector<st
     }
 }
 
+void CompilerCangjieProject::ReportCombinedCycles()
+{
+    auto pkgs = GetKeys(fullPkgNameToPath);
+    for (auto pkg : pkgs) {
+        std::string curModule = SplitFullPackage(pkg).first;
+        if (curModule == pkg || !GetModuleCombined(curModule)) {
+            continue;
+        }
+        auto dependencies = graph->GetDependencies(pkg);
+        if (dependencies.find(curModule) == dependencies.end()) {
+            continue;
+        }
+        std::string combinedCirclePkgName = curModule.append(" ").append(pkg);
+        const auto &dirPath = fullPkgNameToPath[pkg];
+        std::vector<std::string> files = GetAllFilesUnderCurrentPath(dirPath, CANGJIE_FILE_EXTENSION, false);
+        if (files.empty()) {
+            continue;
+        }
+        callback->RemoveDiagOfCurPkg(pkgInfoMap[pkg]->packagePath);
+        std::ostringstream diagMessage;
+        diagMessage << "packages " << combinedCirclePkgName
+                    << " are in circular dependencies (because of combined module '"
+                    << curModule << "').";
+        for (const auto &file: files) {
+            const auto &filePath = FileStore::NormalizePath(JoinPath(dirPath, file));
+            DiagnosticToken dt;
+            dt.category = LSP_ERROR_CODE;
+            dt.code = LSP_ERROR_CODE;
+            dt.message = diagMessage.str();
+            dt.range = {{0, 0, 0}, {0, 0, 1}};
+            dt.severity = 1;
+            dt.source = "Cangjie";
+            callback->UpdateDiagnostic(filePath, dt);
+        }
+    }
+}
+
 void CompilerCangjieProject::EmitDiagsOfFile(const std::string &filePath)
 {
     std::vector<DiagnosticToken> diagnostics = callback->GetDiagsOfCurFile(filePath);
@@ -1551,7 +1605,9 @@ void CompilerCangjieProject::CheckPackageNameByAbsName(const File &needCheckedFi
         actualPkgName += prefix + CONSTANTS::DOT;
     }
     actualPkgName += needCheckedFile.package->packageName;
-
+    if (needCheckedFile.package->hasDoubleColon) {
+        actualPkgName = needCheckedFile.package->GetPackageName();
+    }
     if (actualPkgName != expectedPkgName) {
         auto errPos = getPackageNameErrPos(needCheckedFile);
         pkgInfoMap[fullPackageName]->diag->DiagnoseRefactor(DiagKindRefactor::package_name_not_identical_lsp,
@@ -2050,4 +2106,20 @@ std::unordered_set<std::string> CompilerCangjieProject::GetOneModuleDirectDeps(c
     return res;
 }
 
+bool CompilerCangjieProject::GetModuleCombined(const std::string &curModule)
+{
+    auto found = moduleManager->combinedMap.find(curModule);
+    if (found != moduleManager->combinedMap.end()) {
+        return found->second;
+    }
+    return false;
+}
+
+bool CompilerCangjieProject::IsCombinedSym(const std::string &curModule, const std::string &curPkg,
+    const std::string &symPkg)
+{
+    bool isCombinedModule = GetModuleCombined(curModule);
+    bool isRootPkg = curModule == curPkg;
+    return isCombinedModule && symPkg == curModule && !isRootPkg;
+}
 } // namespace ark

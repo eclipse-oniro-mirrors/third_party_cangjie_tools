@@ -98,7 +98,9 @@ void DotCompleterByParse::Complete(const ArkAST &input,
         fullImportId = idToFullIdMap[prefix];
     }
     auto targetPkg = importManager->GetPackageDecl(fullImportId);
-    if (targetPkg) {
+    // filter root pkg symbols if cur module is combined
+    std::string curModule = SplitFullPackage(srcPkgName).first;
+    if (targetPkg && !CompilerCangjieProject::GetInstance()->IsCombinedSym(curModule, srcPkgName, fullImportId)) {
         auto members = importManager->GetPackageMembers(srcPkgName, targetPkg->fullPackageName);
         for (const auto &decl : members) {
             env.InvokedAccessible(decl.get(), false, false, CompletionImpl::IsPreamble(input, pos));
@@ -690,7 +692,7 @@ void DotCompleterByParse::FindMatchExpr(Ptr<Node> node, const Position &pos, std
     if (!pMatchExpr) { return; }
     // matchExpr->(selector, matchCase)
     if (pMatchExpr->selector && Contain(pMatchExpr->selector.get(), pos)) {
-        isInclude = false;
+        DeepFind(pMatchExpr->selector.get(), pos, scopeName, isInclude);
         return;
     }
     for (auto &mc : pMatchExpr->matchCases) {
