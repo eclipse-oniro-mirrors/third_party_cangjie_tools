@@ -28,8 +28,6 @@ Available options:
   -g                            enable compile debug version target
   --coverage                    enable coverage
   --cfg                         enable the customized option 'cfg'
-  --enable-features <value>     explicitly specify comma-separated list of features to be enabled
-  --no-feature-deduce           disables auto-enabling of features, deduced from other options, machine properties, etc.
   -m, --member <value>          specify a member module of the workspace
   --target <value>              generate code for the given target platform
   --target-dir <value>          specify target directory
@@ -139,7 +137,6 @@ class BuildCommand <: Handle {
         buildConfig.isLint = getBoolOption(argMap, "-l", "--lint")
         buildConfig.mockSupported = getBoolOption(argMap, "--mock")
         buildConfig.globalConfig.isSkipScript = getBoolOption(argMap, "--skip-script")
-        buildConfig.globalConfig.noFeatureDeduce = getBoolOption(argMap, "--no-feature-deduce")
 
         var featureDeducer = FeatureDeducer(buildConfig.globalConfig.features,
             enabled: !buildConfig.globalConfig.noFeatureDeduce)
