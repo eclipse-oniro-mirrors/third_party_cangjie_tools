@@ -11,6 +11,7 @@ package my_module
 import ohos.ark_interop.*
 import ohos.ark_interop_helper.*
 import ohos.base.*
+
 /***********OBJECT***********/
 
 /*interface ExportKeyword p29 {
@@ -23,7 +24,7 @@ import ohos.base.*
 
 public open class p29 {
     
-    protected p29(public var arkts_object: JSObject) {}
+    protected p29(public var arkts_object: JSObject) { }
     
     
     /**
@@ -61,7 +62,7 @@ public open class p29 {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): p29 {
+    public open  static func fromJSValue(context: JSContext, input: JSValue): p29 {
         p29(input.asObject())
     }
 }

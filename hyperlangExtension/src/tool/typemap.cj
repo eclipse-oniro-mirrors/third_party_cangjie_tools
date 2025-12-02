@@ -18,7 +18,6 @@ public class TypeMap {
         if ((tmp.startsWith("<") && (tmp.count("<") > 2 || tmp.contains("|"))) || (tmp.startsWith("{") && tmp.endsWith(
             "}")) || tmp.contains("->") || tmp.startsWith("typeof")) {
             let oneLine = Regex(#"(\r|\n|\r\n) *"#).replaceAll(type_ark, " ")
-            println("WARNING: type is not supported - ${oneLine}")
             return "JSValue/* FIXME: `${oneLine}` */"
         }
 
@@ -93,7 +92,7 @@ public class TypeMap {
                 "Array<${cj_tp}>"
             case _ where (tmp.startsWith("'") && tmp.endsWith("'")) => str
             case _ =>
-                if (userDefinedNames.contains(tmp)) {
+                if (userDefinedNames.contains(tmp) || tmp.startsWith("AutoGenType")) {
                     return tmp
                 } else {
                     return "JSValue/* FIXME: `${tmp}` */"

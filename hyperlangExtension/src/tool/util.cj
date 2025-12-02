@@ -8,10 +8,8 @@
 
 package hle.tool
 
-import std.fs.*
 import std.ast.*
 import std.collection.*
-import std.regex.*
 
 public func addComment(msg: String, reason!: ?String = None): Tokens {
     if (let Some(r) <- reason) {
@@ -220,11 +218,11 @@ public func splitUnionParams(params: ArrayList<TsParameter>): Array<ArrayList<Ts
     for (i in 0..params.size) {
         let p = params[i]
         if (let TsUnion(types) <- p.ty) {
-            // Do not split union type which pattern is "T|null" or "T|undefined"
+            // Do not split union type which pattern is "T|null" or "T|undefined" or "T|void"
             let nonNullTypes: ArrayList<TsType> = ArrayList<TsType>()
             for (e in types) {
                 match (e) {
-                    case TsNull | TsUndefined => ()
+                    case TsNull | TsUndefined | TsVoid => ()
                     case _ => nonNullTypes.add(e)
                 }
             }
@@ -246,4 +244,39 @@ public func splitUnionParams(params: ArrayList<TsParameter>): Array<ArrayList<Ts
         }
     }
     result
+}
+
+public func getTypeParametersToken(typeParameters: ArrayList<TypeParameter>): Tokens {
+    let typeParametersToken = Tokens()
+    if (typeParameters.isEmpty()) {
+        return typeParametersToken
+    }
+
+    typeParametersToken.append(Token(TokenKind.LT))
+    for (i in 0..typeParameters.size) {
+        typeParametersToken.append(Token(TokenKind.IDENTIFIER, typeParameters[i].name))
+        if (i < typeParameters.size - 1) {
+            typeParametersToken.append(commaToken)
+        }
+    }
+    typeParametersToken.append(Token(TokenKind.GT))
+    return typeParametersToken
+}
+
+public func getTypeConstraintsToken(typeParameters: ArrayList<TypeParameter>): Tokens {
+    let typeConstraintsToken = Tokens()
+    if (typeParameters.size == 0) {
+        return typeConstraintsToken
+    } else {
+        var name = "where "
+        for (i in 0..typeParameters.size) {
+            name += "${typeParameters[i].name} <: JSInteropType<${typeParameters[i].name}>"
+            name += if (i != typeParameters.size - 1) {
+                ", "
+            } else {
+                ""
+            }
+        }
+        return Token(TokenKind.IDENTIFIER, name).toTokens()
+    }
 }

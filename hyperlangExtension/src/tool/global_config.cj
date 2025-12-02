@@ -10,6 +10,7 @@ package hle.tool
 
 import std.collection.*
 import std.ast.*
+import std.sync.*
 
 public class GlobalConfig {
     public var module: String = ""
@@ -27,6 +28,11 @@ public class GlobalConfig {
     public var typeDeclFile: String = ""
     public var gconfigArray: ArrayList<GlobalConfig> = ArrayList<GlobalConfig>()
     public var arkTSMoudleName: String = ""
+    public var requiredUnionMembers = ArrayList<(String, TsType, ArrayList<String>)>() 
+    public var requiredAnonymousInterfaces = ArrayList<ObjectType>() 
+    private var count = AtomicInt64(0)
+    private var cacheUnions: HashMap<String, TsType> = HashMap<String, TsType>()
+    private var cacheAnonymousInterfaces: HashMap<String, TsType> = HashMap<String, TsType>()
 
     public init(cjModuleNameArg: String, is3rdArg: Bool,
         typeDeclFileArg!: String = "") {
@@ -160,5 +166,283 @@ public class GlobalConfig {
         let moduleName = moduleFullName.replace("@", "").replace("hms", "").replace("ohos", "")
 
         "tpc" + removeTsSuffix(moduleName)
+    }
+    
+    // Collect all required union member counts by scanning all types in the module
+    public func collectRequiredUnionMemberCounts(): Unit {
+        for (i in 0..this.moduleMeta.namespaces.size) {
+            let cns: NameSpace = this.moduleMeta.namespaces[i]
+            if (cns.isEmpty()) {
+                continue
+            }
+            
+            // Scan properties in classes
+            for ((_, c) in cns.classes) {
+                let result = HashSet<String>()
+                c.typeParameters |> map {it => it.name.replace(" ", "")} |> forEach {item => 
+                    result.add(item)
+                }
+                for (p in c.properties) {
+                    if (let Some(v) <- scanTypeForAnonymousInterface(p.typeNode)) {
+                        p.typeNode = v
+                    }
+                    if (let Some(v) <- scanTypeForUnions(p.typeNode, result)) {
+                        p.typeNode = v
+                    }
+                }
+                // Scan methods in classes
+                for (m in c.methods) {
+                    for (param in m.parameters) {
+                        if (let Some(v) <- scanTypeForAnonymousInterface(param.ty)) {
+                            param.ty = v
+                        }
+                    }
+                    if (let Some(v) <- scanTypeForAnonymousInterface(m.returnTypeNode)) {
+                        m.returnTypeNode = v
+                    }
+                    m.typeParameters |> map {it => it.name.replace(" ", "")} |> forEach {item => 
+                        result.add(item)
+                    }
+                    if (let Some(v) <- scanTypeForUnions(m.returnTypeNode, result)) {
+                        m.returnTypeNode = v
+                    }
+                }
+            }
+            
+            // Scan properties in interfaces
+            for ((_, iface) in cns.interfaces) {
+                let result = HashSet<String>()
+                iface.typeParameters |> map {it => it.name.replace(" ", "")} |> forEach {item => 
+                    result.add(item)
+                }
+                for (p in iface.properties) {
+                    if (let Some(v) <- scanTypeForAnonymousInterface(p.typeNode)) {
+                        p.typeNode = v
+                    }
+                    if (let Some(v) <- scanTypeForUnions(p.typeNode, result)) {
+                        p.typeNode = v
+                    }
+                }
+                // Scan methods in interfaces
+                for (m in iface.methods) {
+                    for (param in m.parameters) {
+                        if (let Some(v) <- scanTypeForAnonymousInterface(param.ty)) {
+                            param.ty = v
+                        }
+                    }
+                    if (let Some(v) <- scanTypeForAnonymousInterface(m.returnTypeNode)) {
+                        m.returnTypeNode = v
+                    }
+                    m.typeParameters |> map {it => it.name.replace(" ", "")} |> forEach {item => 
+                        result.add(item)
+                    }
+                    if (let Some(v) <- scanTypeForUnions(m.returnTypeNode, result)) {
+                        m.returnTypeNode = v
+                    }   
+                }
+            }
+            
+            // Scan global methods
+            for (m in cns.methods) {
+                for (param in m.parameters) {
+                    if (let Some(v) <- scanTypeForAnonymousInterface(param.ty)) {
+                            param.ty = v
+                    }
+                }
+                if (let Some(v) <- scanTypeForAnonymousInterface(m.returnTypeNode)) {
+                        m.returnTypeNode = v
+                }
+
+                /* Consider the following example, where generic parameters need to be collected.
+
+                    declare function testGeneric<T>(t:T): T | string
+                */
+                let result = HashSet<String>()
+                m.typeParameters |> map {it => it.name.replace(" ", "")} |> forEach {item => 
+                    result.add(item)
+                }
+                if (let Some(v) <- scanTypeForUnions(m.returnTypeNode,  result)) {
+                        m.returnTypeNode = v
+                } 
+            }
+        }
+    }
+    
+    // Recursively scan a type for union types and record their member counts
+    private func scanTypeForUnions(ty: TsType, genericParameters: HashSet<String>): Option<TsType> {
+        match (ty) {
+            case TsUnion(elems) =>
+                let elements = elems.map {item => 
+                    if (let Some(v) <- scanTypeForUnions(item, genericParameters)) {
+                        v
+                    } else {
+                        item
+                    }
+                } 
+                let nonNullTypes = ArrayList<TsType>()
+                for (e in elements) {
+                    match (e) {
+                        case TsNull | TsUndefined => ()
+                        case _ => nonNullTypes.add(e)
+                    }
+                }
+                let result = ArrayList<String>()
+                for (e in elements) {
+                    if (genericParameters.contains(e.toString())) {
+                        result.add(e.toString())
+                    }
+                }
+                // Only count primitive unions with 2+ members
+                if (nonNullTypes.size > 1) {
+                    let tempName = ty.toString().replace(" ", "")
+                    if (cacheUnions.contains(tempName)) {
+                        return Some(cacheUnions[tempName])
+                    } else {
+                        let paramName = "AutoGenType" + count.load().toString()
+                        requiredUnionMembers.add((paramName, ty, result))
+                        count.fetchAdd(1)
+                        cacheUnions[tempName] = TsTypeRef(paramName)
+                        let temp = result |> map {item => 
+                            let result = TypeParameter()
+                            result.name = item
+                            result
+                        } |> collectArrayList
+                        return Some(TsTypeRef(paramName + getTypeParametersToken(temp).toString()))
+                    }
+                }
+               return TsUnion(elements) 
+            case TsArray(elemTy) => 
+                let elementType = if (let Some(v) <- scanTypeForUnions(elemTy, genericParameters)) {
+                    v
+                } else {
+                    elemTy
+                }
+                return TsArray(elementType)
+            case TsOptional(elemTy) => scanTypeForUnions(elemTy, genericParameters)
+            case TsTypeRef(temp, arr) =>
+                let elements = arr.map {item => 
+                    if (let Some(v) <- scanTypeForUnions(item, genericParameters)) {
+                        v
+                    } else {
+                        item
+                    }
+                }
+                return TsTypeRef(temp, elements) 
+            case TsTuple(elems) =>
+                let elements = elems.map {item => 
+                    if (let Some(v) <- scanTypeForUnions(item, genericParameters)) {
+                        v
+                    } else {
+                        item
+                    }
+                } 
+                return TsTuple(elements)
+            case TsFunction(ret, params, temp) =>
+                let returnType = if (let Some(v) <- scanTypeForUnions(ret, genericParameters)) {
+                        v
+                    } else {
+                        ret
+                    }
+                let elements = params.map {item => 
+                    if (let Some(v) <- scanTypeForUnions(item.ty, genericParameters)) {
+                        item.ty = v
+                        item
+                    } else {
+                        item
+                    }
+                }
+                return TsFunction(returnType, elements, temp)
+            case _ => ()
+        }
+        return None
+    }
+
+    private func scanTypeForAnonymousInterface(ty: TsType): Option<TsType> {
+        match (ty) {
+            case TsUnion(elems) =>
+                let elements = elems.map {item => 
+                    if (let Some(v) <- scanTypeForAnonymousInterface(item)) {
+                        v
+                    } else {
+                        item
+                    }
+                } 
+                return TsUnion(elements)
+            case TsArray(elemTy) => 
+                let elementType = if (let Some(v) <- scanTypeForAnonymousInterface(elemTy)) {
+                    v
+                } else {
+                    elemTy
+                }
+                return TsArray(elementType)
+            case TsOptional(elemTy) => scanTypeForAnonymousInterface(elemTy)
+            case TsTypeRef(temp, arr) =>
+                let elements = arr.map {item => 
+                    if (let Some(v) <- scanTypeForAnonymousInterface(item)) {
+                        v
+                    } else {
+                        item
+                    }
+                }
+                return TsTypeRef(temp, elements) 
+            case TsTuple(elems) =>
+                let elements = elems.map {item => 
+                    if (let Some(v) <- scanTypeForAnonymousInterface(item)) {
+                        v
+                    } else {
+                        item
+                    }
+                } 
+                return TsTuple(elements)
+            case TsFunction(ret, params, temp) =>
+                let returnType = if (let Some(v) <- scanTypeForAnonymousInterface(ret)) {
+                        v
+                    } else {
+                        ret
+                    }
+                let elements = params.map {item => 
+                    if (let Some(v) <- scanTypeForAnonymousInterface(item.ty)) {
+                        item.ty = v
+                        item
+                    } else {
+                        item
+                    }
+                }
+                return TsFunction(returnType, elements, temp)
+            case TsTypeLiteral(members) =>
+                let propertiesNew = ArrayList<Property>()
+                let boxed = Box<ArrayList<Property>>(propertiesNew)
+                members.map {item:TsMember => 
+                    match (item) {
+                        case TsProperty(name, ty, optional) => 
+                            let result = Property()
+                            result.propKey = name
+                            result.propType = ty.toString()
+                            result.cjKey = name
+                            result.isOptional = optional
+                            result.typeNode = ty
+                            boxed.value.add(result)
+                            ()
+                        case _ =>
+                            ()
+                    }
+            
+                }
+                let tempName = ty.toString().replace(" ", "")
+                if (cacheAnonymousInterfaces.contains(tempName)) {
+                    return Some(cacheUnions[tempName])
+                } else {
+                    var objectType = ObjectType()
+                    objectType.properties = propertiesNew
+                    let paramName = "AutoGenType" + count.load().toString() 
+                    objectType.name = paramName
+                    requiredAnonymousInterfaces.add(objectType)
+                    count.fetchAdd(1)
+                    return Some(TsTypeRef(paramName))
+                }
+                
+            case _ => ()
+        }
+        return ty
     }
 }

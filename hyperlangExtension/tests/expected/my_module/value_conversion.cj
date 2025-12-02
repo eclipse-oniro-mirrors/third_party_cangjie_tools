@@ -17,6 +17,7 @@ import std.collection.{ HashMap }
 /*FIXME: Import details need to be verified and rewritten by user.*/
 /*import { MyStringEnum, MyNumericEnum } from './exportAlias';*/
 
+
 /***********OBJECT***********/
 
 /*interface I1 {
@@ -33,15 +34,15 @@ import std.collection.{ HashMap }
 
 public open class I1 {
     
-    protected I1(public var a: Float64,
-    public var c: Array<UInt8>,
-    public var e: Array<Float32>,
-    public var g: HashMap<String, Array<UInt8>>,
-    public var h: MyStringEnum,
-    public var i: BigInt,
-    public var b!: Option<String> = None,
-    public var d!: Option<Array<UInt8>> = None,
-    public var f!: Option<Bool> = None) {}
+    protected I1(private var a: Float64,
+    private var c: Array<UInt8>,
+    private var e: Array<Float32>,
+    private var g: HashMap<String, Array<UInt8>>,
+    private var h: MyStringEnum,
+    private var i: BigInt,
+    private var b!: Option<String> = None,
+    private var d!: Option<Array<UInt8>> = None,
+    private var f!: Option<Bool> = None) { }
     
     
     public open func toJSValue(context: JSContext): JSValue {
@@ -96,7 +97,7 @@ public open class I1 {
 
 public class C1 {
     
-    protected C1(var arkts_object: JSObject) {}
+    protected C1(var arkts_object: JSObject) { }
     
     
     public static mut prop sa: Float64 {
@@ -232,7 +233,7 @@ public class C1 {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): C1 {
+     static func fromJSValue(context: JSContext, input: JSValue): C1 {
         C1(input.asObject())
     }
 }

@@ -12,6 +12,35 @@ import ohos.ark_interop.*
 import ohos.ark_interop_helper.*
 import ohos.base.*
 import tpc.AbilityKit.common
+
+
+/*interface AutoGenType0 {
+    a: number;
+    b: string;
+    }*/
+
+public open class AutoGenType0 {
+    
+    protected AutoGenType0(public var a: Float64,
+    public var b: String) { }
+    
+    
+    public open func toJSValue(context: JSContext): JSValue {
+        let obj = context.object()
+        obj["a"] = a.toJSValue(context)
+        obj["b"] = b.toJSValue(context)
+        obj.toJSValue()
+    }
+    
+    public static func fromJSValue(context: JSContext, input: JSValue): AutoGenType0 {
+        let obj = input.asObject()
+        AutoGenType0(
+        Float64.fromJSValue(context, obj["a"]),
+        String.fromJSValue(context, obj["b"])
+        )
+    }
+    
+}
 /***********ENUM***********/
 
 /* enum Colors {
@@ -75,7 +104,7 @@ public enum Colors <: ToString & Equatable < Colors > {
 
 public class ASC {
     
-    protected ASC(var arkts_object: JSObject) {}
+    protected ASC(var arkts_object: JSObject) { }
     /**
 	 * @brief constructor(param1:string, param2:{a:number,b:string}, param3:number, funcParam:()=>string, callback?:AsyncCallback<string>): void
 	 */
@@ -107,7 +136,7 @@ public class ASC {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): ASC {
+     static func fromJSValue(context: JSContext, input: JSValue): ASC {
         ASC(input.asObject())
     }
 }
@@ -118,7 +147,7 @@ public class ASC {
 
 public class ForParamToJs {
     
-    protected ForParamToJs(var arkts_object: JSObject) {}
+    protected ForParamToJs(var arkts_object: JSObject) { }
     /**
 	 * @brief constructor(param1:common.Context, param2:Colors, param3:BigInt, param4:Uint8Array, param5:number[], param6:Array<number>, callback:AsyncCallback<string>, paramEnum:Array<Colors>, param7?:Array<number>, param8?:Colors, param9?:Array<UInt8>): void
 	 */
@@ -142,7 +171,7 @@ public class ForParamToJs {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): ForParamToJs {
+     static func fromJSValue(context: JSContext, input: JSValue): ForParamToJs {
         ForParamToJs(input.asObject())
     }
 }
