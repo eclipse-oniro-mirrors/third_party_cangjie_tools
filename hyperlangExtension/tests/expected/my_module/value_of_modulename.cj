@@ -9,6 +9,7 @@ package my_module
 import ohos.ark_interop.*
 import ohos.ark_interop_helper.*
 import ohos.base.*
+
 //构造函数
 /*class DeclareKeyword Greeter {
     constructor(greeting : string): void
@@ -16,7 +17,7 @@ import ohos.base.*
 
 public class Greeter {
     
-    protected Greeter(var arkts_object: JSObject) {}
+    protected Greeter(var arkts_object: JSObject) { }
     /**
 	 * @brief constructor(greeting : string): void
 	 */
@@ -40,7 +41,7 @@ public class Greeter {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): Greeter {
+     static func fromJSValue(context: JSContext, input: JSValue): Greeter {
         Greeter(input.asObject())
     }
 }
