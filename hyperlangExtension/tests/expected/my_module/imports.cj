@@ -30,6 +30,7 @@ import ohos.base.*
 /*FIXME: Import details need to be verified and rewritten by user.*/
 /*import { ExportedInterface } from './exportAlias';*/
 
+
 /*
 
 public const value1 = 0/* FIXME: Initialization is required */
@@ -58,7 +59,7 @@ public func createSub(): JSValue/* FIXME: `Inheritances.SubClass` */ {
 
 public open class ExportedInterface {
     
-    protected ExportedInterface(public var myOption!: Option<String> = None) {}
+    protected ExportedInterface(private var myOption!: Option<String> = None) { }
     
     
     public open func toJSValue(context: JSContext): JSValue {

@@ -12,6 +12,7 @@ import ohos.ark_interop.*
 import ohos.ark_interop_helper.*
 import ohos.base.*
 
+
 public enum MyUnion8 {
     | _STRING_NUMBER___(JSValue/* FIXME: `(string | number)[]` */)
     | _KEY_STRING_(JSValue/* FIXME: `{ key: string }` */)
@@ -21,6 +22,10 @@ public enum MyUnion8 {
             case _STRING_NUMBER___(x) => x
             case _KEY_STRING_(x) => x
         }
+    }
+    public static func fromJSValue(context: JSContext, input: JSValue): MyUnion8 {
+        
+        throw Exception("unsupport type!")
     }
 }
 

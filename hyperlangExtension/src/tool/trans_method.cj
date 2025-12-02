@@ -10,7 +10,6 @@ package hle.tool
 
 import std.ast.*
 import std.collection.*
-import std.regex.*
 
 public class TransMethod {
     var arkName = ""
@@ -91,7 +90,8 @@ public class TransMethod {
         }
         let arkR = methodType.returns
         this.arkRetType = arkR
-        this.cjRetType = TypeMap.typeMap(arkR)
+        // Use TsType-based conversion for better union type support
+        this.cjRetType = methodType.returnTypeNode.toCJType()
         if (promiseNeedGen) {
             callbackInnerType = cjRetType
         }
@@ -174,12 +174,12 @@ public class TransMethod {
 
         let ctxToken = quote(ctx)
         let paramToken = paramListToCJ()
-        let typeParameters = getTypeParametersToken()
+        let typeParameters = getTypeParametersToken(this.methodType.typeParameters)
         let transparamToken = (parametersToJS(ctxToken) |> reduce {l, r => l + commaToken + r}).getOrDefault {
             => quote()
         }
 
-        let typeConstraintsToken = getTypeConstraintsToken()
+        let typeConstraintsToken = getTypeConstraintsToken(this.methodType.typeParameters)
 
         let retTypeToken = Token(TokenKind.IDENTIFIER, this.cjRetType)
 
@@ -257,8 +257,8 @@ public class TransMethod {
             third_param.append(quote({$(ctxToken) => [$(transparamToken)]}))
         }
         let moduleName = gconfig.requireModuleName
-        let typeParameters = getTypeParametersToken()
-        let typeConstraintsToken = getTypeConstraintsToken()
+        let typeParameters = getTypeParametersToken(this.methodType.typeParameters)
+        let typeConstraintsToken = getTypeConstraintsToken(this.methodType.typeParameters)
 
         let forth_param = getAsyncRetToken(this.cjRetType, retTypeToken)
 
@@ -280,7 +280,7 @@ public class TransMethod {
         }
 
         let template: Tokens = quote(
-            $(prefix) func $(funcName)($(paramToken)):$(retTypeToken) $(typeConstraintsToken) {
+            $(prefix) func $(funcName)$(typeParameters)($(paramToken)):$(retTypeToken) $(typeConstraintsToken) {
                 $(cbToken)jsObjApiCall<$(retTypeToken)>($(staticConstructor)$(memberToken)$(getArkTSFuncName()), $(third_param)) $(forth_param)
             }
         )
@@ -305,40 +305,7 @@ public class TransMethod {
             .getOrDefault {=> quote()}
     }
 
-    public func getTypeParametersToken(typeParameters!: ArrayList<TypeParameter> = this.methodType.typeParameters): Tokens {
-        let typeParametersToken = Tokens()
-        if (typeParameters.isEmpty()) {
-            return typeParametersToken
-        }
-
-        typeParametersToken.append(Token(TokenKind.LT))
-        for (i in 0..typeParameters.size) {
-            typeParametersToken.append(Token(TokenKind.IDENTIFIER, typeParameters[i].name))
-            if (i < typeParameters.size - 1) {
-                typeParametersToken.append(commaToken)
-            }
-        }
-        typeParametersToken.append(Token(TokenKind.GT))
-        return typeParametersToken
-    }
-
-    public func getTypeConstraintsToken(typeParameters!: ArrayList<TypeParameter> = this.methodType.typeParameters): Tokens {
-        let typeConstraintsToken = Tokens()
-        if (typeParameters.size == 0) {
-            return typeConstraintsToken
-        } else {
-            var name = "where "
-            for (i in 0..typeParameters.size) {
-                name += "${typeParameters[i].name} <: JSInteropType<${typeParameters[i].name}>"
-                name += if (i != typeParameters.size - 1) {
-                    ", "
-                } else {
-                    ""
-                }
-            }
-            return Token(TokenKind.IDENTIFIER, name).toTokens()
-        }
-    }
+    
 
     // @deprecated
     public func getParamToken(params!: ArrayList<String> = this.methodType.params, isAssignDefaultValue!: Bool = true): Tokens {
