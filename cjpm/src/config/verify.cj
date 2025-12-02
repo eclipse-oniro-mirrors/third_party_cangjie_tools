@@ -38,7 +38,7 @@ public func nameCheck(text: String, path: String): Bool {
         eprintln("Error: the 'name' field in ${path} can't be empty")
         return false
     }
-    var matched = Regex(REGEXP_CONDITON_VALUE)
+    let matched = Regex(REGEXP_CONDITON_VALUE)
     match (matched.find(text)) {
         case Some(_) => return true
         case None => eprintln("Error: the 'name' field '${text}' in ${path} is wrong, " +
@@ -53,7 +53,7 @@ public func nameCheck(text: String): Bool {
         eprintln("Error: the 'name' field can't be empty")
         return false
     }
-    var matched = Regex(REGEXP_CONDITON_VALUE)
+    let matched = Regex(REGEXP_CONDITON_VALUE)
     match (matched.find(text)) {
         case Some(_) => return true
         case None => eprintln("Error: the 'name' field '${text}' is wrong, " +
@@ -196,7 +196,7 @@ public func customizedOptionCheck(option: String, path: String): Bool {
         eprintln(errorString)
         return false
     }
-    var matched = Regex(REGEXP_CONDITON_VALUE)
+    let matched = Regex(REGEXP_CONDITON_VALUE)
     match (matched.find(option)) {
         case Some(_) => return true
         case None =>
@@ -243,7 +243,7 @@ public func srcDirCheck(text: String, path: String, configPath: String): Bool {
 }
 
 public func envNameCheck(envName: String, cmd: String, configFilePath: String): Bool {
-    var matched = Regex(REGEXP_CONDITON_VALUE)
+    let matched = Regex(REGEXP_CONDITON_VALUE)
     match (matched.find(envName)) {
         case Some(_) => return true
         case None => eprintln("Error: environment name '${envName}' in profile '${cmd}' in ${configFilePath} " +
