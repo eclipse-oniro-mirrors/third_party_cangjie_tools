@@ -10,20 +10,21 @@ import ohos.ark_interop.*
 import ohos.ark_interop_helper.*
 import ohos.base.*
 
+
 /*class ExportKeyword DeclareKeyword MessagePackage {
     getDataAsync(p: typeof MessagePackage): Promise<typeof MessagePackage>
     }*/
 
 public class MessagePackage {
     
-    protected MessagePackage(var arkts_object: JSObject) {}
+    protected MessagePackage(var arkts_object: JSObject) { }
     
     
     /**
 	 * @brief getDataAsync(p: typeof MessagePackage): Promise<typeof MessagePackage>
 	 */
-    public static func getDataAsync(callback: AsyncCallback < JSValue/* FIXME: `typeof MessagePackage` */ >, p: JSValue/* FIXME: `typeof MessagePackage` */): Unit {
-        jsObjApiCallPromise < JSValue/* FIXME: `typeof MessagePackage` */ >(getClassConstructorObj("my_module_typeofType", "MessagePackage"), "getDataAsync", callback, { ctx =>[p] }) {
+    public static func getDataAsync(callback: AsyncCallback < JSValue/* FIXME: `Promise<UnsupportedType[TypeQuery]>` */ >, p: JSValue/* FIXME: `typeof MessagePackage` */): Unit {
+        jsObjApiCallPromise < JSValue/* FIXME: `Promise<UnsupportedType[TypeQuery]>` */ >(getClassConstructorObj("my_module_typeofType", "MessagePackage"), "getDataAsync", callback, { ctx =>[p] }) {
             ctx, info => info
         }
     }
@@ -32,7 +33,7 @@ public class MessagePackage {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): MessagePackage {
+     static func fromJSValue(context: JSContext, input: JSValue): MessagePackage {
         MessagePackage(input.asObject())
     }
 }

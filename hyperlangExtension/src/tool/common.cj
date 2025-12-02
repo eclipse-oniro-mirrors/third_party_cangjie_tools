@@ -26,7 +26,6 @@ public const bool: String = "Bool"
 public const str: String = "String"
 public const unit: String = "Unit"
 public const byteArr: String = "Array<UInt8>"
-public const any: String = "Any"
 public const promise: String = "Promise"
 public const JsBigInt: String = "bigint"
 public const JsHashMap: String = "Record"
@@ -196,6 +195,7 @@ public class MethodType <: Serializable<MethodType> {
     public var parameters: ArrayList<TsParameter> = ArrayList<TsParameter>()
     public var isConstructor: Bool = false
     public var returns: String = ""
+    public var returnTypeNode: TsType = TsVoid  
     public var comment: String = ""
     public var typeParameters: ArrayList<TypeParameter> = ArrayList<TypeParameter>()
 
@@ -250,6 +250,12 @@ public class MethodType <: Serializable<MethodType> {
         result.isConstructor = Bool.deserialize(dms2.get("isConstructor"))
         result.parameters = ArrayList<TsParameter>.deserialize(dms2.get("parameters"))
         result.typeParameters = ArrayList<TypeParameter>.deserialize(dms2.get("typeParameters"))
+        // Parse return type node if available
+        try {
+            result.returnTypeNode = TsType.fromSExp(String.deserialize(dms2.get("returnTypeNode")))
+        } catch (e: Exception) {
+            result.returnTypeNode = TsVoid  // Fallback to void if parsing fails
+        }
         return result
     }
 }
@@ -330,13 +336,13 @@ public class TypeType <: Serializable<TypeType> {
                 let nonNullTypes: ArrayList<TsType> = ArrayList<TsType>()
                 for (e in arr) {
                     match (e) {
-                        case TsNull | TsUndefined => ()
+                        case TsNull | TsUndefined | TsVoid => ()
                         case _ => nonNullTypes.add(e)
                     }
                 }
                 if (nonNullTypes.size != 1) {
                     // handle union type, convert it to enum
-                    let ut = UnionType(name, tsType)
+                    let ut = UnionType(name, tsType, ArrayList<String>())
                     tok.append(ut.genTokens())
                     return tok
                 }
@@ -558,43 +564,111 @@ public class UnionType {
     let metaInfo: TsType
     let typeList = ArrayList<String>()
     let ctxName = "context"
-    let nativeTypeMap = HashMap<String, (String, String, String)>(
+    let genericParams: ArrayList<TypeParameter>
+    let genericSet = HashSet<String>()
+    let nativeTypeMap = HashMap<String, (String, String, String, String)>(
         [
-            ("null", ("NULL", "NULL", "${ctxName}.null().toJSValue()")),
-            ("undefined", ("UNDEFINED", "UNDEFINED", "${ctxName}.undefined().toJSValue()")),
-            ("number", ("NUMBER(Float64)", "NUMBER(x)", "${ctxName}.number(x).toJSValue()")),
-            ("string", ("STRING(String)", "STRING(x)", "${ctxName}.string(x).toJSValue()")),
-            ("boolean", ("BOOLEAN(Bool)", "BOOLEAN(x)", "${ctxName}.boolean(x).toJSValue()")),
+            ("null", ("NULL", "NULL", "${ctxName}.null().toJSValue()", ###"
+        if (input.isNull()) {
+            return NULL
+        }"###)),
+            ("undefined", ("UNDEFINED", "UNDEFINED", "${ctxName}.undefined().toJSValue()", ###"
+        if (input.isUndefined()) {
+            return UNDEFINED
+        }"###)),
+            ("number", ("NUMBER(Float64)", "NUMBER(x)", "${ctxName}.number(x).toJSValue()", ###"
+        if(input.isNumber()) {
+            return NUMBER(Float64.fromJSValue(context, input))
+        } "###)),
+            ("string", ("STRING(String)", "STRING(x)", "${ctxName}.string(x).toJSValue()", ###"
+        if(input.isString()) {
+            return STRING(String.fromJSValue(context, input))
+        }"###)),
+            ("boolean", ("BOOLEAN(Bool)", "BOOLEAN(x)", "${ctxName}.boolean(x).toJSValue()", ###"
+        if (input.isBoolean()) {
+            return BOOLEAN(Bool.fromJSValue(context, input))
+        }"###)),
             ("Uint8Array", ("BYTEARRAY(Array<UInt8>)", "BYTEARRAY(x)",
-                    "${ctxName}.global[\"Uint8Array\"].asClass().new(x.toJSValue(${ctxName}))")),
+                    "${ctxName}.global[\"Uint8Array\"].asClass().new(x.toJSValue(${ctxName}))", ###"
+        if (instanceof(input, "Uint8Array")) {
+            let jsArray: JSValue = context.global["Uint8Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<UInt8>(context, jsArray))
+        }"###)),
             ("Float32Array", ("FLOAT32ARRAY(Array<Float32>)", "FLOAT32ARRAY(x)",
-                    "${ctxName}.global[\"Float32Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())")),
+                    "${ctxName}.global[\"Float32Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())", ###"
+        if (instanceof(input, "Float32Array")) {
+            let jsArray: JSValue = context.global["Float32Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<Float32>(context, jsArray))
+        }"###)),
             ("Int8Array", ("INT8ARRAY(Array<Int8>)", "INT8ARRAY(x)",
-                    "${ctxName}.global[\"Int8Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())")),
+                    "${ctxName}.global[\"Int8Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())", ###"
+        if (instanceof(input, "Int8Array")) {
+            let jsArray: JSValue = context.global["Int8Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<Int8>(context, jsArray))
+        }"###)),
             ("Int16Array", ("INT16ARRAY(Array<Int16>)", "INT16ARRAY(x)",
-                    "${ctxName}.global[\"Int16Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())")),
+                    "${ctxName}.global[\"Int16Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())", ###"
+        if (instanceof(input, "Int16Array")) {
+            let jsArray: JSValue = context.global["Int16Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<Int16>(context, jsArray))
+        }"###)),
             ("Uint16Array", ("UINT16ARRAY(Array<UInt16>)", "UINT16ARRAY(x)",
-                    "${ctxName}.global[\"Uint16Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())")),
+                    "${ctxName}.global[\"Uint16Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())", ###"
+        if (instanceof(input, "Uint16Array")) {
+            let jsArray: JSValue = context.global["Uint16Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<UInt16>(context, jsArray))
+        }"###)),
             ("Uint32Array", ("UINT32ARRAY(Array<UInt32>)", "UINT32ARRAY(x)",
-                    "${ctxName}.global[\"Uint32Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())")),
+                    "${ctxName}.global[\"Uint32Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())", ###"
+        if (instanceof(input, "Uint32Array")) {
+            let jsArray: JSValue = context.global["Uint32Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<UInt32>(context, jsArray))
+        }"###)),
             ("Int32Array", ("INT32ARRAY(Array<Int32>)", "INT32ARRAY(x)",
-                    "${ctxName}.global[\"Int32Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())")),
+                    "${ctxName}.global[\"Int32Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())", ###"
+        if (instanceof(input, "Int32Array")) {
+            let jsArray: JSValue = context.global["Int32Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<Int32>(context, jsArray))
+        }"###)),
             ("BigInt64Array", ("INT64ARRAY(Array<Int64>)", "INT64ARRAY(x)",
-                    "${ctxName}.global[\"BigInt64Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())")),
+                    "${ctxName}.global[\"BigInt64Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())", ###"
+        if (instanceof(input, "BigInt64Array")) {
+            let jsArray: JSValue = context.global["BigInt64Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<Int64>(context, jsArray))
+        }"###)),
             ("BigUint64Array", ("UINT64ARRAY(Array<UInt64>)", "UINT64ARRAY(x)",
-                    "${ctxName}.global[\"BigUint64Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())")),
+                    "${ctxName}.global[\"BigUint64Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())", ###"
+        if (instanceof(input, "BigUint64Array")) {
+            let jsArray: JSValue = context.global["BigUint64Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<UInt64>(context, jsArray))
+        }"###)),
             ("Float64Array", ("FLOAT64ARRAY(Array<Float64>)", "FLOAT64ARRAY(x)",
-                    "${ctxName}.global[\"Float64Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())")),
-            ("bigint", ("BIGINT(BigInt)", "BIGINT(x)", "${ctxName}.bigint(x).toJSValue()"))
+                    "${ctxName}.global[\"Float64Array\"].asClass().new(${ctxName}.arrayBuffer(x).toJSValue())", ###"
+        if (instanceof(input, "Float64Array")) {
+            let jsArray: JSValue = context.global["Float64Array"].asObject().callMethod("from", [input])
+            return UINT8ARRAY(fromJSArray<Float64>(context, jsArray))
+        }"###)),
+            ("bigint", ("BIGINT(BigInt)", "BIGINT(x)", "${ctxName}.bigint(x).toJSValue()", ###"
+        if (input.isBigInt()) {
+            return BIGINT(input.toBigInt())
+        }"###))
         ]
     )
 
-    public init(_name: String, _metaInfo: TsType) {
+    public init(_name: String, _metaInfo: TsType, _genericParams: ArrayList<String>) {
         name = _name
         metaInfo = _metaInfo
         match (metaInfo) {
             case TsUnion(list) => typeList.add(all: list.map {it => it.toString()})
             case _ => throw IllegalArgumentException("Input is not a union type")
+        }
+        genericParams = _genericParams |> map {item =>
+            let result = TypeParameter()
+            result.name = item
+            result
+        } |> collectArrayList
+        _genericParams |> forEach {item =>
+            genericSet.add(item)
         }
     }
 
@@ -624,7 +698,9 @@ public class UnionType {
         return if (let Some(v) <- nativeTypeMap.get(t)) {
             // handle native type
             v[0]
-        } else if (userDefinedNames.contains(t)) {
+        } else if (genericSet.contains(t)) {
+            t + 0.toString() + "(${t})"
+        } else if (userDefinedNames.contains(t) || t.startsWith("AutoGenType")) {
             // handle user-defined type
             t.toAsciiUpper() + "(${t})"
         } else if (isStringLiteral(t)) {
@@ -639,7 +715,11 @@ public class UnionType {
     func getIdentifierToken(t: String): (Token, Token) {
         return if (let Some(c) <- nativeTypeMap.get(t)) {
             (Token(TokenKind.IDENTIFIER, c[1]), Token(TokenKind.IDENTIFIER, c[2]))
-        } else if (userDefinedNames.contains(t)) {
+        } else if (genericSet.contains(t)) {
+            let x = Token(TokenKind.IDENTIFIER, t + 0.toString() + "(x)")
+            let y = Token(TokenKind.IDENTIFIER, "x.toJSValue(context)")
+            (x, y)
+        } else if (userDefinedNames.contains(t) || t.startsWith("AutoGenType")) {
             let x = Token(TokenKind.IDENTIFIER, t.toAsciiUpper() + "(x)")
             let y = Token(TokenKind.IDENTIFIER, "x.toJSValue(context)")
             (x, y)
@@ -658,7 +738,9 @@ public class UnionType {
     public func genTokens(): Tokens {
         var ret = Tokens()
         let nameToken = Token(TokenKind.IDENTIFIER, name)
-        ret.append(quote(public enum $(nameToken) { ) + nl)
+        let typeParameters = getTypeParametersToken(genericParams)
+        let typeConstraintsToken = getTypeConstraintsToken(genericParams)
+        ret.append(quote(public enum $(nameToken)$(typeParameters)$(typeConstraintsToken){ ) + nl)
         for (t in typeList) {
             let vToken = Token(TokenKind.IDENTIFIER, getStringToken(t))
             ret.append(quote(| $(vToken)) + nl)
@@ -675,7 +757,21 @@ public class UnionType {
             ret.append(quote(case $(cs) => ) + cv + nl)
         }
 
-        ret.append(quote(}) + nl + quote(}) + nl + quote(}) + nl)
+        ret.append(quote(}) + nl + quote(}) + nl)
+        
+        ret.append(quote(public static func fromJSValue(context: JSContext, input: JSValue): $(nameToken)$(typeParameters) {) + nl)
+        for (t in typeList) {
+            if (let Some(c) <- nativeTypeMap.get(t)) {
+                ret.append(Token(TokenKind.IDENTIFIER, c[3]))       
+            }
+        }
+        ret.append(nl)
+        ret.append(quote(throw Exception("unsupport type!")))
+        ret.append(nl)
+        
+        ret.append(quote(}) + nl)
+        ret.append(quote(}) + nl)
+
         ret
     }
 }
@@ -772,4 +868,12 @@ public class CommandLineArg {
     public var is3rd: Bool = true
     public var directoryPath: String = ""
     public var tsPath: String = ""
+    public var bindings2C: Bool = false
+    public var clangArgs: String = ""
+    public var autoDect: Bool = false
+    public var bindingsPath: String = ""
+}
+
+public enum InputType {
+    ARKTS | C
 }

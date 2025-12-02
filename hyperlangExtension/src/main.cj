@@ -18,7 +18,7 @@ import stdx.encoding.json.*
 import std.process.*
 import hle.tool.*
 import hle.entry.*
-import std.fs.{exists, remove}
+import std.fs.{exists}
 import std.regex.*
 
 const OS_WINDOWS = "Windows"
@@ -28,6 +28,10 @@ const OS = OS_WINDOWS
 @When[os != "Windows"]
 const OS = OS_OTHERS
 public const analysisFilePath: String = "./src/dtsparser/analysis.js"
+@When[os == "Windows"]
+public const cBindingsPath: String = "./src/dtsparser/node_modules/.bin/cjbind.exe"
+@When[os != "Windows"]
+public const cBindingsPath: String = "./src/dtsparser/node_modules/.bin/cjbind"
 let mtx = Mutex()
 let cla = CommandLineArg()
 let HELP_INFO = """
@@ -41,9 +45,12 @@ Options:
   -r <file>             The absolute path of the typescript compiler source code
   -d <directory>        The absolute path of the directory containing d.ts or d.ets file (required if -i is not used)
   -o <directory>        The directory to save the binding code (optional, defaults to the current directory)
+  -c                    Generate C to Cangjie bindings
+  --clang-args          The parameters that will be directly passed to clang
+  --no-detect-include-path  Disable automatic include path detection
+  -b <file>             The absolute path of the binding file
   -j <file>             The absolute path of the d.ts or d.ets file analyzer (optional)
   --module-name <name>  Customize the generated Cangjie package name (optional)
-  --arkui               Generate bindings for arkui (optional)
   --lib                 Generate bindings for third-party library (optional)
   --help                Display this help information
 
@@ -65,15 +72,18 @@ main(args: Array<String>) {
 
     let argSpecs = [
         Long("module-name", RequiredValue),
-        Long("arkui", NoValue),
+        Long("clang-args", RequiredValue),
         Long("lib", NoValue),
+        Long("no-detect-include-path", NoValue),
         Long("help", NoValue),
         Short(r'r', RequiredValue),
         Short(r'i', RequiredValue),
         Short(r'o', RequiredValue),
         Short(r'j', RequiredValue),
         Short(r'd', RequiredValue),
-        Short(r'h', NoValue)
+        Short(r'b', RequiredValue),
+        Short(r'h', NoValue),
+        Short(r'c', NoValue)
     ]
     let pa = parseArguments(args, argSpecs)
     if (pa.options.contains("help") || pa.options.contains("h")) {
@@ -86,9 +96,40 @@ main(args: Array<String>) {
     }
     parseCommandLine(pa)
 
+    if (cla.bindings2C) {
+        println("========Generate C to cangjie bindings Begins!========")
+        let dir = Path(cla.outDir)
+        println("The out dir is:" + dir.toString())
+        if (!cla.arkpath.isEmpty()) {
+            generateCangjieBindingsForC(cla.cjModuleName, cla.arkpath, dir.toString())
+        } else {
+            let fileInfos = ArrayList<FileInfo>()
+            let inputDir = Path(cla.directoryPath)
+            getFiles(fileInfos, inputDir, inputType: InputType.C)
+            if (fileInfos.isEmpty()) {
+                println("Error: generation failed! Not found .h file under ${cla.directoryPath}")
+                return 0
+            }
+            let futureList = ArrayList<Future<Unit>>()
+            fileInfos |> forEach { fileInfo => 
+                let future = spawn {
+                    generateCangjieBindingsForC(cla.cjModuleName, fileInfo.path.toString(), dir.toString())
+                }
+                futureList.add(future)
+            }
+            for (f in futureList) {
+                f.get()
+            }
+        }
+        println("========Generate C to cangjie bindings end!========")
+        let end = MonoTime.now()
+        println("total cost of hle: ${end - start}")
+        return 0
+    }
+
     // we want to get `lz4js` from `src/dtsparser/node_modules/@types/lz4js/`
     var moduleNameTemp = cla.cjModuleName
-    cla.directoryPath = (pa.options.get("d") ?? "")
+    
     if (!cla.directoryPath.isEmpty() && moduleNameTemp == "") {
         if (!cla.directoryPath.endsWith("/")) {
             cla.directoryPath += "/"
@@ -122,6 +163,29 @@ main(args: Array<String>) {
     return 0
 }
 
+func generateCangjieBindingsForC(moduleName: String, filePath: String, outDir: String): Unit {
+    if (!filePath.endsWith(".h")) {
+        println("Warning: The input file is not a .h file: " + filePath)
+        return
+    }
+
+    let outputFileName = getFileName(filePath).replace(".h", ".cj")
+
+    let result = if (cla.autoDect) {"--no-detect-include-path"} else {""}
+    println("The command is: ${cla.bindingsPath} --auto-cstring --array-pointers-in-args --no-layout-test " + result + " -p " + 
+        moduleName + " -o " + outDir + outputFileName + " " + filePath + " -- " + cla.clangArgs)
+    if (cla.autoDect) {
+        execute(cla.bindingsPath, "--auto-cstring", "--array-pointers-in-args", "--no-layout-test","--no-detect-include-path",
+            "-p", moduleName, "-o",outDir + outputFileName, filePath, "--", cla.clangArgs
+        )
+
+    } else {
+        execute(cla.bindingsPath, "--auto-cstring", "--array-pointers-in-args", "--no-layout-test",
+            "-p", moduleName, "-o",outDir + outputFileName, filePath, "--", cla.clangArgs
+        )
+    }
+}
+
 func parseCommandLine(pa: ParsedArguments): Unit {
     let currentPath = getHomeDirectory().toString()
 
@@ -131,8 +195,12 @@ func parseCommandLine(pa: ParsedArguments): Unit {
         cla.outDir += "/"
     }
     cla.jsASTPath = (pa.options.get("j") ?? analysisFilePath) //  ArkTS文件分析器路径
+    cla.bindingsPath = (pa.options.get("b") ?? cBindingsPath)
     cla.cjModuleName = (pa.options.get("module-name") ?? "")
     cla.is3rd = pa.options.contains("lib")
+    cla.autoDect = pa.options.contains("no-detect-include-path")
+    cla.bindings2C = pa.options.contains("c")
+    cla.clangArgs = (pa.options.get("clang-args") ?? "")
 
     @When[cjc_version < "0.59.4"]
     let pathName = pa.options.get("r") ?? "typescript"
@@ -141,6 +209,8 @@ func parseCommandLine(pa: ParsedArguments): Unit {
     let pathName = Path(pa.options.get("r") ?? "typescript").normalize().toString()
 
     cla.tsPath = pathName
+
+    cla.directoryPath = (pa.options.get("d") ?? "")
 }
 
 func parseMultipleFiles(moduleNameTemp: String): Bool {
@@ -245,6 +315,16 @@ func createDir(dir: String) {
     mtx.unlock()
 }
 
+func getFileName(arkpath: String) {
+    let arkFileName = if (OS == OS_WINDOWS) {
+        let canonicalPath = arkpath.replace("\\", "/")
+        canonicalPath.split("/")[canonicalPath.split("/").size - 1]
+    } else {
+        arkpath.split("/")[arkpath.split("/").size - 1]
+    }
+    return arkFileName
+}
+
 func parseFile(arkpath: String, outDir: String, jsASTPath: String, gconfig: GlobalConfig,
     moduleNameTemp!: String = "", thirdpartyName!: ?String = None, relativePathName!: String = "", tsPath!: String = "") {
     let isInvalid = !exists(arkpath) || !arkpath.endsWith(".d.ts") && !arkpath.endsWith(".d.ets")
@@ -252,12 +332,7 @@ func parseFile(arkpath: String, outDir: String, jsASTPath: String, gconfig: Glob
         throw IllegalArgumentException("Invalid arkts input: ${arkpath}")
     }
 
-    let arkFileName = if (OS == OS_WINDOWS) {
-        let canonicalPath = arkpath.replace("\\", "/")
-        canonicalPath.split("/")[canonicalPath.split("/").size - 1]
-    } else {
-        arkpath.split("/")[arkpath.split("/").size - 1]
-    }
+    let arkFileName = getFileName(arkpath)
 
     let module = arkFileName.split("/")[0]
     let moduleFullName = module
@@ -348,7 +423,7 @@ func getArrayFromJson(dataModel: DataModelStruct, key: String): JsonArray {
     return JsonArray.fromStr(dataModel.get(key).toJson().toString()).asArray()
 }
 
-func getFiles(fileInfos: ArrayList<FileInfo>, dir: Path): Unit {
+func getFiles(fileInfos: ArrayList<FileInfo>, dir: Path, inputType!: InputType = InputType.ARKTS): Unit {
     let files = Directory.readFrom(dir)
     for (f in files) {
         if (f.isSymbolicLink()) {
@@ -356,8 +431,15 @@ func getFiles(fileInfos: ArrayList<FileInfo>, dir: Path): Unit {
             getFiles(fileInfos, f.path)
         } else if (f.isRegular()) {
             let fileName = f.path.fileName
-            if (fileName.endsWith(".d.ts") || fileName.endsWith(".d.ets")) {
-                fileInfos.add(f)
+            match (inputType) {
+                case InputType.ARKTS =>
+                    if (fileName.endsWith(".d.ts") || fileName.endsWith(".d.ets")) {
+                        fileInfos.add(f)
+                    }
+                case InputType.C =>
+                    if (fileName.endsWith(".h")) {
+                        fileInfos.add(f)
+                    }
             }
         }
     }
