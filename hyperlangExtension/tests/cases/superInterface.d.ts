@@ -5,6 +5,7 @@
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 export interface p29 {
     debug(arg: string): void;
     info(arg: string): void;

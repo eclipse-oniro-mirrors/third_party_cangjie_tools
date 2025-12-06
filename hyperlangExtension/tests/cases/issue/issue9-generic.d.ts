@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 declare function testGeneric<T>(t:T): T | string
 
 declare function testGeneric1<T, U>(t:T): T | U | string

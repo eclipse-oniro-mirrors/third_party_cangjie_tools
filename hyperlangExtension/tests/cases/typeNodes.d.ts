@@ -5,6 +5,7 @@
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 // These interfaces are used for testing type syntax of the typescript compiler.
 // Properties are named after the syntax kinds as in tsc.
 interface BasicTypes {

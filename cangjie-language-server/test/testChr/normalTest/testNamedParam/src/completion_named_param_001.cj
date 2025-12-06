@@ -5,8 +5,11 @@
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
-type Callback<T> = (arg: T) => void;
 
-class CM {
-    static f01(x: (obj: IM, cb: Callback<EMStr>) => void): void
+package namedParam
+
+func add(abcdefg!: Int64, uuu!: Int64): Int64 {
+    return abcdefg + uuu
 }
+
+let a = add(a)

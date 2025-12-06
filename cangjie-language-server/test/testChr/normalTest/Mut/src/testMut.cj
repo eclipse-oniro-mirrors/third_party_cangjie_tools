@@ -5,6 +5,7 @@
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 // mut 函数是一种特殊的实例成员函数。在mut 函数内部，this 的语义是特殊的，这种this 拥有原地修
 // 改字段的能力，修改会立刻生效。我们可以使用这种特性，让struct 类型的实例函数拥有修改自身的功能，
 // 以满足特殊的场景。

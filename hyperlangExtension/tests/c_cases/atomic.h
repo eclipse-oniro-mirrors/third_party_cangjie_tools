@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 // #include <stdatomic.h>
 
 // 用 _Atomic 关键字声明原子类型（int 的原子封装）

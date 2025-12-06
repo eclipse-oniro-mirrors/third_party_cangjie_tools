@@ -4,10 +4,12 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 package my_module
 
 public const num: Int32 = 42
 
-foreign func malloc(a: Int32): CPointer<Unit>
-
 public type callback_func = CFunc<(arg1: Int32, arg2: Int32) -> Int32>
+
+foreign func testPointer(a: Int32): CPointer<Unit>
