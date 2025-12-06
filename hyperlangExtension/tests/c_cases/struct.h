@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 // 外层结构体包含匿名结构体
 struct Point {
     // 匿名结构体：无名称，直接包含 x、y 成员
@@ -56,3 +58,13 @@ typedef struct {
 teststruct struct1 = {1, 1};
 
 
+struct Point1 {
+    struct {
+        int x;
+        int y;
+    } test1;
+    struct {
+        int m;
+        int n;
+    } test2;
+};

@@ -4,11 +4,12 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 int num = 42;
 int* ptr = &num;
 
 // float* floatPtr = nullptr;
 
-void* malloc(int a);
-
 typedef int (*callback_func)(int, int);
+void* testPointer(int a);

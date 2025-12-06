@@ -4,6 +4,8 @@
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
 
+// The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
+
 #include <complex.h> // C 标准复数头文件
 
 float _Complex c_float;
