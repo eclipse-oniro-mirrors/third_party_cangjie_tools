@@ -7,3 +7,6 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 package my_module
+
+/*FIXME: Non-constant global variable details need to be verified and rewritten by user.*/
+/* float _Complex c_float */

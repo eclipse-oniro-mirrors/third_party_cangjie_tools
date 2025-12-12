@@ -15,7 +15,7 @@ import ohos.ark_interop.*
 import std.convert.*
 import std.process.*
 import std.time.*
-import ohos.base.Main
+import ohos.base.UIThread
 
 foreign func gettid(): Int64
 
@@ -56,7 +56,7 @@ protected func getMainContext(): JSContext {
     if (curTid == mainThreadId) {
         initJs()
     } else {
-        let f = spawn (Main) {
+        let f = spawn (UIThread) {
             initJs()
         }
         f.get()
@@ -67,7 +67,7 @@ protected func checkThreadAndCall<T>(ctx: JSContext, f: (JSContext) -> T): T {
     if (ctx.isInBindThread()) {
         f(ctx)
     } else {
-        let fut = spawn (Main) {
+        let fut = spawn (UIThread) {
             f(ctx)
         }
         fut.get()
@@ -115,7 +115,7 @@ protected func asyncCallbackWrapper<T>(ctx: JSContext, callback: AsyncCallback<T
                 }
                 callback(err, data)
             } catch (e: Exception) {
-                AppLog.error(e.toString())
+                Hilog.error(1, "hle", e.toString())
                 throw e
             }
             ctx.undefined().toJSValue()
@@ -152,7 +152,7 @@ protected func asyncCallbackWrapper2Arg<T, P>(ctx: JSContext, callback: (?Busine
                 }
                 callback(err, data1, data2)
             } catch (e: Exception) {
-                AppLog.error(e.toString())
+                Hilog.error(1, "hle", e.toString())
                 throw e
             }
             ctx.undefined().toJSValue()
@@ -181,7 +181,7 @@ protected func asyncCallbackWrapperEx<T>(ctx: JSContext, callback: AsyncCallback
                 }
                 callback(err, data)
             } catch (e: Exception) {
-                AppLog.error(e.toString())
+                Hilog.error(1, "hle", e.toString())
                 throw e
             }
             ctx.undefined().toJSValue()
