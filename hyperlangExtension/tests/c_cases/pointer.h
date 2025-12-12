@@ -6,7 +6,7 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-int num = 42;
+const int num = 42;
 int* ptr = &num;
 
 // float* floatPtr = nullptr;

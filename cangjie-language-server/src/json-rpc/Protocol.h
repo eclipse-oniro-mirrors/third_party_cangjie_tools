@@ -453,7 +453,8 @@ struct DiagnosticRelatedInformation {
 struct CodeAction;
 
 struct DiagFix {
-    bool isAutoImport{false};
+    bool addImport{false};
+    bool removeImport{false};
 };
 
 struct DiagnosticToken {
@@ -475,7 +476,7 @@ struct DiagnosticToken {
 
     std::optional<std::vector<CodeAction>> codeActions{};
 
-    std::optional<DiagFix> diaFix = DiagFix{false};
+    std::optional<DiagFix> diaFix = DiagFix{false, false};
 
     DiagnosticToken()
         : range(), severity(0), code(0), source(""), message(""), relatedInformation() {};
@@ -524,7 +525,9 @@ struct CodeAction {
 
     std::string kind = "";
 
-    const static std::string QUICKFIX_KIND;
+    const static std::string QUICKFIX_ADD_IMPORT;
+
+    const static std::string QUICKFIX_REMOVE_IMPORT;
 
     const static std::string REFACTOR_KIND;
 

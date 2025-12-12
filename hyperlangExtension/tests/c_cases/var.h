@@ -6,22 +6,22 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-char ch = 'a';
+const char ch = 'a';
 
-int a = 0;
+const int a = 0;
 
-unsigned int b = 0;
+const unsigned int b = 0;
 
-short c = 0;
+const short c = 0;
 
-unsigned short d = 0;
+const unsigned short d = 0;
 
-long f = 0;
+const long f = 0;
 
-unsigned long g = 0;
+const unsigned long g = 0;
 
-float x = 1.0;
+const float x = 1.0;
 
-double e = 1.0;
+const double e = 1.0;
 
 const int MAX = 10;

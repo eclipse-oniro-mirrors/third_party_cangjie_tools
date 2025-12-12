@@ -75,6 +75,8 @@ public:
 
     static bool IsPreamble(const ArkAST &input, Cangjie::Position pos);
 
+    static bool IsImportHasOrg(const ArkAST &input, Cangjie::Position pos);
+
     static Token curToken;
 
     static bool needImport;
