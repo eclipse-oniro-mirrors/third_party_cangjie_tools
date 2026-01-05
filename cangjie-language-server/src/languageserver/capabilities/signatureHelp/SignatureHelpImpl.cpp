@@ -323,7 +323,7 @@ void SignatureHelpImpl::ResolveParameter(std::string &detail, bool &firstParams,
 
 void SignatureHelpImpl::ResolveFuncDecl(Cangjie::AST::Decl &decl)
 {
-    if (!ast) {
+    if (!ast || IsHiddenDecl(&decl) || IsHiddenDecl(decl.outerDecl)) {
         return;
     }
     auto realTokens = realTokensAndIndex.first;

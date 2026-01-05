@@ -17,6 +17,8 @@ using namespace Cangjie::FileUtil;
 namespace ark {
 const int NUMBER_FOR_LINE_COMMENT = 2; // length of "//"
 const int NUMBER_FOR_DOC_COMMENT = 3;  // length of "/**"
+const std::string PKG_NAME_OHOS_LABELS = "ohos.labels";
+const std::string HIDE_ANNO_NAME = "Hide";
 const std::unordered_map<ASTKind, SymbolKind> AST_KIND_TO_SYMBOL_KIND = {
     {ASTKind::INTERFACE_DECL, SymbolKind::INTERFACE_DECL},
     {ASTKind::CLASS_DECL, SymbolKind::CLASS},
@@ -57,6 +59,30 @@ TypeCompatibility CheckTypeCompatibility(const Ty *lvalue, const Ty *rvalue)
         return TypeCompatibility::IDENTICAL;
     }
     return TypeCompatibility::INCOMPATIBLE;
+}
+
+bool IsHiddenDecl(const Ptr<Node> node)
+{
+    if (!Options::GetInstance().IsOptionSet("test") && !MessageHeaderEndOfLine::GetIsDeveco()) {
+        return false;
+    }
+    auto decl = DynamicCast<Decl *>(node.get());
+    if (!decl) {
+        return false;
+    }
+    for (auto& anno: decl->annotations) {
+        if (anno->identifier != HIDE_ANNO_NAME) {
+            continue;
+        }
+        auto target = anno->baseExpr ? anno->baseExpr->GetTarget() : nullptr;
+        if (target) {
+            return target->GetFullPackageName() == PKG_NAME_OHOS_LABELS && target->outerDecl &&
+                target->outerDecl->identifier == HIDE_ANNO_NAME;
+        }
+        // 6.0 annotation is not export target, to compatible with 6.0, treat as hidden
+        return true;
+    }
+    return false;
 }
 
 bool IsFuncParameterTypesIdentical(const FuncTy &t1, const FuncTy &t2)
