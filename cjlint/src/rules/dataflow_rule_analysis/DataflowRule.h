@@ -15,7 +15,7 @@
 #include "rules/Rule.h"
 
 
-#include "cangjie/CHIR/Analysis/AnalysisWrapper.h"
+#include "cangjie/CHIR/Analysis/ConstAnalysisWrapper.h"
 #include "cangjie/CHIR/Analysis/ConstAnalysis.h"
 
 namespace Cangjie::CodeCheck {
@@ -26,8 +26,7 @@ public:
     void DoAnalysis(CJLintCompilerInstance* instance) override;
 
 protected:
-    using AnalysisWrapper = CHIR::AnalysisWrapper<CHIR::ConstAnalysis, CHIR::ConstDomain>;
-    AnalysisWrapper* analysisWrapper{nullptr};
+    CHIR::ConstAnalysisWrapper* analysisWrapper{nullptr};
     virtual void CheckBasedOnCHIR(CHIR::Package& package) = 0;
 };
 } // namespace Cangjie::CodeCheck

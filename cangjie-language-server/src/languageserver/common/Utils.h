@@ -366,5 +366,11 @@ std::vector<std::string> Split(const std::string &str, const std::string &patter
 std::vector<std::string> GetAllFilePathUnderCurrentPath(
     const std::string& path, const std::string& extension,
     bool shouldSkipTestFiles = false, bool shouldSkipRegularFiles = false);
+
+bool IsCommonSpecificSymbol(Ptr<Cangjie::AST::Decl> decl);
+
+std::string GetRealFilePathInCommonSpecific(Ptr<Cangjie::AST::Decl> decl);
+
+std::string NormalizeStringToGBK(const std::string& data);
 }
 #endif // LSPSERVER_UTILS_H

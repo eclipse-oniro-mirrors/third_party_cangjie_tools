@@ -39,7 +39,7 @@
 
 [[source-set]]
   name = "common"
-  src-dir = "./common
+  src-dir = "./common"
   features = []
 
 [[source-set]]

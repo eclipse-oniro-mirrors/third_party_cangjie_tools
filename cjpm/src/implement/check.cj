@@ -48,7 +48,10 @@ func resolve(globalConfig: GlobalConfig, isScriptDep!: Bool = false): (DepModel,
         }
     }
 
-    if (!dealWithSuperPkg(dm, globalConfig.isProjectCombine)) {
+    // combined is only used in cjpm build
+    if (!dm.globalConfig.isPureBuild) {
+        dm.superPkgMap.clear()
+    } else if (!dealWithSuperPkg(dm, globalConfig.isProjectCombine)) {
         return (dm, false, mockUsed)
     }
 

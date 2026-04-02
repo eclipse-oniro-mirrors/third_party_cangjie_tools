@@ -6,7 +6,7 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-@NoneProduct
+@NonProduct
 features {}
 package lib.pkg
 
@@ -14,3 +14,11 @@ package lib.pkg
 public common func message_pkg(): Unit
 
 public common func message1_pkg(): Unit
+
+public func addfun(a:Int8, b:Int8) {
+    a + b
+}
+
+public common func message2_pkg(): Unit {
+    addfun(1, 2)
+}

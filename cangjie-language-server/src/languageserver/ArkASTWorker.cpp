@@ -272,6 +272,17 @@ void ArkASTWorker::RunWithASTCache(
     }
 }
 
+int ArkASTWorker::GetFileIDForCompletion(const std::string &file)
+{
+    int fileID = -1;
+    if (Options::GetInstance().IsOptionSet("test")) {
+        fileID = CompilerCangjieProject::GetInstance()->GetFileID(file);
+    } else {
+        fileID = CompilerCangjieProject::GetInstance()->GetFileIDForCompete(file);
+    }
+    return fileID;
+}
+
 void ArkASTWorker::DoCompletionWithASTCache(
     const std::string &name, const std::string &file, Position pos, std::function<void(InputsAndAST)> action)
 {
@@ -292,12 +303,7 @@ void ArkASTWorker::DoCompletionWithASTCache(
         return;
     }
 
-    int fileID = -1;
-    if (Options::GetInstance().IsOptionSet("test")) {
-        fileID = CompilerCangjieProject::GetInstance()->GetFileID(file);
-    } else {
-        fileID = CompilerCangjieProject::GetInstance()->GetFileIDForCompete(file);
-    }
+    int fileID = GetFileIDForCompletion(file);
     if (fileID == -1) {
         std::unique_lock<std::mutex> lock(completionMtx);
         isCompleteRunning = false;

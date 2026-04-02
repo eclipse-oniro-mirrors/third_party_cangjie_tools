@@ -281,7 +281,7 @@ void DataflowRuleGOTH01Check::CheckBasedOnCHIR(CHIR::Package &package)
         if (func->TestAttr(CHIR::Attribute::IMPORTED)) {
             continue;
         }
-        auto result = analysisWrapper->CheckFuncResult(func);
+        auto result = analysisWrapper->CheckFuncResult(*func);
         if (!result) {
             continue;
         }

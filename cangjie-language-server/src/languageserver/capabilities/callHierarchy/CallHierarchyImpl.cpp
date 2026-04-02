@@ -7,6 +7,8 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "CallHierarchyImpl.h"
+#include <map>
+#include <string>
 
 using namespace std;
 using namespace Cangjie;
@@ -165,16 +167,22 @@ void DealCallee(const std::pair<lsp::SymbolID, std::vector<lsp::Ref>>& callee, l
     (void) result.emplace_back(callHierarchyOutgoingCall);
 }
 
-void DealCaller(const std::pair<lsp::SymbolID, std::vector<lsp::Ref>>& caller, lsp::SymbolIndex *index,
-                vector<CallHierarchyIncomingCall>& result)
+void DealCaller(const lsp::SymbolID containerId,
+                const std::pair<std::string, std::vector<lsp::Ref>>& caller,
+                lsp::SymbolIndex *index, vector<CallHierarchyIncomingCall>& result)
 {
+    const auto &filePath = caller.first;
     std::unordered_set<lsp::SymbolID> containerIds;
-    (void)containerIds.insert(caller.first);
+    (void)containerIds.insert(containerId);
     lsp::LookupRequest lookUpReq{containerIds};
     lsp::Symbol containerSym;
     // find caller symbol by id
-    index->Lookup(lookUpReq, [&containerSym](const lsp::Symbol &sym) {
+    index->Lookup(lookUpReq, [&containerSym, filePath](const lsp::Symbol &sym) {
         if (sym.location.IsZeroLoc() && sym.name != "init") {
+            return;
+        }
+        // ref and container is in same file
+        if (sym.location.fileUri != filePath) {
             return;
         }
         containerSym = sym;
@@ -206,28 +214,41 @@ void FindFuncDeclCaller(lsp::SymbolID id, lsp::SymbolIndex *index, vector <CallH
     index->FindRiddenDown(topId, ids);
     (void)ids.insert(id);
 
-    std::map<lsp::SymbolID, std::vector<lsp::Ref>> callers;
+    // in common-specific project, the same symbol id can be in different file (specific symbol covered common symbol)
+    // container symbol id -> <filePath -> refs>
+    std::map<lsp::SymbolID, std::map<std::string, std::vector<lsp::Ref>>> callers;
     const lsp::RefsRequest req{ids, lsp::RefKind::REFERENCE};
     // search refs
     index->Refs(req, [&callers, id](const lsp::Ref &ref) {
         if (ref.location.IsZeroLoc()) {
             return;
         }
+        auto filePath = ref.location.fileUri;
         auto containerId = ref.container;
-        if (containerId == id || containerId == lsp::INVALID_SYMBOL_ID) {
+        if (containerId == id || containerId == lsp::INVALID_SYMBOL_ID || filePath.empty()) {
             return;
         }
-        if (callers.find(containerId) != callers.end()) {
-            // called more than twice
-            callers[containerId].emplace_back(ref);
-        } else {
+        auto symbolCallerItem = callers.find(containerId);
+        if (symbolCallerItem == callers.end()) {
             // first called
-            callers.emplace(containerId, std::vector<lsp::Ref>{ref});
+            callers[containerId] = {{filePath, std::vector<lsp::Ref>{ref}}};
+            return;
         }
+        auto pathRefs = symbolCallerItem->second.find(filePath);
+        if (pathRefs == symbolCallerItem->second.end()) {
+            // first called in path
+            symbolCallerItem->second.emplace(filePath, std::vector<lsp::Ref>{ref});
+            return;
+        }
+        // called more than twice
+        pathRefs->second.emplace_back(ref);
     });
 
-    for (auto &caller: callers) {
-        DealCaller(caller, index, result);
+    for (auto &symbolCallerItem : callers) {
+        const auto &containerId = symbolCallerItem.first;
+        for (auto &caller : symbolCallerItem.second) {
+            DealCaller(containerId, caller, index, result);
+        }
     }
 }
 
@@ -260,6 +281,18 @@ void CallHierarchyImpl::FindCallHierarchyImpl(const ArkAST &ast, CallHierarchyIt
             result.range = result.selectionRange;
         }
     }
+    if (!IsCommonSpecificSymbol(decl)) {
+        return;
+    }
+    auto index = ark::CompilerCangjieProject::GetInstance()->GetIndex();
+    if (!index) {
+        return;
+    }
+    auto symFromIndex = index->GetAimSymbol(*decl);
+    if (symFromIndex.IsInvalidSym() || symFromIndex.location.fileUri.empty() || symFromIndex.isCjoSym) {
+        return;
+    }
+    result.uri.file = URI::URIFromAbsolutePath(symFromIndex.location.fileUri).ToString();
 }
 
 void CallHierarchyImpl::FindOnOutgoingCallsImpl(vector <CallHierarchyOutgoingCall> &results,

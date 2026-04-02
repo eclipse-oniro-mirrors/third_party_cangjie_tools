@@ -17,3 +17,4 @@ public specific func message1_pkg(): Unit {
     println("Some example message")
 }
 
+public specific func message2_pkg(): Unit {}
