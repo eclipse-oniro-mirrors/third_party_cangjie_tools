@@ -15,7 +15,6 @@ import std.collection.*
 import stdx.net.http.*
 import stdx.net.tls.common.*
 import stdx.net.tls.*
-import stdx.compress.*
 import stdx.crypto.digest.*
 import stdx.encoding.hex.*
 import stdx.serialization.serialization.*
@@ -37,6 +36,7 @@ public class Depot {
     public var baseUrl: String = ""
     public var token: String = ""
     public var localRepo: String = ""
+    public var global: GlobalRepoConfig = GlobalRepoConfig()
 
     public func loadConfiguration(isError!: Bool = true): Bool {
         let alertLevel =  if (isError) { "Error" } else { "Warning" }
@@ -53,6 +53,8 @@ public class Depot {
             eprintln("${alertLevel}: get registry of [repository.home] failed, please check if cangjie-repo.toml is set up correctly")
             return false
         }
+
+        this.global = FINAL_CJPM_CONFIG_INFO.global
 
         return true
     }
@@ -87,7 +89,9 @@ public class Depot {
 
         // building client
         var tlsConfig = TlsClientConfig()
-        tlsConfig.verifyMode = TrustAll
+        if (!this.global.strictTls) {
+            tlsConfig.verifyMode = TrustAll
+        }
         let client = ClientBuilder().
             connector(tcpSocketConnector).
             noProxy().
@@ -133,7 +137,9 @@ public class Depot {
 
         // building client
         var tlsConfig = TlsClientConfig()
-        tlsConfig.verifyMode = TrustAll
+        if (!this.global.strictTls) {
+            tlsConfig.verifyMode = TrustAll
+        }
         let client = ClientBuilder().
             connector(tcpSocketConnector).
             noProxy().
@@ -218,27 +224,7 @@ public class Depot {
         }
 
         // save, uncompress and delete cjp file
-        let repositoryPath = Path(this.localRepo).join("source").
-            join(if (org.isEmpty()) { "default" } else { org }).
-            toString()
-        let cjpTempPath = Path(repositoryPath).join("${name}-${version}.cjp")
-        try {
-            // save
-            if (!createDirectory(repositoryPath)) {
-                return (false, "${name}-${version} load failed with error while uncompressing and saving repository cache")
-            }
-            File.writeTo(cjpTempPath, buffer.toArray())
-
-            // uncompress
-            TarGzip.extract(fromTarGzip: cjpTempPath.toString(), destDir: repositoryPath, overwrite: true)
-            return (true, "${name}-${version} load success")
-        } catch (e: Exception) {
-            eprintln(e.message)
-            return (false, "${name}-${version} load failed with error while uncompressing and saving repository cache")
-        } finally {
-            // delete cjp
-            deleteFile(cjpTempPath.toString())
-        }
+        return uncompressCjp(org, name, version, buffer.toArray(), this.localRepo)
     }
 
     // update local index for one module with output
@@ -254,7 +240,9 @@ public class Depot {
 
         // building client
         var tlsConfig = TlsClientConfig()
-        tlsConfig.verifyMode = TrustAll
+        if (!this.global.strictTls) {
+            tlsConfig.verifyMode = TrustAll
+        }
         let client = ClientBuilder().
             connector(tcpSocketConnector).
             noProxy().

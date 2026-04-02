@@ -8,6 +8,7 @@
 
 #include "Utils.h"
 #include "cangjie/Basic/Version.h"
+#include "cangjie/Basic/StringConvertor.h"
 #include "Inherit/InheritDeclUtil.h"
 #include "../CompilerCangjieProject.h"
 
@@ -62,9 +63,6 @@ TypeCompatibility CheckTypeCompatibility(const Ty *lvalue, const Ty *rvalue)
 }
 
 bool IsHiddenDecl(const Ptr<Node> node) {
-    if (!Options::GetInstance().IsOptionSet("test") && !MessageHeaderEndOfLine::GetIsDeveco()) {
-        return false;
-    }
     auto decl = DynamicCast<Decl *>(node.get());
     if (!decl) {
         return false;
@@ -76,7 +74,7 @@ bool IsHiddenDecl(const Ptr<Node> node) {
         auto target = anno->baseExpr ? anno->baseExpr->GetTarget() : nullptr;
         if (target) {
             return target->GetFullPackageName() == PKG_NAME_OHOS_LABELS && target->outerDecl &&
-                target->outerDecl->identifier == HIDE_ANNO_NAME; 
+                target->outerDecl->identifier == HIDE_ANNO_NAME;
         }
         // 6.0 annotation is not export target, to compatible with 6.0, treat as hidden
         return true;
@@ -1500,7 +1498,7 @@ Position FindLastImportPos(const File &file)
 {
     int lastImportLine = 0;
     for(const auto &import : file.imports) {
-        if (!import) 
+        if (!import)
         {
             continue;
         }
@@ -1548,5 +1546,51 @@ std::vector<std::string> GetAllFilePathUnderCurrentPath(const std::string& path,
         });
     });
     return allFiles;
+}
+
+bool IsCommonSpecificSymbol(Ptr<Cangjie::AST::Decl> decl)
+{
+    if (!decl) {
+        return false;
+    }
+    return ark::CompilerCangjieProject::GetInstance()->IsCommonSpecificPkg(decl->fullPackageName);
+}
+
+std::string GetRealFilePathInCommonSpecific(Ptr<Cangjie::AST::Decl> decl)
+{
+    if (!decl) {
+        return "";
+    }
+    bool isCommonSpecificPkg = IsCommonSpecificSymbol(decl);
+    if (!isCommonSpecificPkg || !decl->curFile) {
+        return "";
+    }
+    auto index = ark::CompilerCangjieProject::GetInstance()->GetIndex();
+    if (!index) {
+        return decl->curFile->filePath;
+    }
+    auto symFromIndex = index->GetAimSymbol(*decl);
+    if (symFromIndex.IsInvalidSym() || symFromIndex.location.fileUri.empty() || symFromIndex.isCjoSym) {
+        return decl->curFile->filePath;
+    }
+    std::string idxSourceSet =
+            CompilerCangjieProject::GetInstance()->GetSourceSetNameByPath(symFromIndex.location.fileUri);
+    std::string declSourceSet = CompilerCangjieProject::GetInstance()->GetSourceSetNameByPath(decl->curFile->filePath);
+    if (idxSourceSet != declSourceSet) {
+        return symFromIndex.location.fileUri;
+    }
+    return decl->curFile->filePath;
+}
+
+std::string NormalizeStringToGBK(const std::string& data)
+{
+    auto strGBK = data;
+#ifdef _WIN32
+    auto ret = Cangjie::StringConvertor::NormalizeStringToGBK(strGBK);
+    if (ret.has_value()) {
+        strGBK = ret.value();
+    }
+#endif
+    return strGBK;
 }
 } // namespace ark

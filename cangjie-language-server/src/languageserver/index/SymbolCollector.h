@@ -114,6 +114,16 @@ private:
 
     void CollectCrossScopes(Ptr<Node> node);
 
+    void ProcessFile(const File& file, const std::string& packagePath, AccessLevel pkgAccess,
+                     std::unordered_set<Ptr<InheritableDecl>>& inheritableDecls);
+
+    void ProcessMacroCalls(const File& file);
+
+    void SetUpstreamUncoveredSymbols(const File& file);
+
+    VisitAction CollectPreAction(Ptr<Node> node, const std::string& filePath, AccessLevel pkgAccess,
+                                 std::unordered_set<Ptr<InheritableDecl>>& inheritableDecls);
+
     bool ShouldPassInCjdIndexing(Ptr<Node> node);
 
     void CollectRelations(const std::unordered_set<Ptr<InheritableDecl>>& inheritableDecls);
@@ -259,6 +269,8 @@ private:
     ImportManager& importMgr;
 
     std::vector<Symbol> pkgSymsMap;
+
+    std::set<std::string> fullPkgsSet;
 
     std::map<std::string, std::unique_ptr<ArkAST>> astMap;
 

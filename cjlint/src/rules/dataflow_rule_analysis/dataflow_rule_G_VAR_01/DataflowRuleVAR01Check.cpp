@@ -10,8 +10,8 @@
 #include "cangjie/AST/Walker.h"
 #include "cangjie/Basic/Match.h"
 #include "cangjie/AST/Match.h"
-#include "cangjie/CHIR/Package.h"
-#include "cangjie/CHIR/Visitor/Visitor.h"
+#include "cangjie/CHIR/IR/Package.h"
+#include "cangjie/CHIR/Utils/Visitor/Visitor.h"
 #include "common/CommonFunc.h"
 
 namespace Cangjie::CodeCheck {
@@ -479,7 +479,7 @@ void DataflowRuleVAR01Check::DoAnalysis(CJLintCompilerInstance* instance)
     }
 
     // Traverse and inspect CHIR packages
-    analysisWrapper = const_cast<AnalysisWrapper*>(&instance->GetConstAnalysisWrapper());
+    analysisWrapper = const_cast<CHIR::ConstAnalysisWrapper*>(&instance->GetConstAnalysisWrapper());
     for (auto chirPkg : instance->GetAllCHIRPackages()) {
         CheckBasedOnCHIR(*chirPkg);
     }

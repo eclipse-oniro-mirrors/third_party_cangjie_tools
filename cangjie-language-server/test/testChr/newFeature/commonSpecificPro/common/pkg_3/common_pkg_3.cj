@@ -6,7 +6,7 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-@NoneProduct
+@NonProduct
 features {}
 package lib.pkg_3
 

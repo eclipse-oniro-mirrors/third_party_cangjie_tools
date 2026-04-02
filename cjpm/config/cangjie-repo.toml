@@ -7,8 +7,8 @@
 # The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 [repository.cache]
-    path = ""       # local path to save dependencies from Git and central repository
+    path = ""                                           # local path to save dependencies from Git and central repository
 
 [repository.home]
-    registry = ""   # url of central repository
-    token = ""      # token of current user
+    registry = "https://pkg.cangjie-lang.cn/registry"   # url of central repository
+    token = ""                                          # token of current user
