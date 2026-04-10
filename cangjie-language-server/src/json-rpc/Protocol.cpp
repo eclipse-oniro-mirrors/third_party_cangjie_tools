@@ -67,14 +67,23 @@ bool FromJSON(const nlohmann::json &params, TextDocumentPositionParams &reply)
     }
     reply.position.line = position.value("line", -1);
     reply.position.column = position.value("character", -1);
+    if (reply.position.line < 0 || reply.position.column < 0) {
+        return false;
+    }
 
     return true;
 }
 
 bool FromJSON(const nlohmann::json &params, CrossLanguageJumpParams &reply)
 {
-    reply.packageName = params["packageName"];
-    reply.name = params["name"];
+    if (!params.contains("packageName") || !params["packageName"].is_string()) {
+        return false;
+    }
+    reply.packageName = params.value("packageName", "");
+    if (!params.contains("name") || !params["name"].is_string()) {
+        return false;
+    }
+    reply.name = params.value("name", "");
     reply.outerName = params.value("outerName", "");
     reply.isCombined = params.value("isCombined", false);
     return true;
@@ -98,6 +107,9 @@ bool FromJSON(const nlohmann::json &params, OverrideMethodsParams &reply)
     }
     reply.position.line = position.value("line", -1);
     reply.position.column = position.value("character", -1);
+    if (reply.position.line < 0 || reply.position.column < 0) {
+        return false;
+    }
     reply.isExtend = params.value("isExtend", false);
     return true;
 }
@@ -120,6 +132,9 @@ bool FromJSON(const nlohmann::json &params, ExportsNameParams &reply)
     }
     reply.position.line = position.value("line", -1);
     reply.position.column = position.value("character", -1);
+    if (reply.position.line < 0 || reply.position.column < 0) {
+        return false;
+    }
     reply.packageName = params["packageName"];
     return true;
 }
@@ -360,6 +375,9 @@ bool FromJSON(const nlohmann::json &params, RenameParams &reply)
     reply.newName = params.value("newName", "");
     reply.position.line = position.value("line", -1);
     reply.position.column = position.value("character", -1);
+    if (reply.position.line < 0 || reply.position.column < 0) {
+        return false;
+    }
     return true;
 }
 
@@ -868,8 +886,9 @@ bool FromJSON(const nlohmann::json &params, CodeActionContext &reply)
     if (params.contains("only")) {
         nlohmann::json only = params["only"];
         if (!only.is_null() && only.is_array()) {
+            reply.only.emplace();
             for (const auto &item : only) {
-                reply.only->push_back(item);
+                reply.only.value().push_back(item);
             }
         }
     }
