@@ -30,7 +30,7 @@ Use symbol mapping files to recover obfuscated exception stacktrace. The support
 }
 
 func printVersion() {
-	println("Cangjie Trace Recover: 1.1.0")
+	println("Cangjie Trace Recover: 1.1.1")
 }
 
 func needMoreInformation() {
@@ -41,6 +41,9 @@ func getDemangle(name: String) {
 	unsafe {
 		var mangle = LibC.mallocCString(name)
 		var demangle = Demangle(mangle, name.size)
+		if (demangle.isNull()) {
+			return ""
+		}
 		var res = demangle.toString()
 		LibC.free(mangle)
 		LibC.free(demangle)
