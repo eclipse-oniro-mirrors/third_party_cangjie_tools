@@ -15,6 +15,43 @@
 
 namespace ark {
 namespace lsp {
+
+std::string EscapeLikePattern(const std::string& input)
+{
+    std::string result;
+    for (char c : input) {
+        if (c == '%' || c == '_' || c == '\\') {
+            result += '\\';
+        }
+        result += c;
+    }
+    return result;
+}
+
+std::string EscapeGlobPattern(const std::string& input)
+{
+    std::string result;
+    for (char c : input) {
+        if (c == '*' || c == '?' || c == '[' || c == ']') {
+            result += '\\';
+        }
+        result += c;
+    }
+    return result;
+}
+
+std::string EscapeFts5Pattern(const std::string& input)
+{
+    std::string result;
+    for (char c : input) {
+        if (c == '"') {
+            result += '"';
+        }
+        result += c;
+    }
+    return result;
+}
+
 namespace sql {
 
 #define EXPAND(...) #__VA_ARGS__
@@ -207,6 +244,8 @@ std::once_flag g_configureFlag;
 
 dberr_no ConfigureSQLite()
 {
+    // Security: Log SQLite version for auditing
+    Trace::Log("SQLite version: ", sqlite3_libversion());
     sqldb::setSerializedMode();
     return 0;
 }
@@ -492,8 +531,9 @@ dberr_no IndexDatabase::GetCrossSymbolByID(IDArray id, std::function<void(const 
 dberr_no IndexDatabase::GetPkgSymbols(std::string pkgName, std::function<bool(const Symbol &sym)> callback)
 {
     try {
-        std::string scopePrefix = pkgName + ":";
-        Use(sql::SelectSymbolsByPkgName).execute(sqldb::with(pkgName, scopePrefix),
+        std::string scopePrefix = EscapeLikePattern(pkgName) + ":%";
+        std::string escapedPkgName = EscapeLikePattern(pkgName);
+        Use(sql::SelectSymbolsByPkgName).execute(sqldb::with(escapedPkgName, scopePrefix),
             [&](sqldb::Result Row) {
             Symbol resSym;
             PopulateSymbol(Row, resSym);
@@ -509,7 +549,7 @@ dberr_no IndexDatabase::GetPkgSymbols(std::string pkgName, std::function<bool(co
 dberr_no IndexDatabase::GetSymbolsAndCompletions(const std::string &prefix,
     std::function<void(const Symbol &sym, const CompletionItem &completion)> callback)
 {
-    std::string fuzzyPrefix = AddPercentAfterEachUTF8Char(prefix);
+    std::string fuzzyPrefix = EscapeLikePattern(AddPercentAfterEachUTF8Char(prefix));
     try {
         Use(sql::SelectCompletions).execute(sqldb::with(fuzzyPrefix), [&](sqldb::Result Row) {
             Symbol resSym;
@@ -624,7 +664,8 @@ dberr_no IndexDatabase::GetMatchingSymbols(
     std::stringstream patternStream;
     auto Tokenize = GetIdentifierTokenizer();
     Tokenize(query, [&patternStream](std::string_view token, size_t) {
-        patternStream << '"' << token << '"' << '*' << ' ';
+        std::string escapedToken = EscapeFts5Pattern(std::string(token));
+        patternStream << '"' << escapedToken << '"' << '*' << ' ';
     });
     std::string pattern = patternStream.str();
     try {
@@ -661,7 +702,7 @@ dberr_no IndexDatabase::GetReferences(const SymbolID &id, RefKind kind,
 }
 
 dberr_no IndexDatabase::GetFileReferences(const std::string &fileUri, RefKind kind,
-    std::function<bool(const Ref &ref, const SymbolID symId)> callback) 
+    std::function<bool(const Ref &ref, const SymbolID symId)> callback)
 {
     Use(sql::SelectFileReference)
         .execute(sqldb::with(fileUri, kind), [&](sqldb::Result row) {
@@ -881,11 +922,7 @@ void IndexDatabase::DBUpdate::DealSymbols(const std::vector<Symbol> &syms)
         }
         int Index = 0;
         sqldb::Statement &stmt = db.Use(oss.str(), false);
-        for (size_t i = 0; i < maxMultiInsertIndex + 1; i++) {
-            if (i >= MUTI_INSERT_MAX_SIZE && i % MUTI_INSERT_MAX_SIZE == 0) {
-                Index = 0;
-                stmt.execute();
-            }
+        for (size_t i = 0; i < maxMultiInsertIndex;) {
             const auto &insertSym = syms[i];
             const auto &bind = sqldb::with((insertSym.idArray), insertSym.kind, insertSym.symInfo.subKind,
                 insertSym.symInfo.lang, insertSym.symInfo.properties, insertSym.name, insertSym.scope,
@@ -900,6 +937,10 @@ void IndexDatabase::DBUpdate::DealSymbols(const std::vector<Symbol> &syms)
                 insertSym.curMacroCall.begin.column, insertSym.curMacroCall.end.line,
                 insertSym.curMacroCall.end.column);
             BindValue(bind, stmt.GetStmt(), Index);
+            if (++i % MUTI_INSERT_MAX_SIZE == 0) {
+                Index = 0;
+                stmt.execute();
+            }
         }
     }
 
@@ -976,15 +1017,15 @@ void IndexDatabase::DBUpdate::DealCompletions(const std::vector<std::pair<IDArra
         }
         int Index = 0;
         sqldb::Statement &stmt = db.Use(oss.str(), false);
-        for (size_t i = 0; i < maxMultiInsertIndex + 1; i++) {
-            if (i >= MUTI_INSERT_MAX_SIZE && i % MUTI_INSERT_MAX_SIZE == 0) {
-                Index = 0;
-                stmt.execute();
-            }
+        for (size_t i = 0; i < maxMultiInsertIndex;) {
             const auto &array = completions[i].first;
             const auto &insertCompletion = completions[i].second;
             const auto &bind = sqldb::with(array, insertCompletion.label, insertCompletion.insertText);
             BindValue(bind, stmt.GetStmt(), Index);
+            if (++i % MUTI_INSERT_MAX_SIZE == 0) {
+                Index = 0;
+                stmt.execute();
+            }
         }
     }
 
@@ -1052,16 +1093,16 @@ void IndexDatabase::DBUpdate::DealComments(const std::vector<std::pair<IDArray, 
         }
         int Index = 0;
         sqldb::Statement &stmt = db.Use(oss.str(), false);
-        for (size_t i = 0; i < maxMultiInsertIndex + 1; i++) {
-            if (i >= MUTI_INSERT_MAX_SIZE && i % MUTI_INSERT_MAX_SIZE == 0) {
-                Index = 0;
-                stmt.execute();
-            }
+        for (size_t i = 0; i < maxMultiInsertIndex;) {
             const auto &array = comments[i].first;
             const auto &insertComment = comments[i].second;
             const auto &bind =
                 sqldb::with(array, insertComment.style, insertComment.kind, insertComment.commentStr);
             BindValue(bind, stmt.GetStmt(), Index);
+            if (++i % MUTI_INSERT_MAX_SIZE == 0) {
+                Index = 0;
+                stmt.execute();
+            }
         }
     }
 
@@ -1132,11 +1173,7 @@ void IndexDatabase::DBUpdate::DealReferences(const std::vector<std::pair<IDArray
         }
         int Index = 0;
         sqldb::Statement &stmt = db.Use(oss.str(), false);
-        for (size_t i = 0; i < maxMultiInsertIndex + 1; i++) {
-            if (i >= MUTI_INSERT_MAX_SIZE && i % MUTI_INSERT_MAX_SIZE == 0) {
-                Index = 0;
-                stmt.execute();
-            }
+        for (size_t i = 0; i < maxMultiInsertIndex;) {
             const auto &array = refs[i].first;
             const auto &insertRef = refs[i].second;
             const auto &containerArray = GetArrayFromID(insertRef.container);
@@ -1144,6 +1181,10 @@ void IndexDatabase::DBUpdate::DealReferences(const std::vector<std::pair<IDArray
                 insertRef.location.begin.column, insertRef.location.end.line, insertRef.location.end.column,
                 insertRef.kind, containerArray, insertRef.isCjoRef, insertRef.isSuper);
             BindValue(bind, stmt.GetStmt(), Index);
+            if (++i % MUTI_INSERT_MAX_SIZE == 0) {
+                Index = 0;
+                stmt.execute();
+            }
         }
     }
 
@@ -1208,16 +1249,16 @@ void IndexDatabase::DBUpdate::DealRelations(const std::vector<Relation> &relatio
         }
         int Index = 0;
         sqldb::Statement &stmt = db.Use(oss.str(), false);
-        for (size_t i = 0; i < maxMultiInsertIndex + 1; i++) {
-            if (i >= MUTI_INSERT_MAX_SIZE && i % MUTI_INSERT_MAX_SIZE == 0) {
-                Index = 0;
-                stmt.execute();
-            }
+        for (size_t i = 0; i < maxMultiInsertIndex;) {
             const auto &relation = relations[i];
             IDArray subject = GetArrayFromID(relation.subject);
             IDArray object = GetArrayFromID(relation.object);
             const auto &bind = sqldb::with(subject, relation.predicate, relation.object);
             BindValue(bind, stmt.GetStmt(), Index);
+            if (++i % MUTI_INSERT_MAX_SIZE == 0) {
+                Index = 0;
+                stmt.execute();
+            }
         }
     }
 
@@ -1320,17 +1361,17 @@ void IndexDatabase::DBUpdate::DealCrossSymbols(const std::vector<std::pair<std::
         }
         int Index = 0;
         sqldb::Statement &stmt = db.Use(oss.str(), false);
-        for (size_t i = 0; i < maxMultiInsertIndex + 1; i++) {
-            if (i >= MUTI_INSERT_MAX_SIZE && i % MUTI_INSERT_MAX_SIZE == 0) {
-                Index = 0;
-                stmt.execute();
-            }
+        for (size_t i = 0; i < maxMultiInsertIndex;) {
             const auto &curPkgName = crsSyms[i].first;
             const auto &crs = crsSyms[i].second;
             const auto &bind = sqldb::with(curPkgName, crs.id, crs.name, crs.container, crs.containerName,
                 crs.crossType, crs.location.fileUri, crs.location.begin.line, crs.location.begin.column,
                 crs.location.end.line, crs.location.end.column);
             BindValue(bind, stmt.GetStmt(), Index);
+            if (++i % MUTI_INSERT_MAX_SIZE == 0) {
+                Index = 0;
+                stmt.execute();
+            }
         }
     }
 
