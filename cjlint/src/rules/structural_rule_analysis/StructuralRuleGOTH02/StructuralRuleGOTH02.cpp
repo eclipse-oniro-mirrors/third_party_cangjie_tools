@@ -82,7 +82,7 @@ void StructuralRuleGOTH02::MatchPatternInAST(const VarWithPatternDecl& varWithPa
                 }
                 return VisitAction::WALK_CHILDREN;
             },
-            [this]() { return VisitAction::WALK_CHILDREN; });
+            []() { return VisitAction::WALK_CHILDREN; });
     });
     walker.Walk();
 }
@@ -113,7 +113,7 @@ void StructuralRuleGOTH02::FindSenInfoInAST(Ptr<Node> node)
                 }
                 return VisitAction::WALK_CHILDREN;
             },
-            [this]() { return VisitAction::WALK_CHILDREN; });
+            []() { return VisitAction::WALK_CHILDREN; });
     });
     walker.Walk();
 }

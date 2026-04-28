@@ -46,7 +46,7 @@ void StructuralRuleGOPR01::CheckFuncDecl(Cangjie::AST::FuncDecl& funcDecl)
                         }
                         return VisitAction::WALK_CHILDREN;
                     },
-                    [this]() { return VisitAction::WALK_CHILDREN; });
+                    []() { return VisitAction::WALK_CHILDREN; });
             });
             walker.Walk();
         }

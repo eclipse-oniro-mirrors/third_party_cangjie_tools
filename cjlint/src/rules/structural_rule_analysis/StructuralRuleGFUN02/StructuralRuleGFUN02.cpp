@@ -46,7 +46,7 @@ void StructuralRuleGFUN02::FuncParamFinder(Ptr<Node> node)
                 }
                 return VisitAction::SKIP_CHILDREN;
             },
-            [this]() { return VisitAction::WALK_CHILDREN; });
+            []() { return VisitAction::WALK_CHILDREN; });
     });
     walker.Walk();
 }
@@ -68,12 +68,12 @@ void StructuralRuleGFUN02::FuncParamFinderHelper(Ptr<Node> node, std::map<std::s
         return;
     }
 
-    Walker walker(node, [this, &paramMap](Ptr<Node> node) -> VisitAction {
+    Walker walker(node, [&paramMap](Ptr<Node> node) -> VisitAction {
         match (*node)(
-            [&paramMap, this](const RefExpr& refExpr) {
+            [&paramMap](const RefExpr& refExpr) {
                 EraseItemOfMap(refExpr.ref.identifier.GetRawText(), paramMap);
             },
-            [&paramMap, this](const MacroExpandExpr& macroExpandExpr) {
+            [&paramMap](const MacroExpandExpr& macroExpandExpr) {
                 for (auto& arg : macroExpandExpr.invocation.args) {
                     if (arg.kind != TokenKind::IDENTIFIER) {
                         continue;
