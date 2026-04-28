@@ -138,7 +138,7 @@ private:
         }
     };
     /* @brief Check whether a disabled container type is used */
-    NodeHandler handleContainerTypeRefExpr = [this](const AST::Node& node, const std::string& syntax) {
+    NodeHandler handleContainerTypeRefExpr = [this](const AST::Node& node, const std::string&) {
         auto refExpr = static_cast<const AST::RefExpr*>(&node);
         auto ref = &refExpr->ref;
         if (ref && disabledConatinerType.count(ref->identifier) > 0) {
@@ -147,7 +147,7 @@ private:
         }
     };
     /* @brief Check whether a disabled container type is used */
-    NodeHandler handleContainerTypeRefType = [this](const AST::Node& node, const std::string& syntax) {
+    NodeHandler handleContainerTypeRefType = [this](const AST::Node& node, const std::string&) {
         auto refExpr = static_cast<const AST::RefType*>(&node);
         auto ref = &refExpr->ref;
         if (ref && disabledConatinerType.count(ref->identifier) > 0) {
