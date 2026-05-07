@@ -54,6 +54,8 @@ public:
 
     static ark::lsp::SymbolID GetDeclSymbolID(const Decl& decl);
 
+    static Range GetEditRangeForAutoImport(const ArkAST &file);
+
     void DealTypeAlias(Ptr<Node> node);
 
     void DeepComplete(Ptr<Node> node, const Position pos);

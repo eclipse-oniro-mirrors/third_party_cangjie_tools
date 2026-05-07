@@ -40,7 +40,7 @@ private:
 class FIO01Analysis final : public Cangjie::CHIR::GenKillAnalysis<FIO01Domain> {
 public:
     FIO01Analysis() = delete;
-    explicit FIO01Analysis(Cangjie::CHIR::Func* func, const std::vector<std::string>& files = {});
+    explicit FIO01Analysis(Cangjie::CHIR::Function* func, const std::vector<std::string>& files = {});
     ~FIO01Analysis() final {}
 
     void InitializeFuncEntryState(FIO01Domain& state) override;
@@ -62,8 +62,8 @@ public:
     ~DataflowRuleGFIO01Check() override = default;
 
 protected:
-    std::vector<std::string> CheckDefaultParamFunc(CHIR::Func* func);
-    void CheckNormalFunc(CHIR::Func* func, const std::vector<std::string>& files,
+    std::vector<std::string> CheckDefaultParamFunc(CHIR::Function* func);
+    void CheckNormalFunc(CHIR::Function* func, const std::vector<std::string>& files,
         std::map<std::string, std::pair<Cangjie::Position, Cangjie::Position>>& posMap);
     void CheckBasedOnCHIR(CHIR::Package& package) override;
 };
