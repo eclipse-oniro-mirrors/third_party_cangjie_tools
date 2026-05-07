@@ -58,7 +58,7 @@ LSPCompilerInstance::LSPCompilerInstance(ark::Callbacks *cb, CompilerInvocation 
 {
     this->diagOwned = std::move(diag);
     (void)ExecuteCompilerApi("SetSourceCodeImportStatus", &ImportManager::SetSourceCodeImportStatus,
-                             &importManager, false);
+                             importManager, false);
 }
 
 std::unordered_map<std::string, ark::EdgeType> LSPCompilerInstance::UpdateUpstreamPkgs()
@@ -303,7 +303,7 @@ void LSPCompilerInstance::ImportUsrPackage(const std::string &curModuleName)
     const std::unordered_set<std::string> cjoPackageAll = GetAllImportedCjo(pkgNameForPath, isVisited);
     for (const auto &cjoPackage : cjoPackageAll) {
         if (ToImportPackage(curModuleName, cjoPackage)) {
-            importManager.SetPackageCjoCache(cjoPackage, astDataMap[cjoPackage].first);
+            importManager->SetPackageCjoCache(cjoPackage, astDataMap[cjoPackage].first);
         }
     }
 }
@@ -318,7 +318,7 @@ void LSPCompilerInstance::ImportUsrCjo(const std::string &curModuleName,
                 continue;
             }
             visitedPackages.insert(item.first);
-            importManager.SetPackageCjoCache(item.first, item.second);
+            importManager->SetPackageCjoCache(item.first, item.second);
         }
     }
 }
@@ -339,7 +339,7 @@ void LSPCompilerInstance::ImportCjoToManager(
 
     // Import stdlib cjo, priority is low.
     for (const auto &cjoCache : cjoFileCacheMap) {
-        importManager.SetPackageCjoCache(cjoCache.first, cjoCache.second);
+        importManager->SetPackageCjoCache(cjoCache.first, cjoCache.second);
     }
 
     // import cjo for bin dependencies in cjpm.toml
@@ -352,7 +352,7 @@ void LSPCompilerInstance::ImportCjoToManager(
         if (!cjoCache) {
             continue;
         }
-        importManager.SetPackageCjoCache(
+        importManager->SetPackageCjoCache(
             ark::CompilerCangjieProject::GetInstance()->GetRealPackageName(package), *cjoCache);
     }
 }
@@ -362,11 +362,11 @@ void LSPCompilerInstance::IndexCjoToManager(
 {
     // Import stdlib's cjo, priority is low.
     for (const auto &cjoCache : cjoFileCacheMap) {
-        importManager.SetPackageCjoCache(cjoCache.first, cjoCache.second);
+        importManager->SetPackageCjoCache(cjoCache.first, cjoCache.second);
     }
     for (const auto &item : usrCjoFileCacheMap) {
         for (const auto &cjoCache : item.second) {
-            importManager.SetPackageCjoCache(cjoCache.first, cjoCache.second);
+            importManager->SetPackageCjoCache(cjoCache.first, cjoCache.second);
         }
     }
 }
@@ -392,7 +392,7 @@ bool LSPCompilerInstance::CompileAfterParse(
     }
     macroExpandSuccess = MacroExpand();
     (void)Sema();
-    (void)ExecuteCompilerApi("DeleteASTLoaders", &ImportManager::DeleteASTLoaders, this->importManager);
+    (void)ExecuteCompilerApi("DeleteASTLoaders", &ImportManager::DeleteASTLoaders, *this->importManager);
     const auto packages = GetSourcePackages();
     if (packages.empty()) {
         return false;
