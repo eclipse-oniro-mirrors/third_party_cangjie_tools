@@ -1016,6 +1016,7 @@ void DotCompleterByParse::InitMap() const
 
 void DotCompleterByParse::AddExtendDeclFromIndex(Ptr<Ty> &extendTy, CompletionEnv &env, const Position &pos) const
 {
+    (void)pos;
     auto ast = CompilerCangjieProject::GetInstance()->GetArkAST(curFilePath);
     if (!ast || !ast->file) {
         return;
@@ -1117,6 +1118,7 @@ void DotCompleterByParse::FillingDeclsInPackageDot(std::pair<std::string, Comple
                                                    const std::pair<bool, bool> openFillAndIsImport)
 
 {
+    (void)curNode;
     Ptr<PackageDecl> pkgDecl = importManager->GetPackageDecl(pkgNameAndEnv.first);
     if (!pkgDecl || !pkgDecl->srcPackage || pkgDecl->srcPackage->files.empty()) {
         return;
@@ -1452,6 +1454,7 @@ void DotCompleterByParse::WalkForMemberAccess(Ptr<Decl> topDecl, Ptr<Expr>& expr
 void DotCompleterByParse::WalkForIfAvailable(Ptr<Decl> topDecl, Ptr<Expr>& expr, const ArkAST &input,
                         const Position &pos)
 {
+    (void)input;
     Walker(topDecl, [&](auto node) {
         if (auto refExpr = DynamicCast<RefExpr *>(node.get())) {
             if (refExpr->GetEnd().line == pos.line && refExpr->GetEnd().column == pos.column - 1) {

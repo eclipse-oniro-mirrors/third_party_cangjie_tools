@@ -140,14 +140,14 @@ std::optional<Tweak::Effect> IntroduceConstant::Apply(const Selection &sel)
 
     std::string uri = URI::URIFromAbsolutePath(filePath).ToString();
     effect.applyEdits.emplace(uri, std::move(textEdits));
-    return std::move(effect);
+    return effect;
 }
 
 TextEdit IntroduceConstant::InsertDeclaration(const Selection &sel, Range &range, std::string &varName)
 {
     TextEdit textEdit;
     if (!sel.arkAst || !sel.arkAst->file) {
-        return std::move(textEdit);
+        return textEdit;
     }
     Range insertRange = TweakUtils::FindGlobalInsertPos(*sel.arkAst->file, range);
     insertRange = TransformFromChar2IDE(insertRange);
@@ -156,7 +156,7 @@ TextEdit IntroduceConstant::InsertDeclaration(const Selection &sel, Range &range
     insertText = "\n\nconst " + varName + " = " + sourceCode + "\n";
     textEdit.range = insertRange;
     textEdit.newText = insertText;
-    return std::move(textEdit);
+    return textEdit;
 }
 
 TextEdit IntroduceConstant::ReplaceExprWithVar(const Selection &sel, Range &range, std::string &varName)
@@ -172,6 +172,6 @@ TextEdit IntroduceConstant::ReplaceExprWithVar(const Selection &sel, Range &rang
         range.end.column = range.start.column + size;
     }
     textEdit.range = TransformFromChar2IDE(range);
-    return std::move(textEdit);
+    return textEdit;
 }
 } // namespace ark

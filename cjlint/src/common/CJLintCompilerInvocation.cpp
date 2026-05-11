@@ -133,7 +133,7 @@ std::unique_ptr<CJLintCompilerInstance> CJLintCompilerInvocation::PrePareCompile
     diag.SetSourceManager(&compilerInstance->GetSourceManager());
     compilerInstance->cangjieHome = ConfigContext::GetInstance().GetCangjieHome();
     compilerInstance->cangjieModules = FileUtil::JoinPath(FileUtil::JoinPath(moduleDir, "modules"), libPathName);
-    return std::move(compilerInstance);
+    return compilerInstance;
 }
 
 CJLintCompilerInvocation::CJLintCompilerInvocation() = default;

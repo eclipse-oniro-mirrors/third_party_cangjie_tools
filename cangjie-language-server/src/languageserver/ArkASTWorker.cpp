@@ -45,7 +45,6 @@ void ArkASTWorker::Update(const ParseInputs &inputs, NeedDiagnostics needDiag)
         std::string realName = inputs.fileName;
         if (inputs.forceRebuild) {
             std::stringstream log;
-            Logger &logger = Logger::Instance();
             // Check whether the newly opened file is in the current project.
             if (CompilerCangjieProject::GetInstance()->GetCangjieFileKind(realName).first == CangjieFileKind::MISSING) {
                 return;
