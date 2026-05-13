@@ -922,7 +922,7 @@ void ItemResolverUtil::ResolveFuncDeclSignature(std::string &detail, const Cangj
         decl.outerDecl->curFile != nullptr) { myFilePath = decl.outerDecl->curFile->filePath; }
     if (decl.curFile != nullptr) { myFilePath = decl.curFile->filePath; }
     if (decl.funcBody == nullptr) { return; }
-    if (decl.identifier.Val() == "arrayInit1" || decl.identifier.Val() == "arrayInit2" &&
+    if ((decl.identifier.Val() == "arrayInit1" || decl.identifier.Val() == "arrayInit2") &&
         decl.fullPackageName == "std.core") {
         return;
     }
@@ -982,7 +982,6 @@ void ItemResolverUtil::ResolveFuncTypeParamSignature(std::string &detail,
         return;
     }
     bool firstParams = true;
-    size_t index = 0;
     size_t paramCount = paramTypes.size();
     if (!needLastParam && paramCount > 0) {
         paramCount--;
@@ -1212,7 +1211,6 @@ void ItemResolverUtil::ResolveFollowLambdaFuncSignature(std::string &detail, con
     if (decl.funcBody->generic != nullptr && !decl.TestAttr(Cangjie::AST::Attribute::ENUM_CONSTRUCTOR)) {
         signature += ItemResolverUtil::GetGenericParamByDecl(decl.funcBody->generic.get());
     }
-    bool isCustomAnnotationFlag = ItemResolverUtil::IsCustomAnnotation(decl);
     DealEmptyParamFollowLambda(decl, sourceManager, paramList, signature, myFilePath);
     ItemResolverUtil::ResolveFuncTypeParamSignature(signature, funcType->paramTypes,
         sourceManager, myFilePath);
@@ -1247,6 +1245,7 @@ void ItemResolverUtil::DealEmptyParamFollowLambda(const T &decl, Cangjie::Source
 void ItemResolverUtil::ResolveFollowLambdaVarSignature(std::string &detail, const Cangjie::AST::VarDecl &decl,
     Cangjie::SourceManager *sourceManager, const std::string &initFuncReplace)
 {
+    (void)initFuncReplace;
     if (!decl.type || decl.type->astKind != ASTKind::FUNC_TYPE) {
         return;
     }
@@ -1354,7 +1353,7 @@ int ItemResolverUtil::BuildLambdaFuncPreParamInsert(const T &decl, Cangjie::Sour
     bool isEnumConstruct = false;
     if (!decl.TestAttr(Attribute::ENUM_CONSTRUCTOR)) {
         numParm = AddGenericInsertByDecl(insertText, decl.GetGeneric()) + 1;
-        if ((decl.identifier.Val().compare("init") == 0 && decl.astKind == ASTKind::FUNC_DECL ||
+        if (((decl.identifier.Val().compare("init") == 0 && decl.astKind == ASTKind::FUNC_DECL) ||
                 decl.astKind == ASTKind::PRIMARY_CTOR_DECL) && decl.outerDecl != nullptr) {
             std::string temp = "";
             numParm = AddGenericInsertByDecl(temp, decl.outerDecl->GetGeneric()) + 1;
@@ -1393,6 +1392,7 @@ int ItemResolverUtil::BuildLambdaFuncPreParamInsert(const T &decl, Cangjie::Sour
 void ItemResolverUtil::ResolveFollowLambdaVarInsert(std::string &detail, const Cangjie::AST::VarDecl &decl,
     Cangjie::SourceManager *sourceManager, const std::string &initFuncReplace)
 {
+    (void)initFuncReplace;
     if (!decl.type || decl.type->astKind != ASTKind::FUNC_TYPE) {
         return;
     }
@@ -1496,7 +1496,7 @@ void ItemResolverUtil::ResolveFuncLikeDeclInsert(std::string &detail, const T &d
     bool isEnumConstruct = false;
     if (!decl.TestAttr(Cangjie::AST::Attribute::ENUM_CONSTRUCTOR)) {
         numParm = AddGenericInsertByDecl(detail, decl.GetGeneric()) + 1;
-        if ((decl.identifier.Val().compare("init") == 0 && decl.astKind == ASTKind::FUNC_DECL ||
+        if (((decl.identifier.Val().compare("init") == 0 && decl.astKind == ASTKind::FUNC_DECL) ||
              decl.astKind == ASTKind::PRIMARY_CTOR_DECL) && decl.outerDecl != nullptr) {
             std::string temp = "";
             numParm = AddGenericInsertByDecl(temp, decl.outerDecl->GetGeneric()) + 1;

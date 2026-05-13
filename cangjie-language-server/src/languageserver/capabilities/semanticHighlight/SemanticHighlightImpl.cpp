@@ -22,6 +22,7 @@ const std::vector<std::string> KEYWORD_IDENTIFIER = {"public", "private", "prote
 void AddAnnoToken(Ptr<Decl> node, std::vector<SemanticHighlightToken> &result,
                   const std::vector<Cangjie::Token> &tokens, Cangjie::SourceManager *sourceManager)
 {
+    (void)sourceManager;
     for (auto& anno: node->annotations) {
         if (anno->baseExpr) {
             Position annoPos = anno->identifier.Begin();
@@ -94,6 +95,7 @@ void GetPropDecl(Ptr<Node> node, std::vector<SemanticHighlightToken> &result, co
 void GetCallExpr(Ptr<Node> node, std::vector<SemanticHighlightToken> &result, const std::vector<Cangjie::Token> &tokens,
                  Cangjie::SourceManager *sourceManager)
 {
+    (void)sourceManager;
     auto callExpr = dynamic_cast<CallExpr*>(node.get());
     if (!callExpr || !callExpr->symbol || !callExpr->resolvedFunction || !callExpr->baseFunc) {
         return;
@@ -120,6 +122,7 @@ void GetMemberAccess(
     Ptr<Node> node, std::vector<SemanticHighlightToken> &result, const std::vector<Cangjie::Token> &tokens,
     Cangjie::SourceManager *sourceManager)
 {
+    (void)sourceManager;
     auto mAccess = dynamic_cast<MemberAccess*>(node.get());
     if (!mAccess || mAccess->field == "<invalid identifier>") {
         return;
@@ -160,6 +163,7 @@ void GetMemberAccess(
 void GetFuncArg(Ptr<Node> node, std::vector<SemanticHighlightToken> &result, const std::vector<Cangjie::Token> &tokens,
                 Cangjie::SourceManager *sourceManager)
 {
+    (void)sourceManager;
     auto funcArg = dynamic_cast<FuncArg*>(node.get());
     if (!funcArg) { return; }
     Position pos = funcArg->name.Begin();
@@ -281,6 +285,7 @@ void GetClassDecl(
 void GetRefType(Ptr<Node> node, std::vector<SemanticHighlightToken> &result, const std::vector<Cangjie::Token> &tokens,
                 Cangjie::SourceManager *sourceManager)
 {
+    (void)sourceManager;
     auto refType = dynamic_cast<RefType*>(node.get());
     if (!refType) {
         return;
@@ -391,6 +396,7 @@ void GetGenericParam(
 void GetQualifiedType(Ptr<Node> node, std::vector<SemanticHighlightToken> &result,
                       const std::vector<Cangjie::Token> &tokens, Cangjie::SourceManager *sourceManager)
 {
+    (void)sourceManager;
     auto qualifiedType = dynamic_cast<QualifiedType*>(node.get());
     if (!qualifiedType) { return; }
 
@@ -436,6 +442,7 @@ void GetMacroExtendDecl(Ptr<Node> node, std::vector<SemanticHighlightToken> &res
 void GetMacroExtendExpr(Ptr<Node> node, std::vector<SemanticHighlightToken> &result,
                         const std::vector<Cangjie::Token> &tokens, Cangjie::SourceManager *sourceManager)
 {
+    (void)sourceManager;
     Range range = GetMacroRange<MacroExpandExpr>(*node);
     UpdateRange(tokens, range, *node);
     result.push_back({HighlightKind::FUNCTION_H, TransformFromChar2IDE(range)});
@@ -444,6 +451,7 @@ void GetMacroExtendExpr(Ptr<Node> node, std::vector<SemanticHighlightToken> &res
 void GetTypeAliasDecl(Ptr<Node> node, std::vector<SemanticHighlightToken> &result,
                       const std::vector<Cangjie::Token> &tokens, Cangjie::SourceManager *sourceManager)
 {
+    (void)sourceManager;
     Ptr<Decl> decl = dynamic_cast<Decl*>(node.get());
     if (!decl || decl->identifier == "<invalid identifier>") { return; }
     Position pos = decl->identifier.Begin();
@@ -537,7 +545,7 @@ void SemanticHighlightImpl::FindHighlightsTokens(const ArkAST &ast, std::vector<
             continue;
         }
         Ptr<Node> node = symbol->node;
-        if (node->TestAttr(Cangjie::AST::Attribute::MACRO_EXPANDED_NODE)) {
+        if (node->curMacroCall && !node->isInMacroCall) {
             if (symbol->astKind != ASTKind::REF_EXPR && symbol->astKind != ASTKind::MEMBER_ACCESS &&
                 symbol->astKind != ASTKind::CALL_EXPR) {
                 continue;

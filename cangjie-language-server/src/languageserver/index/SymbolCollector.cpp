@@ -439,7 +439,8 @@ void SymbolCollector::CreateBaseSymbol(const Decl &decl, const std::string &file
     }
     CJC_ASSERT(!scopes.empty());
     std::string curScope;
-    for (auto [_, scope] : scopes) {
+    for (const auto& scopeInfo : scopes) {
+        const auto& scope = scopeInfo.second;
         curScope += scope;
     }
     curScope.pop_back(); // Pop back last delimiter char.
@@ -1105,7 +1106,7 @@ void SymbolCollector::DealCrossClassSymbol(const NameReferenceExpr &clazzRef, co
     // registerClass clazz in func, this func used to ref_expr
     Ptr<const Decl> decl;
     if (!scopes.empty()) {
-        for (size_t i = scopes.size() - 1; i >= 0; i--) {
+        for (size_t i = scopes.size(); i-- > 0;) {
             decl = DynamicCast<const Decl*>(scopes[i].first);
             if (decl && decl->astKind == ASTKind::VAR_DECL) {
                 continue;
@@ -1231,6 +1232,7 @@ struct ExtendInfo {
 
 void SymbolCollector::CreateExtend(const Decl &decl, const std::string &filePath)
 {
+    (void)filePath;
     auto extendDecl = DynamicCast<ExtendDecl *>(&decl);
     bool isInvalidExtend = !extendDecl || !IsExportedExtendDecl(extendDecl) || !extendDecl->extendedType ||
         extendDecl->inheritedTypes.empty();
@@ -1251,10 +1253,9 @@ void SymbolCollector::CreateExtend(const Decl &decl, const std::string &filePath
             continue;
         }
         std::string signature = ItemResolverUtil::ResolveSignatureByNode(*member);
-        auto modifier = GetDeclModifier(*member);
         auto extendSymbolID = GetDeclSymbolID(*member);
-        ExtendItem extendItem = {.id = extendSymbolID};
-        extendVec.push_back({.id=extendSymbolID, .name=signature});
+        extendVec.push_back({.id=extendSymbolID, .name=signature,
+            .modifier=ark::lsp::Modifier::UNDEFINED, .interfaceName=""});
         extendInfoMap.insert_or_assign(signature, extendVec.back());
     }
     std::function<void(const InheritableDecl&, std::vector<Ptr<Decl>>&)> collectInheritMember =
@@ -1294,7 +1295,6 @@ void SymbolCollector::CreateExtend(const Decl &decl, const std::string &filePath
             return;
         }
         auto interfaceModifier = GetDeclModifier(*targetDecl);
-        auto extendSymbolID = GetDeclSymbolID(*targetDecl);
         std::vector<Ptr<Decl>> members;
         collectInheritMember(*targetDecl, members);
         std::string interfaceName = ItemResolverUtil::ResolveSignatureByNode(*targetDecl);
@@ -1660,7 +1660,7 @@ std::vector<Ptr<Decl>> SymbolCollector::FindImplMemberFromInterface(const Decl &
             if (interfaceDecl == nullptr) {
                 continue;
             }
-            if (auto [_, success] = searched.emplace(interfaceDecl); !success) {
+            if (auto result = searched.emplace(interfaceDecl); !result.second) {
                 continue;
             }
             auto currentMapping =

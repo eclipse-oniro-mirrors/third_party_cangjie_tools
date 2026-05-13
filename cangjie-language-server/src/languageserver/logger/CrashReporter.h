@@ -21,9 +21,6 @@ public:
     static void SignalHandler(int sig);
 #endif
     static void RegisterHandlers();
-
-private:
-    bool isActive;
 };
 } // namespace ark
 
