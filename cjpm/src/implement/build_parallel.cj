@@ -534,8 +534,9 @@ func createCompileTasks(r: ResolveItem, buildConfig: BuildConfig): ?ArrayList<Co
                 r.outputType == Static &&
                 buildConfig.indirectRebuilds.contains(r.fullName)
 
-            let isLto = buildConfig.isLto && (outputType == Static || outputType == Exe)
+            let isLto = buildConfig.isLto
             let ltoValue = if (isLto) { buildConfig.ltoValue } else { "" }
+            let keepPkgVisibility = buildConfig.keepPkgVisibility
 
             let filename = if (outputType == Exe && buildConfig.packageList.exe.size <= 1 && !COMMON_INFO.inWorkspace) {
                 buildConfig.exeName
@@ -628,6 +629,7 @@ func createCompileTasks(r: ResolveItem, buildConfig: BuildConfig): ?ArrayList<Co
                 isMacro: isMacro,
                 isLto: isLto,
                 ltoValue: ltoValue,
+                keepPkgVisibility: keepPkgVisibility,
                 prevStageArtifacts: prevStageArtifacts,
                 isMultiplatform: isMultiplatform,
                 checkDepCjo: checkDepCjo,
@@ -693,6 +695,7 @@ func createCompileTasks(r: ResolveItem, buildConfig: BuildConfig): ?ArrayList<Co
                 isMacro: isMacro,
                 isLto: isLto,
                 ltoValue: ltoValue,
+                prevStageArtifacts: prevStageArtifacts,
                 isMultiplatform: isMultiplatform,
                 checkDepCjo: checkDepCjo,
                 supressed: supressed,
