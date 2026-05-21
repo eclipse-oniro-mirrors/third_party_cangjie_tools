@@ -9,8 +9,10 @@
 #include "DotCompleterByParse.h"
 #include <unordered_set>
 #include <vector>
+#include "CompletionEnv.h"
 #include "cangjie/AST/Node.h"
 #include "cangjie/Utils/CastingTemplate.h"
+#include "../../index/SymbolCollector.h"
 
 using namespace Cangjie;
 using namespace Cangjie::AST;
@@ -103,8 +105,13 @@ void DotCompleterByParse::Complete(const ArkAST &input,
     if (targetPkg && !CompilerCangjieProject::GetInstance()->IsCombinedSym(curModule, srcPkgName, fullImportId) &&
         CompilerCangjieProject::GetInstance()->IsVisibleForPackage(srcPkgName, targetPkg->fullPackageName)) {
         auto members = importManager->GetPackageMembers(srcPkgName, targetPkg->fullPackageName);
-        for (const auto &decl : members) {
-            env.InvokedAccessible(decl.get(), false, false, CompletionImpl::IsPreamble(input, pos));
+        for (const auto &[alias, decls] : members) {
+            for (auto &decl: decls) {
+                auto rawId = decl->identifier;
+                decl->identifier = alias;
+                env.InvokedAccessible(decl.get(), false, false, CompletionImpl::IsPreamble(input, pos));
+                decl->identifier = rawId;
+            }
         }
     }
 
@@ -175,71 +182,134 @@ void DotCompleterByParse::NestedMacroComplete(const ArkAST &input, const Positio
         // notify client need wait macro expand
         callback->PublishCompletionTip(tipItem);
     }
+    CompleteByExpandDecl(input, pos, prefix, env, expr.get());
+}
 
+void DotCompleterByParse::CompleteByExpandDecl(const ArkAST &input, const Position &pos, const std::string &prefix,
+    CompletionEnv &env, Ptr<Expr> expr)
+{
+    std::string filePath = Normalize(input.semaCache->file->filePath);
     std::string content = CompilerCangjieProject::GetInstance()->GetContentByFile(input.semaCache->file->filePath);
     if (content.empty()) {
         return;
     }
-    std::unique_ptr<ArkAST> newSemaCache = nullptr;
 
     // Compile the file that use before file content of enter "."
     auto ci = CompilerCangjieProject::GetInstance()->GetCIForDotComplete(filePath, pos, content);
-    if (!ci) {
-        return;
-    }
-    if (ci->GetSourcePackages().empty()) {
-        return;
-    }
-    auto pkg = ci->GetSourcePackages().front();
-    if (!pkg) {
-        return;
-    }
-    auto pkgInstance = std::make_unique<PackageInstance>(ci->diag, *ci->importManager);
-    if (!pkgInstance) {
-        return;
-    }
-    pkgInstance->package = pkg;
-    pkgInstance->ctx = nullptr;
-
-    for (auto &file : pkg->files) {
-        if (!file || file->filePath != input.semaCache->file->filePath) {
+    OwnedPtr<Decl> targetDecl{};
+    for (auto &file : ci->GetSourcePackages()[0]->files) {
+        if (file->filePath != filePath) {
             continue;
         }
-        std::pair<std::string, std::string> paths = { file->filePath, content };
-        auto arkAST = std::make_unique<ArkAST>(paths, file.get(), ci->diag,
-            pkgInstance.get(), &ci->GetSourceManager());
-        std::string absName = FileStore::NormalizePath(file->filePath);
-        int fileId = ci->GetSourceManager().GetFileID(absName);
-        if (fileId >= 0) {
-            arkAST->fileID = static_cast<unsigned int>(fileId);
+        for (auto &decl : file->decls) {
+            if (decl->begin <= pos && decl->end >= pos) {
+                targetDecl = std::move(decl);
+                break;
+            }
         }
-        newSemaCache = std::move(arkAST);
         break;
     }
 
-    if (!newSemaCache || !newSemaCache->file || newSemaCache->file->originalMacroCallNodes.empty()) {
+    auto &semaCI = CompilerCangjieProject::GetInstance()->pLRUCache->Get(input.file->curPackage->fullPackageName);
+    auto decls = semaCI->ExpandDecl(std::move(targetDecl));
+    // macro expand failed
+    if (decls.empty()) {
         return;
     }
-    Ptr<Ty> ty;
-    Ptr<NameReferenceExpr> resExpr;
-    GetTyFromMacroCallNodes(expr, std::move(newSemaCache), ty, resExpr);
-    if (!ty) {
+
+    auto [originalMacroNode, curParseExpr] = FindParseNameRefExpr(expr, decls);
+    if (!originalMacroNode || !curParseExpr) {
         return;
     }
-    if (Ty::IsTyCorrect(ty)) {
-        std::unordered_set<Ptr<AST::Ty>> tys = {ty};
-        Candidate candidate(tys);
-        CompleteCandidate(pos, prefix, env, candidate);
+
+    auto [includeDecl, expandedExpr] = FindExpandedNameRefExpr(ci, originalMacroNode, curParseExpr, content, decls);
+
+    if (!includeDecl || !expandedExpr) {
         return;
     }
-    if (!resExpr) {
-        return;
+    std::string scopeName = "a";
+    bool isInclude = true;
+    DeepFind(includeDecl, expandedExpr->begin, scopeName, isInclude);
+
+    CompleteByReferenceTarget(pos, prefix, env, expr, scopeName);
+}
+
+std::pair<Ptr<Node>, Ptr<NameReferenceExpr>> DotCompleterByParse::FindParseNameRefExpr(Ptr<Expr> expr,
+    std::vector<OwnedPtr<AST::Decl>> &decls)
+{
+    Ptr<Node> originalMacroNode{};
+    for (auto &decl : decls) {
+        if (decl && decl->curMacroCall &&
+            decl->curMacroCall->begin <= expr->begin &&
+            decl->curMacroCall->end >= expr->end) {
+            originalMacroNode = decl->curMacroCall;
+            break;
+        }
     }
-    CompleteByReferenceTarget(pos, prefix, env, expr, resExpr);
+
+    // node not in macro expand
+    if (!originalMacroNode) {
+        return {};
+    }
+
+    Ptr<NameReferenceExpr> curParseExpr{};
+    auto findParseExpr = [&expr, &curParseExpr](Ptr<Node> node) {
+        if (auto nre = DynamicCast<NameReferenceExpr>(node)) {
+            if (nre->begin == expr->begin && nre->end == expr->end) {
+                curParseExpr = nre;
+                return VisitAction::STOP_NOW;
+            }
+        }
+        return VisitAction::WALK_CHILDREN;
+    };
+
+    Walker(originalMacroNode, findParseExpr).Walk();
+    return {originalMacroNode, curParseExpr};
+}
+
+std::pair<Ptr<Decl>, Ptr<NameReferenceExpr>> DotCompleterByParse::FindExpandedNameRefExpr(
+    std::unique_ptr<LSPCompilerInstance> &ci, Ptr<Node> originalMacroNode, Ptr<NameReferenceExpr> curParseExpr,
+    std::string &content, std::vector<OwnedPtr<AST::Decl>>& decls)
+{
+    std::pair<std::string, std::string> paths = {curParseExpr->curFile->filePath, content};
+    auto dummyAST = std::make_unique<ArkAST>(paths, nullptr, ci->diag, nullptr, &ci->GetSourceManager());
+    dummyAST->fileID = curParseExpr->begin.fileID;
+
+    auto nextTokenPos = GetMacroNodeNextPosition(dummyAST, curParseExpr);
+    auto nrecroBeginPos = originalMacroNode->GetMacroCallNewPos(curParseExpr->begin);
+    auto nreNextTokenPos = originalMacroNode->GetMacroCallNewPos(nextTokenPos);
+
+    Ptr<NameReferenceExpr> expandedExpr;
+    auto searchExpandedExpr = [&nrecroBeginPos, &nreNextTokenPos, &expandedExpr](auto node) {
+        if (auto ma = dynamic_cast<NameReferenceExpr *>(node.get())) {
+            if (ma->begin == nrecroBeginPos && (nreNextTokenPos.IsZero() || ma->end <= nreNextTokenPos)) {
+                expandedExpr = ma;
+                return VisitAction::STOP_NOW;
+            }
+        }
+        return VisitAction::WALK_CHILDREN;
+    };
+
+    Ptr<Decl> includeDecl{};
+    for (auto &decl : decls) {
+        if (decl) {
+            Walker(decl, searchExpandedExpr).Walk();
+        }
+        if (expandedExpr) {
+            includeDecl = decl.get();
+            break;
+        }
+    }
+
+    if (!expandedExpr) {
+        return {};
+    }
+
+    return {includeDecl, expandedExpr};
 }
 
 void DotCompleterByParse::CompleteByReferenceTarget(const Position &pos, const std::string &prefix, CompletionEnv &env,
-    const Ptr<Expr> &expr, const Ptr<NameReferenceExpr> &resExpr)
+    const Ptr<Expr> &expr, std::string &scopeName)
 {
     std::string comPrefix = prefix;
     if (comPrefix.empty()) {
@@ -247,16 +317,16 @@ void DotCompleterByParse::CompleteByReferenceTarget(const Position &pos, const s
             if (auto re = DynamicCast<RefExpr *>(tc->expr.get())) {
                 comPrefix = re->ref.identifier;
             }
-            bool hasLocalDecl = CheckHasLocalDecl(comPrefix, resExpr->scopeName, tc, pos);
+            bool hasLocalDecl = CheckHasLocalDecl(comPrefix, scopeName, tc, pos);
             Candidate declOrTy = CompilerCangjieProject::GetInstance()->GetGivenReferenceTarget(
-                *context, resExpr->scopeName, *tc, hasLocalDecl, packageNameForPath);
+                *context, scopeName, *tc, hasLocalDecl, packageNameForPath);
             CompleteCandidate(pos, prefix, env, declOrTy);
             return;
         }
     }
-    bool hasLocalDecl = CheckHasLocalDecl(comPrefix, resExpr->scopeName, expr.get(), pos);
+    bool hasLocalDecl = CheckHasLocalDecl(comPrefix, scopeName, expr.get(), pos);
     Candidate declOrTy = CompilerCangjieProject::GetInstance()->GetGivenReferenceTarget(
-        *context, resExpr->scopeName, *expr, hasLocalDecl, packageNameForPath);
+        *context, scopeName, *expr, hasLocalDecl, packageNameForPath);
     CompleteCandidate(pos, prefix, env, declOrTy);
 }
 
@@ -1014,56 +1084,96 @@ void DotCompleterByParse::InitMap() const
     DotMatcher::GetInstance().RegFunc(ASTKind::IF_AVAILABLE_EXPR, &ark::DotCompleterByParse::FindIfAvailableExpr);
 }
 
-void DotCompleterByParse::AddExtendDeclFromIndex(Ptr<Ty> &extendTy, CompletionEnv &env, const Position &pos) const
+void DotCompleterByParse::AddExtendDeclFromIndex(Ptr<Ty> extendTy, CompletionEnv &env) const
 {
+    std::vector<Ptr<Ty>> extendTys = {extendTy};
+    AddExtendDeclFromIndexBatch(extendTys, env);
+}
+
+void DotCompleterByParse::AddExtendVisibleMembers(const std::vector<Ptr<Ty>> &extendTys,
+    CompletionEnv &env,
+    ArkAST *ast,
+    std::unordered_set<lsp::SymbolID> &ids,
+    std::unordered_set<lsp::SymbolID> &allVisibleMembers) const
+{
+    auto addMember = [&env] (const Ptr<Decl> member, const Ptr<Decl> outer) {
+        if (env.GetValue(FILTER::IS_STATIC)) {
+            if (member->TestAttr(Attribute::STATIC)) {
+                env.DotAccessible(*member, *outer);
+            }
+        } else {
+            if (!member->TestAnyAttr(Attribute::STATIC, Attribute::OPERATOR)) {
+                env.DotAccessible(*member, *outer);
+            }
+        }
+    };
+
+    for (auto extendTy : extendTys) {
+        auto extendMembers =
+            CompilerCangjieProject::GetInstance()->GetAllVisibleExtendMembers(extendTy, packageNameForPath, *ast->file);
+        auto decl = Ty::GetDeclPtrOfTy(extendTy);
+        if (!decl && !extendTy->IsPrimitive()) {
+            continue;
+        }
+
+        std::unordered_set<lsp::SymbolID> visibleMembers;
+        for (auto &member : extendMembers) {
+            if (IsHiddenDecl(member) || IsHiddenDecl(member->outerDecl)) {
+                continue;
+            }
+            if (decl) {
+                addMember(member, decl);
+            }
+            auto symbol = CompletionEnv::GetDeclSymbolID(*member);
+            visibleMembers.insert(symbol);
+        }
+
+        if (decl && decl->ty && decl->ty->HasGeneric()) {
+            continue;
+        }
+
+        lsp::SymbolID symbolID = lsp::INVALID_SYMBOL_ID;
+        if (decl) {
+            symbolID = CompletionEnv::GetDeclSymbolID(*decl);
+        } else {
+            symbolID = CompletionEnv::GetPrimaryTypeSymbolId(extendTy);
+        }
+
+        ids.insert(symbolID);
+        allVisibleMembers.insert(visibleMembers.begin(), visibleMembers.end());
+    }
+}
+
+void DotCompleterByParse::AddExtendDeclFromIndexBatch(const std::vector<Ptr<Ty>> &extendTys, CompletionEnv &env) const
+{
+    if (extendTys.empty()) {
+        return;
+    }
+
     auto ast = CompilerCangjieProject::GetInstance()->GetArkAST(curFilePath);
     if (!ast || !ast->file) {
         return;
     }
-    auto extendMembers = CompilerCangjieProject::GetInstance()->GetAllVisibleExtendMembers(
-        extendTy, packageNameForPath, *ast->file);
-    auto decl = Ty::GetDeclPtrOfTy(extendTy);
-    if (!decl) {
-        return;
-    }
-    std::unordered_set<lsp::SymbolID> visibleMembers;
-    for (auto &member : extendMembers) {
-        if (IsHiddenDecl(member) || IsHiddenDecl(member->outerDecl)) {
-            continue;
-        }
-        env.DotAccessible(*member, *decl);
-        auto symbol = CompletionEnv::GetDeclSymbolID(*member);
-        visibleMembers.insert(symbol);
-    }
+
+    std::unordered_set<lsp::SymbolID> ids;
+    std::unordered_set<lsp::SymbolID> allVisibleMembers;
+
+    AddExtendVisibleMembers(extendTys, env, ast, ids, allVisibleMembers);
+
     if (!ast->file->package || !ast->file->curPackage) {
         return;
     }
-    if (decl->ty && decl->ty->HasGeneric()) {
-        return;
-    }
-    auto symbolID = CompletionEnv::GetDeclSymbolID(*decl);
     auto curPkgName = ast->file->curPackage->fullPackageName;
-    auto curModule = SplitFullPackage(curPkgName).first;
-    // get import's pos
-    int lastImportLine = 0;
-    for (const auto &import : ast->file->imports) {
-        if (!import) {
-            continue;
-        }
-        lastImportLine = std::max(import->content.rightCurlPos.line, std::max(import->importPos.line, lastImportLine));
-    }
-    Position pkgPos = ast->file->package->packagePos;
-    if (lastImportLine == 0 && pkgPos.line > 0) {
-        lastImportLine = pkgPos.line;
-    }
-    Position textEditStart = {ast->fileID, lastImportLine, 0};
-    Range editRange{textEditStart, textEditStart};
+
+    Range editRange = CompletionEnv::GetEditRangeForAutoImport(*ast);
+
     auto index = ark::CompilerCangjieProject::GetInstance()->GetIndex();
     if (!index) {
         return;
     }
+
     std::vector<CodeCompletion> completetions;
-    index->FindExtendSymsOnCompletion(symbolID, visibleMembers, curPkgName, curModule,
+    index->FindExtendSymsOnCompletionBatch(ids, allVisibleMembers, curPkgName, env.GetValue(FILTER::IS_STATIC),
         [&editRange, &completetions](const std::string &pkg, const std::string &interface,
             const lsp::Symbol &sym, const lsp::CompletionItem &completionItem) {
             CodeCompletion item;
@@ -1081,6 +1191,7 @@ void DotCompleterByParse::AddExtendDeclFromIndex(Ptr<Ty> &extendTy, CompletionEn
             item.sortType = SortType::AUTO_IMPORT_SYM;
             completetions.push_back(item);
         });
+
     for (const auto &completion : completetions) {
         env.AddCompletionItem(completion.label, completion.label, completion, false);
     }
@@ -1190,7 +1301,7 @@ void DotCompleterByParse::CompleteClassDecl(Ptr<Ty> ty, const Cangjie::Position 
         env.DotAccessible(*decl, *classDecl, isSuperOrThis);
     }
     // Complete extend decl
-    AddExtendDeclFromIndex(ty, env, pos);
+    AddExtendDeclFromIndex(ty, env);
     // Complete interfaces
     for (auto &inheritedType : classDecl->inheritedTypes) {
         if (!ark::Is<RefType>(inheritedType.get().get())) {
@@ -1264,7 +1375,7 @@ void DotCompleterByParse::CompleteEnumDecl(Ptr<Ty> ty, const Cangjie::Position &
         env.DotAccessible(*member, *enumDecl);
     }
     // Complete extend decl
-    AddExtendDeclFromIndex(ty, env, pos);
+    AddExtendDeclFromIndex(ty, env);
 
     CompleteEnumInterface(enumDecl, pos, env);
 }
@@ -1298,7 +1409,7 @@ void DotCompleterByParse::CompleteStructDecl(Ptr<Ty> ty, const Cangjie::Position
         env.DotAccessible(*decl, *structDecl);
     }
     // Complete extend decl
-    AddExtendDeclFromIndex(ty, env, pos);
+    AddExtendDeclFromIndex(ty, env);
     // Complete interface decl
     for (auto &inheritedType : structDecl->inheritedTypes) {
         if (!inheritedType || !ark::Is<RefType>(inheritedType.get().get())) {
@@ -1335,6 +1446,24 @@ void DotCompleterByParse::CompleteBuiltInType(Ty *type, CompletionEnv &env) cons
             }
         }
     }
+
+    if (!type->IsPrimitive()) {
+        return;
+    }
+
+    if (type->IsIdeal()) {
+        auto kinds = GetIdealTypesByKind(type->kind);
+        std::vector<Ptr<Ty>> extendTys;
+        for (auto kind: kinds) {
+            auto primitivety = TypeManager::GetPrimitiveTy(kind);
+            extendTys.push_back(primitivety);
+        }
+        if (!extendTys.empty()) {
+            AddExtendDeclFromIndexBatch(extendTys, env);
+        }
+        return;
+    }
+    AddExtendDeclFromIndex(type, env);
 }
 
 std::string DotCompleterByParse::QueryByPos(Ptr<Node> node, const Position pos)

@@ -7,6 +7,7 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include <string>
+#include <nlohmann/json.hpp>
 #include "TestUtils.h"
 
 enum TestType {
@@ -56,6 +57,7 @@ struct HoverInfo {
 struct DiagnosticInfo {
     ark::DiagnosticToken diagInfo;
     std::string uri;
+    nlohmann::json codeActions;
 };
 struct CallHierarchyResult {
     bool isOutgoingCall{true};

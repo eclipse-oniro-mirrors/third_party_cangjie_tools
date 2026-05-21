@@ -22,6 +22,44 @@ namespace ark {
 using namespace Cangjie;
 using namespace Cangjie::FileUtil;
 using namespace CONSTANTS;
+
+namespace {
+using TweakReply = std::function<void(const ValueOrError &)>;
+
+void ReplyTweakNoEdit(const TweakReply &reply)
+{
+    ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
+    reply(value);
+}
+
+Range BuildTweakSelectionRange(unsigned int fileId, const TweakArgs &args)
+{
+    Range range;
+    range.start = Cangjie::Position{
+        fileId,
+        args.selection.start.line,
+        args.selection.start.column
+    };
+    range.end = Cangjie::Position{
+        fileId,
+        args.selection.end.line,
+        args.selection.end.column
+    };
+    return range;
+}
+
+ValueOrError BuildTweakWorkspaceEditValue(Tweak::Effect effect)
+{
+    ApplyWorkspaceEditParams editParams;
+    editParams.edit.changes = std::move(effect.applyEdits);
+    editParams.edit.documentChanges = std::move(effect.documentChanges);
+    nlohmann::json res;
+    ToJSON(editParams, res);
+
+    return ValueOrError(ValueOrErrorCheck::VALUE, res);
+}
+} // namespace
+
 // MessageHandler dispatches incoming LSP messages.
 // It handles cross-cutting concerns:
 //  - serialize/deserialize protocol objects to JSON
@@ -513,8 +551,8 @@ void ArkLanguageServer::OnDocumentDidOpen(const DidOpenTextDocumentParams &param
     }
     if (reBuild) {
         auto pkgName = CompilerCangjieProject::GetInstance()->GetFullPkgName(file);
-        CompilerCangjieProject::GetInstance()->
-            UpdateFileStatusInCI(pkgName, file, CompilerInstance::SrcCodeChangeState::CHANGED);
+        CompilerCangjieProject::GetInstance()->UpdateFileStatusInCI(
+            pkgName, file, CompilerInstance::SrcCodeChangeState::CHANGED);
     }
     int64_t version = DocMgr.AddDoc(file, params.textDocument.version, contents);
     Server->AddDoc(file, contents, version, ark::NeedDiagnostics::YES, reBuild);
@@ -1276,7 +1314,7 @@ void ArkLanguageServer::ReadyForDiagnostics(std::string file,
 
     PublishDiagnosticsParams notification;
     if (WhetherSupportVersionInDiag()) {
-        notification.version.value() = version;
+        notification.version = version;
     }
     notification.uri.file = URI::URIFromAbsolutePath(file).ToString();
     ArkAST *arkAst = CompilerCangjieProject::GetInstance()->GetArkAST(file);
@@ -1303,16 +1341,16 @@ void ArkLanguageServer::AddDiagnosticQuickFix(std::vector<DiagnosticToken> &diag
     }
     const std::string uri = URI::URIFromAbsolutePath(file).ToString();
     for (auto &diagnostic : diagnostics) {
-        if (!diagnostic.diaFix.has_value()) {
+        if (!diagnostic.diagFix.has_value()) {
             continue;
         }
-        if (diagnostic.diaFix->addImport) {
+        if (diagnostic.diagFix->addImport) {
             AddImportQuickFix(diagnostic, arkAst);
         }
-        if (diagnostic.diaFix->removeImport) {
+        if (diagnostic.diagFix->removeImport) {
             RemoveImportQuickFix(diagnostic, arkAst, uri);
         }
-        if (diagnostic.diaFix->removeUnusedSymbol) {
+        if (diagnostic.diagFix->removeUnusedSymbol) {
             RemoveUnusedSymbolQuickFix(diagnostic, arkAst, uri);
         }
     }
@@ -1620,7 +1658,7 @@ void ArkLanguageServer::RemoveAllUnusedImportsCodeAction(std::vector<DiagnosticT
         allUnusedImportCA.edit.value().changes[uri].push_back(textEdit);
     }
     for (auto &diagnostic : diagnostics) {
-        if (!diagnostic.diaFix.has_value() || !diagnostic.diaFix->removeImport || !diagnostic.codeActions.has_value()) {
+        if (!diagnostic.diagFix.has_value() || !diagnostic.diagFix->removeImport || !diagnostic.codeActions.has_value()) {
             continue;
         }
         diagnostic.codeActions.value().push_back(allUnusedImportCA);
@@ -1773,7 +1811,7 @@ void ArkLanguageServer::RemoveUnusedSymbolQuickFix(DiagnosticToken &diagnostic, 
     if (!arkAst || !arkAst->file) {
         return;
     }
-    
+
     Range diagRange = TransformFromIDE2Char(diagnostic.range);
     Range deleteRange = diagRange;
     bool found = false;
@@ -1796,7 +1834,7 @@ void ArkLanguageServer::RemoveUnusedSymbolQuickFix(DiagnosticToken &diagnostic, 
         if (!decl) {
             return VisitAction::WALK_CHILDREN;
         }
-        
+
         auto identifierPos = decl->GetIdentifierPos();
         if (identifierPos.line != diagRange.start.line ||
             identifierPos.column != diagRange.start.column) {
@@ -1816,9 +1854,9 @@ void ArkLanguageServer::RemoveUnusedSymbolQuickFix(DiagnosticToken &diagnostic, 
         found = true;
         return VisitAction::STOP_NOW;
     };
-    
+
     ConstWalker(arkAst->file, finder).Walk();
-    
+
     if (!found) {
         return;
     }
@@ -1969,41 +2007,21 @@ void ArkLanguageServer::OnCommandApplyTweak(const TweakArgs &args, nlohmann::jso
         return;
     }
 
-    int fileId = CompilerCangjieProject::GetInstance()->GetFileID(args.file.file);
-    if (fileId < 0) {
-        ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
-        reply(value);
+    auto fileId = CompilerCangjieProject::GetInstance()->GetFileID(args.file.file);
+    if (!fileId) {
+        ReplyTweakNoEdit(reply);
         return;
     }
-    Range range;
-    range.start = Cangjie::Position{
-        static_cast<unsigned int>(fileId),
-        args.selection.start.line,
-        args.selection.start.column
-    };
-    range.end = Cangjie::Position{
-        static_cast<unsigned int>(fileId),
-        args.selection.end.line,
-        args.selection.end.column
-    };
+    Range range = BuildTweakSelectionRange(static_cast<unsigned int>(fileId), args);
 
     auto action = [this, reply = std::move(reply)](Tweak::Effect effect) mutable {
-        if (effect.applyEdits.empty()) {
-            ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
-            reply(value);
+        if (effect.applyEdits.empty() && effect.documentChanges.empty()) {
+            ReplyTweakNoEdit(reply);
             return;
         }
-        ValueOrError commandValue(ValueOrErrorCheck::VALUE, nullptr);
-        reply(commandValue);
-
-        ApplyWorkspaceEditParams editParams;
-        editParams.edit.changes = std::move(effect.applyEdits);
-        nlohmann::json res;
-        ToJSON(editParams, res);
-
-        ValueOrError value(ValueOrErrorCheck::VALUE, res);
+        ReplyTweakNoEdit(reply);
+        ValueOrError value = BuildTweakWorkspaceEditValue(std::move(effect));
         Notify("workspace/applyEdit", value);
-        return;
     };
     Server->ApplyTweak(file, range, args.tweakID, args.extraOptions, std::move(action));
 }
@@ -2012,7 +2030,7 @@ int ArkLanguageServer::GetUnusedImportCount(std::vector<DiagnosticToken> &diagno
 {
     int unusedImportCount = 0;
     for (auto &diagnostic : diagnostics) {
-        if (!diagnostic.diaFix.has_value() || !diagnostic.diaFix->removeImport || !diagnostic.codeActions.has_value()) {
+        if (!diagnostic.diagFix.has_value() || !diagnostic.diagFix->removeImport || !diagnostic.codeActions.has_value()) {
             continue;
         }
         unusedImportCount++;
@@ -2040,7 +2058,7 @@ WorkspaceEdit ArkLanguageServer::GetWorkspaceEdit(std::vector<DiagnosticToken> &
 {
     WorkspaceEdit edit;
     for (auto &diagnostic : diagnostics) {
-        if (!diagnostic.diaFix.has_value() || !diagnostic.diaFix->removeImport || !diagnostic.codeActions.has_value()) {
+        if (!diagnostic.diagFix.has_value() || !diagnostic.diagFix->removeImport || !diagnostic.codeActions.has_value()) {
             continue;
         }
         TextEdit textEdit;
