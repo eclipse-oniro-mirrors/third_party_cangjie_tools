@@ -369,6 +369,11 @@ struct TextDocumentEdit {
     std::vector<TextEdit> textEdits{};
 };
 
+struct CreateFile {
+    std::string kind = "create";
+    std::string uri;
+};
+
 struct TextDocumentContentChangeEvent {
     std::optional<Range> range;
 
@@ -462,6 +467,7 @@ struct DiagFix {
     bool addImport{false};
     bool removeImport{false};
     bool removeUnusedSymbol{false};
+    bool implementMembers{false};
 };
 
 struct DiagnosticToken {
@@ -483,7 +489,7 @@ struct DiagnosticToken {
 
     std::optional<std::vector<CodeAction>> codeActions{};
 
-    std::optional<DiagFix> diaFix = DiagFix{false, false};
+    std::optional<DiagFix> diagFix = DiagFix{false, false};
 
     DiagnosticToken()
         : range(), severity(0), code(0), source(""), message(""), relatedInformation() {};
@@ -524,6 +530,7 @@ bool ToJSON(const PublishDiagnosticsParams &params, nlohmann::json &reply);
 
 struct WorkspaceEdit {
     std::map<std::string, std::vector<TextEdit>> changes;
+    std::vector<nlohmann::json> documentChanges;
 };
 bool ToJSON(const WorkspaceEdit &params, nlohmann::json &reply);
 
@@ -537,6 +544,8 @@ struct CodeAction {
     const static std::string QUICKFIX_REMOVE_IMPORT;
 
     const static std::string QUICKFIX_REMOVE_UNUSED_SYMBOL;
+
+    const static std::string QUICKFIX_IMPLEMENT_MEMBERS;
 
     const static std::string REFACTOR_KIND;
 
@@ -553,6 +562,7 @@ struct CodeAction {
 bool ToJSON(const CodeAction &params, nlohmann::json &reply);
 
 bool ToJSON(const TextDocumentEdit &params, nlohmann::json &reply);
+bool ToJSON(const CreateFile &params, nlohmann::json &reply);
 
 struct DocumentLinkParams {
     TextDocumentIdentifier textDocument;

@@ -48,6 +48,9 @@ public:
         // all changes
         std::map<std::string, std::vector<TextEdit>> applyEdits;
 
+        // ordered document changes, used for create-file style refactors
+        std::vector<nlohmann::json> documentChanges;
+
         // the change text whether format
         bool format = true;
 

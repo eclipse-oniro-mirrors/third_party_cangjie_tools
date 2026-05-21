@@ -15,6 +15,7 @@
 #include <utility>
 #include "../../../third_party/flatbuffers/include/index_generated.h"
 #include "MemIndex.h"
+#include "Symbol.h"
 
 namespace ark {
 namespace lsp {
@@ -65,7 +66,8 @@ struct IndexFileIn {
     RefSlab refs;
     RelationSlab relations;
     ExtendSlab extends;
-    CrossSymbolSlab crossSymbos;
+    CrossSymbolSlab crossSymbols;
+    ReExportSymbolSlab reExportSymbols;
 };
 
 struct IndexFileOut {
@@ -73,8 +75,8 @@ struct IndexFileOut {
     const RefSlab *refs = nullptr;
     const RelationSlab *relations = nullptr;
     const ExtendSlab *extends = nullptr;
-    const CrossSymbolSlab *crossSymbos = nullptr;
-
+    const CrossSymbolSlab *crossSymbols = nullptr;
+    const ReExportSymbolSlab *reExportSymbols = nullptr;
     IndexFileOut() = default;
 };
 
@@ -119,6 +121,9 @@ public:
         const IdxFormat::HashedPackage &package, std::unique_ptr<ark::lsp::IndexFileIn> &ifi) const;
 
     void readCrossSymbols(
+        const IdxFormat::HashedPackage &package, std::unique_ptr<ark::lsp::IndexFileIn> &ifi) const;
+
+    void readReExportSymbols(
         const IdxFormat::HashedPackage &package, std::unique_ptr<ark::lsp::IndexFileIn> &ifi) const;
 private:
     std::string basePath;
