@@ -78,9 +78,6 @@ namespace test::common {
     void ChangeMessageUrlForBaseFile(const std::string &testFilePath, nlohmann::json &resultBase, std::string &rootUri,
                                      bool &isMultiModule);
 
-    void ChangeApplyEditUrlForBaseFile(const std::string &testFilePath, nlohmann::json &resultBase, std::string &rootUri,
-        bool &isMultiModule);
-
     void HandleCjdExpLines(nlohmann::json &expLines);
 
     std::string GetRealPath(const std::string &fileName);
@@ -179,11 +176,11 @@ namespace test::common {
     std::vector<ark::CodeLens> ReadExpectedCodeLensItems(std::string &baseFile);
 
     bool CheckCodeLensResult(std::vector<ark::CodeLens> exp, std::vector<ark::CodeLens> act,
-                             std::string &reason);    
+                             std::string &reason);
 
     bool IsMacroExpandTest(const std::string &rootUri);
-    
-    bool IsMacroExpandTest(const std::string &rootUri);
+
+    bool IsLspMacroSrvFailed();
 
     ark::FindOverrideMethodResult CreateOverrideMethodsResult(const nlohmann::json& exp);
 

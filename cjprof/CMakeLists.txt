@@ -11,7 +11,7 @@ cmake_minimum_required(VERSION 3.10)
 project("cjprof")
 
 set(CMAKE_CXX_STANDARD 17)
-set(CJPROF_VERSION_STR "1.2.0-alpha.19")
+set(CJPROF_VERSION_STR "1.2.0-alpha.20")
 set(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2 -O2")
 set(STRIP_FLAG "-s")
 
@@ -27,6 +27,7 @@ endif ()
 
 if (WIN32)
   set(LINK_FLAGS "-Wl,--no-insert-timestamp -Wl,--no-undefined")
+  add_compile_definitions(_WIN32_WINNT=0x0A00)
 endif ()
 
 if (APPLE)
@@ -63,6 +64,8 @@ else()
 endif()
 
 include_directories(third_party/boundscheck/include)
+include_directories(third_party/cpp-httplib)
+include_directories(third_party/third_party_json/include)
 include_directories(third_party/runtime/runtime/src)
 add_subdirectory(third_party/runtime/runtime/src/Demangler EXCLUDE_FROM_ALL)
 set_target_properties(cangjie-demangle PROPERTIES EXCLUDE_FROM_ALL FALSE)

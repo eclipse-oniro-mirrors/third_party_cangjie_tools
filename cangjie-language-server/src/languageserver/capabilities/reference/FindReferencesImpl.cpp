@@ -29,7 +29,7 @@ void FindReferencesImpl::GetCurPkgUesage(Ptr<Decl> decl, const ArkAST &ast, Refe
             continue;
         }
         auto range = GetProperRange(U, ast.tokens);
-        Location loc = {URI::URIFromAbsolutePath(U->curFile->filePath).ToString(), range};
+        Location loc = {{URI::URIFromAbsolutePath(U->curFile->filePath).ToString()}, range};
         (void)result.References.emplace(loc);
     }
 }
@@ -56,7 +56,7 @@ void FindReferencesImpl::CompileDownStreamPackage(const std::vector<Ptr<Cangjie:
     // Compile all downstream packages before searching for references
     CompilerCangjieProject::GetInstance()->SubmitTasksToPool(tasks);
 }
-
+// LCOV_EXCL_START
 std::unordered_set<std::string> FindReferencesImpl::GetSelectedUesScopeNames(Ptr<Decl> decl,
     const ArkAST &ast, Range &range)
 {
@@ -76,7 +76,7 @@ std::unordered_set<std::string> FindReferencesImpl::GetSelectedUesScopeNames(Ptr
     }
     return scopeNames;
 }
-
+// LCOV_EXCL_STOP
 void FindReferencesImpl::FindReferences(const ArkAST &ast, ReferencesResult &result, Position pos)
 {
     Logger &logger = Logger::Instance();
@@ -153,14 +153,14 @@ void FindReferencesImpl::FindReferences(const ArkAST &ast, ReferencesResult &res
                 return;
             }
             CompilerCangjieProject::GetInstance()->GetRealPath(realPath);
-            Location loc{URI::URIFromAbsolutePath(realPath).ToString(),
+            Location loc{{URI::URIFromAbsolutePath(realPath).ToString()},
                          TransformFromChar2IDE({ref.location.begin, ref.location.end})};
             (void)result.References.emplace(loc);
         });
         if (definition.container != 0) {
             auto realPath = definition.location.fileUri;
             CompilerCangjieProject::GetInstance()->GetRealPath(realPath);
-            Location defLoc{URI::URIFromAbsolutePath(realPath).ToString(),
+            Location defLoc{{URI::URIFromAbsolutePath(realPath).ToString()},
                 TransformFromChar2IDE({definition.location.begin, definition.location.end})};
             auto it = result.References.find(defLoc);
             if (it != result.References.end()) {

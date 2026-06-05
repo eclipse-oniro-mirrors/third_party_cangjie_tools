@@ -16,6 +16,72 @@ import ohos.base.*
 /*import {p29} from "./superInterface"*/
 
 
+
+/*interface AutoGenType0Ininheritances {
+    }*/
+
+public open class AutoGenType0Ininheritances {
+    protected init() {
+    }
+    
+    public open func toJSValue(context: JSContext): JSValue {
+        let obj = context.object()
+        
+        obj.toJSValue()
+    }
+    
+    public static func fromJSValue(context: JSContext, input: JSValue): AutoGenType0Ininheritances {
+        let obj = input.asObject()
+        AutoGenType0Ininheritances(
+        
+        )
+    }
+}
+
+
+/*interface AutoGenType1Ininheritances {
+    }*/
+
+public open class AutoGenType1Ininheritances {
+    protected init() {
+    }
+    
+    public open func toJSValue(context: JSContext): JSValue {
+        let obj = context.object()
+        
+        obj.toJSValue()
+    }
+    
+    public static func fromJSValue(context: JSContext, input: JSValue): AutoGenType1Ininheritances {
+        let obj = input.asObject()
+        AutoGenType1Ininheritances(
+        
+        )
+    }
+}
+
+
+/*interface AutoGenType2Ininheritances {
+    }*/
+
+public open class AutoGenType2Ininheritances {
+    protected init() {
+    }
+    
+    public open func toJSValue(context: JSContext): JSValue {
+        let obj = context.object()
+        
+        obj.toJSValue()
+    }
+    
+    public static func fromJSValue(context: JSContext, input: JSValue): AutoGenType2Ininheritances {
+        let obj = input.asObject()
+        AutoGenType2Ininheritances(
+        
+        )
+    }
+}
+
 /***********OBJECT***********/
 
 /*interface A {
@@ -23,9 +89,10 @@ import ohos.base.*
     }*/
 
 public open class A {
-    
-    protected A(public var p: Float64) { }
-    
+    public var p: Float64
+    protected init(p: Float64) {
+        this.p = p
+    }
     
     public open func toJSValue(context: JSContext): JSValue {
         let obj = context.object()
@@ -39,18 +106,20 @@ public open class A {
         Float64.fromJSValue(context, obj["p"])
         )
     }
-    
 }
+
 
 /*interface B {
     p1: number;
     }*/
 
 public open class B <: A {
-    
-    protected B(p: Float64,
-    public var p1: Float64) { super(p) }
-    
+    public var p1: Float64
+    protected init(p: Float64,
+    p1: Float64) {
+        super( p )
+        this.p1 = p1
+    }
     
     public open func toJSValue(context: JSContext): JSValue {
         let obj = context.object()
@@ -66,23 +135,22 @@ public open class B <: A {
         Float64.fromJSValue(context, obj["p1"])
         )
     }
-    
 }
+
 
 /*interface ExportKeyword BuglyLogAdapter {
     }*/
 
 public open class BuglyLogAdapter <: p29 {
-    
     protected BuglyLogAdapter(arkts_object: JSObject) { super(arkts_object) }
     
     
     
-    public open func toJSValue(context: JSContext): JSValue {
+    public open func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    public static func fromJSValue(context: JSContext, input: JSValue): BuglyLogAdapter {
+    public static func fromJSValue(_: JSContext, input: JSValue): BuglyLogAdapter {
         BuglyLogAdapter(input.asObject())
     }
 }
@@ -92,7 +160,6 @@ public open class BuglyLogAdapter <: p29 {
     }*/
 
 public open class C {
-    
     protected C(var arkts_object: JSObject) { }
     
     
@@ -103,11 +170,11 @@ public open class C {
         jsObjApiCall < Unit >( arkts_object, "f", EMPTY_ARG)
     }
     
-    public open func toJSValue(context: JSContext): JSValue {
+    public open func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    public static func fromJSValue(context: JSContext, input: JSValue): C {
+    public static func fromJSValue(_: JSContext, input: JSValue): C {
         C(input.asObject())
     }
 }
@@ -116,16 +183,15 @@ public open class C {
     }*/
 
 public open class D <: C {
-    
     protected D(arkts_object: JSObject) { super(arkts_object) }
     
     
     
-    public open func toJSValue(context: JSContext): JSValue {
+    public open func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    public static func fromJSValue(context: JSContext, input: JSValue): D {
+    public static func fromJSValue(_: JSContext, input: JSValue): D {
         D(input.asObject())
     }
 }
@@ -134,9 +200,9 @@ public open class D <: C {
     }*/
 
 public open class E <: A {
-    
-    protected E(p: Float64) { super(p) }
-    
+    protected init(p: Float64) {
+        super( p )
+    }
     
     public open func toJSValue(context: JSContext): JSValue {
         let obj = context.object()
@@ -150,15 +216,14 @@ public open class E <: A {
         Float64.fromJSValue(context, obj["p"])
         )
     }
-    
 }
+
 
 /*interface F {
     g(): void
     }*/
 
 public open class F <: C {
-    
     protected F(arkts_object: JSObject) { super(arkts_object) }
     
     
@@ -169,23 +234,116 @@ public open class F <: C {
         jsObjApiCall < Unit >( arkts_object, "g", EMPTY_ARG)
     }
     
-    public open func toJSValue(context: JSContext): JSValue {
+    public open func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    public static func fromJSValue(context: JSContext, input: JSValue): F {
+    public static func fromJSValue(_: JSContext, input: JSValue): F {
         F(input.asObject())
     }
 }
+
+/*interface ExportKeyword INamespace {
+    options?: { [k: String]: any };
+    nested?: { [k: String]: AnyNestedObject };
+    }*/
+
+public open class INamespace {
+    public var options: Option<AutoGenType0Ininheritances> = None
+    public var nested: Option<AutoGenType1Ininheritances> = None
+    protected init(
+    options!: Option<AutoGenType0Ininheritances> = None,
+    nested!: Option<AutoGenType1Ininheritances> = None) {
+        this.options = options
+        this.nested = nested
+    }
+    
+    public open func toJSValue(context: JSContext): JSValue {
+        let obj = context.object()
+        if (let Some(v) <- options) {
+            obj["options"] = v.toJSValue(context)
+        }
+        if (let Some(v) <- nested) {
+            obj["nested"] = v.toJSValue(context)
+        }
+        obj.toJSValue()
+    }
+    
+    public static func fromJSValue(context: JSContext, input: JSValue): INamespace {
+        let obj = input.asObject()
+        INamespace(
+        options:
+        if (obj["options"].isNull()) {
+            None < AutoGenType0Ininheritances >
+        } else {
+            AutoGenType0Ininheritances.fromJSValue(context, obj["options"])
+        },
+        nested:
+        if (obj["nested"].isNull()) {
+            None < AutoGenType1Ininheritances >
+        } else {
+            AutoGenType1Ininheritances.fromJSValue(context, obj["nested"])
+        }
+        )
+    }
+}
+
+
+/*interface ExportKeyword IService {
+    methods: { [k: String]: IMethod };
+    }*/
+
+public open class IService <: INamespace {
+    public var methods: AutoGenType2Ininheritances
+    protected init(methods: AutoGenType2Ininheritances,
+    options!: Option<AutoGenType0Ininheritances> = None,
+    nested!: Option<AutoGenType1Ininheritances> = None) {
+        super( options:  options , nested:  nested )
+        this.methods = methods
+    }
+    
+    public open func toJSValue(context: JSContext): JSValue {
+        let obj = context.object()
+        obj["methods"] = methods.toJSValue(context)
+        if (let Some(v) <- options) {
+            obj["options"] = v.toJSValue(context)
+        }
+        if (let Some(v) <- nested) {
+            obj["nested"] = v.toJSValue(context)
+        }
+        obj.toJSValue()
+    }
+    
+    public static func fromJSValue(context: JSContext, input: JSValue): IService {
+        let obj = input.asObject()
+        IService(
+        AutoGenType2Ininheritances.fromJSValue(context, obj["methods"]),
+        options:
+        if (obj["options"].isNull()) {
+            None < AutoGenType0Ininheritances >
+        } else {
+            AutoGenType0Ininheritances.fromJSValue(context, obj["options"])
+        },
+        nested:
+        if (obj["nested"].isNull()) {
+            None < AutoGenType1Ininheritances >
+        } else {
+            AutoGenType1Ininheritances.fromJSValue(context, obj["nested"])
+        }
+        )
+    }
+}
+
 
 /*interface ExportKeyword DeclareKeyword SuperInterface {
     p: number;
     }*/
 
 public open class SuperInterface {
-    
-    protected SuperInterface(public var p: Float64) { }
-    
+    public var p: Float64
+    protected init(p: Float64) {
+        this.p = p
+    }
     
     public open func toJSValue(context: JSContext): JSValue {
         let obj = context.object()
@@ -199,24 +357,23 @@ public open class SuperInterface {
         Float64.fromJSValue(context, obj["p"])
         )
     }
-    
 }
+
 
 /*class ExportKeyword DeclareKeyword SubClass {
     p: number;
     }*/
 
 public class SubClass <: SuperClass {
-    
     protected SubClass(arkts_object: JSObject) { super(arkts_object) }
     
     
     
-    public func toJSValue(context: JSContext): JSValue {
+    public func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    public static func fromJSValue(context: JSContext, input: JSValue): SubClass {
+    public static func fromJSValue(_: JSContext, input: JSValue): SubClass {
         SubClass(input.asObject())
     }
 }
@@ -226,16 +383,15 @@ public class SubClass <: SuperClass {
     }*/
 
 public class SubClass1 <: SuperClass1 {
-    
     protected SubClass1(arkts_object: JSObject) { super(arkts_object) }
     
     
     
-    public func toJSValue(context: JSContext): JSValue {
+    public func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    public static func fromJSValue(context: JSContext, input: JSValue): SubClass1 {
+    public static func fromJSValue(_: JSContext, input: JSValue): SubClass1 {
         SubClass1(input.asObject())
     }
 }
@@ -246,9 +402,9 @@ public class SubClass1 <: SuperClass1 {
     }*/
 
 public class SubInterface <: SuperInterface {
-    
     protected SubInterface(var arkts_object: JSObject) {
-        super(Float64.fromJSValue(getMainContext(), arkts_object["p"])) }
+        super(Float64.fromJSValue(getMainContext(), arkts_object["p"]))
+    }
     
     
     public mut prop p1: Float64 {
@@ -266,11 +422,11 @@ public class SubInterface <: SuperInterface {
     }
     
     
-    public func toJSValue(context: JSContext): JSValue {
+    public func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    public static func fromJSValue(context: JSContext, input: JSValue): SubInterface {
+    public static func fromJSValue(_: JSContext, input: JSValue): SubInterface {
         SubInterface(input.asObject())
     }
 }
@@ -280,7 +436,6 @@ public class SubInterface <: SuperInterface {
     }*/
 
 public open class SuperClass {
-    
     protected SuperClass(var arkts_object: JSObject) { }
     
     
@@ -299,11 +454,11 @@ public open class SuperClass {
     }
     
     
-    public open func toJSValue(context: JSContext): JSValue {
+    public open func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    public static func fromJSValue(context: JSContext, input: JSValue): SuperClass {
+    public static func fromJSValue(_: JSContext, input: JSValue): SuperClass {
         SuperClass(input.asObject())
     }
 }
@@ -313,7 +468,6 @@ public open class SuperClass {
     }*/
 
 public open class SuperClass1 {
-    
     protected SuperClass1(var arkts_object: JSObject) { }
     
     
@@ -332,11 +486,11 @@ public open class SuperClass1 {
     }
     
     
-    public open func toJSValue(context: JSContext): JSValue {
+    public open func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    public static func fromJSValue(context: JSContext, input: JSValue): SuperClass1 {
+    public static func fromJSValue(_: JSContext, input: JSValue): SuperClass1 {
         SuperClass1(input.asObject())
     }
 }

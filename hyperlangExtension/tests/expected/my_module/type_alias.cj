@@ -129,10 +129,10 @@ public enum TA720 {
     }
     public static func fromJSValue(context: JSContext, input: JSValue): TA720 {
         
-        if(input.isNumber()) {
+        if (input.isNumber()) {
             return NUMBER(Float64.fromJSValue(context, input))
         }  
-        if(input.isString()) {
+        if (input.isString()) {
             return STRING(String.fromJSValue(context, input))
         }
         throw Exception("unsupport type!")
@@ -152,7 +152,7 @@ public enum TA730 {
     }
     public static func fromJSValue(context: JSContext, input: JSValue): TA730 {
         
-        if(input.isString()) {
+        if (input.isString()) {
             return STRING(String.fromJSValue(context, input))
         }
         throw Exception("unsupport type!")
@@ -161,12 +161,12 @@ public enum TA730 {
 
 
 public enum TA740 {
-    | AAA
+    | LITERAL_111
     | TA740TA710(TA710)
     
     public func toJSValue(context: JSContext): JSValue {
         match(this) {
-            case AAA => context.string("aaa").toJSValue()
+            case LITERAL_111 => context.string("111").toJSValue()
             case TA740TA710(x) => x.toJSValue(context)
         }
     }
@@ -239,10 +239,10 @@ public enum ARK1 {
         if (input.isNull()) {
             return NULL
         } 
-        if(input.isNumber()) {
+        if (input.isNumber()) {
             return NUMBER(Float64.fromJSValue(context, input))
         }  
-        if(input.isString()) {
+        if (input.isString()) {
             return STRING(String.fromJSValue(context, input))
         } 
         if (input.isBoolean()) {

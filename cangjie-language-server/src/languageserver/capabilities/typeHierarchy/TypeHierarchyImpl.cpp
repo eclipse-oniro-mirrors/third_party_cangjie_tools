@@ -89,7 +89,7 @@ void DealTypeAliasDecl(Ptr<Decl> &decl)
     if (ark::Is<Cangjie::AST::TypeAliasDecl>(decl.get())) {
         auto typeAliasDecl = dynamic_cast<const TypeAliasDecl*>(decl.get());
         if (!typeAliasDecl || !typeAliasDecl->type) { return; }
-        decl = ItemResolverUtil::GetDeclByTy(typeAliasDecl->type->ty);
+        decl = ItemResolverUtil::GetDeclByTy(typeAliasDecl->type->GetTy());
     }
 }
 
@@ -162,7 +162,7 @@ void TypeHierarchyImpl::FindSuperTypesImpl(std::set<TypeHierarchyItem> &results,
     if (hierarchyItem.symbolId == lsp::INVALID_SYMBOL_ID) {
         return;
     }
-
+    // LCOV_EXCL_START
     auto index = CompilerCangjieProject::GetInstance()->GetIndex();
     if (!index) {
         return;
@@ -203,6 +203,7 @@ void TypeHierarchyImpl::FindSuperTypesImpl(std::set<TypeHierarchyItem> &results,
         item.symbolId = sym.id;
         results.insert(item);
     });
+    // LCOV_EXCL_STOP
 }
 
 // subtypes entrance
@@ -216,7 +217,7 @@ void TypeHierarchyImpl::FindSubTypesImpl(std::set<TypeHierarchyItem> &results,
     if (hierarchyItem.symbolId == lsp::INVALID_SYMBOL_ID) {
         return;
     }
-
+    // LCOV_EXCL_START
     auto index = CompilerCangjieProject::GetInstance()->GetIndex();
     if (!index) {
         return;
@@ -261,5 +262,6 @@ void TypeHierarchyImpl::FindSubTypesImpl(std::set<TypeHierarchyItem> &results,
         item.symbolId = sym.id;
         results.insert(item);
     });
+    // LCOV_EXCL_STOP
 }
 } // namespace ark

@@ -26,7 +26,7 @@ void StructuralRuleGITF01::HasModifiedVar(
             }
             break;
         } else if (auto ma = DynamicCast<const MemberAccess*>(baseExpr); ma) {
-            if (ma->baseExpr && ma->baseExpr->ty->IsClassLike()) {
+            if (ma->baseExpr && ma->baseExpr->GetTy()->IsClassLike()) {
                 // don't check member access of field of class like type, unless it is a member access of this
                 // e.g. let T be a class type with field v
                 // this.a = T() // this is a mutation to this
@@ -106,7 +106,7 @@ void StructuralRuleGITF01::CollectVarDeclsOfStructDecl(
 
     for (auto& sdDecl : pStructDecl->body->decls) {
         if (auto vd = DynamicCast<VarDecl*>(sdDecl.get());
-            vd && !vd->TestAttr(Attribute::STATIC) && Ty::IsTyCorrect(vd->ty) && !vd->ty->IsArray()) {
+            vd && !vd->TestAttr(Attribute::STATIC) && Ty::IsTyCorrect(vd->GetTy()) && !vd->GetTy()->IsArray()) {
             varDecls.emplace(vd);
         }
     }

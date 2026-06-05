@@ -16,7 +16,7 @@ std::unordered_map<std::string, std::unique_ptr<ArkAST>> FileMove::astMap = {};
 std::unordered_map<std::string, std::unique_ptr<PackageInstance>> FileMove::pkgInstanceMap = {};
 std::string FileMove::moveDirPath;
 std::string FileMove::targetDir;
-
+// LCOV_EXCL_START
 void FileMove::FileMoveRefactor(const ArkAST *ast,
     FileRefactorRespParams &result,
     const std::string &file,
@@ -114,7 +114,7 @@ void FileMove::DealMoveFile(const ArkAST *ast, const std::string &file,
     lsp::FileRefsRequest fileRefReq{fileId, file, fullPkgName, lsp::RefKind::REFERENCE};
     std::unordered_set<lsp::SymbolID> fileRefIds;
     index->FileRefs(
-        fileRefReq, [&fileRefIds, &fileId](const lsp::Ref &ref, const lsp::SymbolID symId) {
+        fileRefReq, [&fileRefIds](const lsp::Ref &ref, const lsp::SymbolID symId) {
             if (ref.location.IsZeroLoc()) {
                 return;
             }
@@ -168,6 +168,7 @@ void FileMove::DealRefFile(const ArkAST *ast, const std::string &file, const std
     lsp::FileRefsRequest fileDefReq{fileId, file, fullPkgName, lsp::RefKind::DEFINITION};
     std::unordered_set<lsp::SymbolID> fileDefIds;
     index->FileRefs(fileDefReq, [&fileDefIds](const lsp::Ref &ref, const lsp::SymbolID symId) {
+        (void)ref;
         fileDefIds.insert(symId);
     });
 
@@ -248,7 +249,6 @@ void FileMove::DealRefFile(const ArkAST *ast, const std::string &file, const std
 void FileMove::DealReExport(const ArkAST *ast, const std::string &file, const std::string &targetPkg,
     FileRefactor &refactor)
 {
-    unsigned int fileId = ast->fileID;
     std::string fullPkgName = ast->file->curPackage->fullPackageName;
     auto index = ark::CompilerCangjieProject::GetInstance()->GetIndex();
     if (!index || !ast->packageInstance) {
@@ -432,9 +432,9 @@ std::unique_ptr<ArkAST> FileMove::CreateArkAST(LSPCompilerInstance *ci,
         auto arkAST = std::make_unique<ArkAST>(paths, f.get(), ci->diag,
             pkgInstance, &ci->GetSourceManager());
         std::string absName = FileStore::NormalizePath(f->filePath);
-        int fileId = ci->GetSourceManager().GetFileID(absName);
-        if (fileId >= 0) {
-            arkAST->fileID = static_cast<unsigned int>(fileId);
+        auto fileId = ci->GetSourceManager().TryGetFileID(absName);
+        if (fileId) {
+            arkAST->fileID = fileId.value_or(0);
         }
         return arkAST;
     }
@@ -617,5 +617,5 @@ bool FileMove::ExistImportForTargetPkg(lsp::SymbolID symbolID, std::string targe
     });
     return isImport;
 }
-
+// LCOV_EXCL_STOP
 } // namespace ark

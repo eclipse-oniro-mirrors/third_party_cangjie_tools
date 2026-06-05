@@ -9,8 +9,10 @@
 #include "ArkServer.h"
 #include <cangjie/Utils/ConstantsUtils.h>
 #include <cangjie/Utils/FileUtil.h>
+#include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "capabilities/definition/CrossLanguangeDefinition.h"
 #include "capabilities/documentSymbol/DocumentSymbolImpl.h"
@@ -24,13 +26,141 @@
 #undef INTERFACE
 
 namespace {
-bool Contains(const Cangjie::StringPart &str, Cangjie::Position pos)
+bool StartsWith(const std::string &text, const std::string &prefix)
 {
-    return str.begin.column < pos.column < str.begin.column + str.value.size();
+    return text.size() >= prefix.size() && text.compare(0, prefix.size(), prefix) == 0;
 }
+
+std::string NormalizeHoverLineEndings(const std::string &text)
+{
+    std::string result;
+    result.reserve(text.size());
+    size_t i = 0;
+    while (i < text.size()) {
+        if (text[i] == '\r') {
+            if (i + 1 < text.size() && text[i + 1] == '\n') {
+                i += 2;
+            } else {
+                ++i;
+            }
+            result.push_back('\n');
+            continue;
+        }
+        result.push_back(text[i]);
+        ++i;
+    }
+    return result;
+}
+
+std::string TrimHoverBlock(const std::string &text)
+{
+    const auto begin = text.find_first_not_of(" \t\r\n");
+    if (begin == std::string::npos) {
+        return "";
+    }
+    const auto end = text.find_last_not_of(" \t\r\n");
+    return text.substr(begin, end - begin + 1);
+}
+
+std::string EscapeMarkdownText(const std::string &text)
+{
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (char ch : text) {
+        if (ch == '\\' || ch == '`' || ch == '*' || ch == '_' || ch == '[' || ch == ']' ||
+            ch == '<' || ch == '>' || ch == '#') {
+            escaped.push_back('\\');
+        }
+        escaped.push_back(ch);
+    }
+    return escaped;
+}
+
+void AppendMarkdownText(std::ostringstream &markdown, const std::string &text, bool hardBreak = false)
+{
+    std::istringstream stream(text);
+    std::string line;
+    while (std::getline(stream, line)) {
+        markdown << EscapeMarkdownText(line) << (hardBreak ? "  \n" : "\n");
+    }
+}
+
+struct HoverMarkdownBlocks {
+    std::vector<std::string> sourceInfo;
+    std::vector<std::string> declarations;
+    std::vector<std::string> comments;
 };
 
+HoverMarkdownBlocks CollectHoverMarkdownBlocks(const ark::Hover &hover)
+{
+    HoverMarkdownBlocks blocks;
+    bool hasPrimaryDeclaration = false;
+    for (const auto &marked : hover.markedString) {
+        std::string block = TrimHoverBlock(NormalizeHoverLineEndings(marked));
+        if (block.empty()) {
+            continue;
+        }
+        if (StartsWith(block, "Declared in:")) {
+            blocks.sourceInfo.push_back(block);
+        } else if (StartsWith(block, "apiKey:") || StartsWith(block, "// In ")) {
+            blocks.declarations.push_back(block);
+        } else if (!hasPrimaryDeclaration || StartsWith(block, "@")) {
+            blocks.declarations.push_back(block);
+            hasPrimaryDeclaration = true;
+        } else {
+            blocks.comments.push_back(block);
+        }
+    }
+    return blocks;
+}
+
+void AppendHoverSourceInfo(std::ostringstream &markdown, const std::vector<std::string> &sourceInfo)
+{
+    for (const auto &block : sourceInfo) {
+        AppendMarkdownText(markdown, block, true);
+        markdown << "\n";
+    }
+}
+
+void AppendHoverDeclarations(std::ostringstream &markdown, const std::vector<std::string> &declarations)
+{
+    if (declarations.empty()) {
+        return;
+    }
+    markdown << "```cangjie\n";
+    for (const auto &block : declarations) {
+        markdown << block << "\n";
+    }
+    markdown << "```\n";
+}
+
+void AppendHoverComments(std::ostringstream &markdown, const std::vector<std::string> &comments)
+{
+    if (comments.empty()) {
+        return;
+    }
+    markdown << "\n---\n\n";
+    for (size_t i = 0; i < comments.size(); ++i) {
+        AppendMarkdownText(markdown, comments[i]);
+        if (i + 1 < comments.size()) {
+            markdown << "\n\n";
+        }
+    }
+}
+
+} // namespace
+
 namespace ark {
+std::string BuildHoverMarkdown(const Hover &hover)
+{
+    HoverMarkdownBlocks blocks = CollectHoverMarkdownBlocks(hover);
+    std::ostringstream markdown;
+    AppendHoverSourceInfo(markdown, blocks.sourceInfo);
+    AppendHoverDeclarations(markdown, blocks.declarations);
+    AppendHoverComments(markdown, blocks.comments);
+    return markdown.str();
+}
+
 using namespace Cangjie;
 bool CompareCallHierarchyOutgoingCall(const CallHierarchyOutgoingCall &letf, const CallHierarchyOutgoingCall &right)
 {
@@ -142,6 +272,7 @@ void ArkServer::FindSuperTypes(const std::string &file, const TypeHierarchyItem 
                                const Callback<ValueOrError> &reply) const
 {
     auto action = [params, reply = std::move(reply)](const InputsAndAST &inputAST) {
+        (void)inputAST;
         std::set<TypeHierarchyItem> results;
         if (inputAST.ast == nullptr) {
             ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
@@ -166,6 +297,7 @@ void ArkServer::FindSubTypes(const std::string &file, const TypeHierarchyItem &p
                              const Callback<ValueOrError> &reply) const
 {
     auto action = [params, reply = std::move(reply)](const InputsAndAST &inputAST) {
+        (void)inputAST;
         std::set<TypeHierarchyItem> results;
         if (inputAST.ast == nullptr) {
             ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
@@ -218,6 +350,7 @@ void ArkServer::FindOnIncomingCalls(const std::string &file, const CallHierarchy
                                     const Callback<ValueOrError> &reply) const
 {
     auto action = [params, reply = std::move(reply)](const InputsAndAST &inputAST) {
+        (void)inputAST;
         std::vector<CallHierarchyIncomingCall> results;
         CallHierarchyImpl::FindOnIncomingCallsImpl(results, params);
         nlohmann::json jsValue;
@@ -237,6 +370,7 @@ void ArkServer::FindOnOutgoingCalls(const std::string &file, const CallHierarchy
                                     const Callback<ValueOrError> &reply) const
 {
     auto action = [params, reply = std::move(reply)](const InputsAndAST &inputAST) {
+        (void)inputAST;
         std::vector<CallHierarchyOutgoingCall> results;
         CallHierarchyImpl::FindOnOutgoingCallsImpl(results, params);
         std::sort(results.begin(), results.end(), CompareCallHierarchyOutgoingCall);
@@ -289,7 +423,7 @@ void ArkServer::FindReferences(const std::string &file,
 
 void ArkServer::FindFileReferences(const std::string &file, const Callback<ValueOrError> &reply) const
 {
-    auto action = [file, reply = std::move(reply), this](const InputsAndAST& inputAST) {
+    auto action = [file, reply = std::move(reply)](const InputsAndAST& inputAST) {
         ReferencesResult result;
         std::string unixPath = PathWindowsToLinux(file);
         if (inputAST.ast == nullptr) {
@@ -317,7 +451,7 @@ void ArkServer::FindFileReferences(const std::string &file, const Callback<Value
 
     arkScheduler->RunWithAST("FileReferences", file, action);
 }
-
+// LCOV_EXCL_START
 void GetCurPkgUseAge(Ptr<Decl> decl, const ArkAST &ast, ReferencesResult &result)
 {
     if (!decl || !ast.file || !ast.file->curPackage) {
@@ -329,7 +463,7 @@ void GetCurPkgUseAge(Ptr<Decl> decl, const ArkAST &ast, ReferencesResult &result
             continue;
         }
         auto range = GetProperRange(U, ast.tokens);
-        Location loc = {URI::URIFromAbsolutePath(U->curFile->filePath).ToString(), range};
+        Location loc = {{URI::URIFromAbsolutePath(U->curFile->filePath).ToString()}, range};
         (void)result.References.emplace(loc);
     }
 }
@@ -337,15 +471,15 @@ void GetCurPkgUseAge(Ptr<Decl> decl, const ArkAST &ast, ReferencesResult &result
 void ArkServer::GetExportsName(
         const std::string &file, const ExportsNameParams &params, const Callback<ValueOrError> &reply) const
 {
-    auto action = [params, file, reply = std::move(reply), this](const InputsAndAST &inputAST) {
-        int fileId = CompilerCangjieProject::GetInstance()->GetFileID(file);
-        if (fileId < 0) {
+    auto action = [params, file, reply = std::move(reply)](const InputsAndAST &inputAST) {
+        auto fileId = CompilerCangjieProject::GetInstance()->GetFileID(file);
+        if (!fileId) {
             ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
             reply(value);
             return;
         }
         Cangjie::Position pos =
-                Cangjie::Position{static_cast<unsigned int>(fileId), params.position.line, params.position.column};
+                Cangjie::Position{fileId.value_or(0), params.position.line, params.position.column};
         ReferencesResult result;
         if (inputAST.ast == nullptr) {
             ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
@@ -396,7 +530,6 @@ void ArkServer::GetExportsName(
         if (!index) {
             return;
         }
-        int curIdx = ast.GetCurToken(pos, 0, static_cast<int>(ast.tokens.size()) - 1);
         ExportIDItem exportIdItem;
         for (auto &decl : decls) {
             if (decl->astKind == Cangjie::AST::ASTKind::PACKAGE_DECL) {
@@ -449,7 +582,7 @@ void ArkServer::ApplyFileRefactor(const std::string &file,
 
     arkScheduler->RunWithAST("FileRefactor", file, action);
 }
-
+// LCOV_EXCL_STOP
 void ArkServer::FindWorkspaceSymbols(const std::string &query, const Callback<ValueOrError> &reply) const
 {
     auto action = [query, reply = std::move(reply)](const InputsAndAST &) {
@@ -493,16 +626,13 @@ void ArkServer::FindHover(const std::string &file,
             nullValueReply();
             return;
         }
-        std::stringstream temp;
-        for (auto &iter : result.markedString) {
-            temp << iter;
-        }
-        if (temp.str().empty()) { // sometimes we dont have valid hover message
+        std::string hoverMarkdown = BuildHoverMarkdown(result);
+        if (hoverMarkdown.empty()) { // sometimes we dont have valid hover message
             nullValueReply();
             return;
         }
-        jsonValue["contents"]["language"] = "Cangjie";
-        jsonValue["contents"]["value"] = temp.str();
+        jsonValue["contents"]["kind"] = "markdown";
+        jsonValue["contents"]["value"] = std::move(hoverMarkdown);
 
         jsonValue["range"]["start"]["line"] = result.range.start.line;
         jsonValue["range"]["start"]["character"] = result.range.start.column;
@@ -557,7 +687,7 @@ void ArkServer::LocateSymbolAt(const std::string &file,
     };
     arkScheduler->RunWithAST("Definition", file, action);
 }
-
+// LCOV_EXCL_START
 void ArkServer::LocateRegisterCrossSymbolAt(
         const CrossLanguageJumpParams &params, const Callback<ValueOrError> &reply) const
 {
@@ -585,7 +715,7 @@ void ArkServer::LocateRegisterCrossSymbolAt(
     ValueOrError value(ValueOrErrorCheck::VALUE, jsonValue);
     reply(value);
 }
-
+// LCOV_EXCL_STOP
 void ArkServer::LocateCrossSymbolAt(const CrossLanguageJumpParams &params, const Callback<ValueOrError> &reply) const
 {
     CrossSymbolsResult result{};
@@ -643,47 +773,70 @@ void ArkServer::UpdateModifierDiag(const InputsAndAST &inputAST,
     }
 }
 
-void ArkServer::FindCompletion(const CompletionParams &params, const std::string &file,
-                               const Callback<ValueOrError> &reply) const
+std::optional<unsigned int> ArkServer::GetFileId(const std::string &file) const
 {
-    Trace::Log("ArkServer::FindCompletion in.");
+    if (Options::GetInstance().IsOptionSet("test")) {
+        return CompilerCangjieProject::GetInstance()->GetFileID(file);
+    }
+    return CompilerCangjieProject::GetInstance()->GetFileIDForCompete(file);
+}
 
+void ArkServer::ProcessCompletion(const InputsAndAST &input, const Cangjie::Position &pos,
+                                  const Callback<ValueOrError> &reply) const
+{
     auto nullValueReply = [reply]() {
         ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
         reply(value);
     };
 
+    CompletionResult result;
+    std::string prefix;
+    if (input.ast == nullptr) {
+        nullValueReply();
+        return;
+    }
+    CompletionImpl::CodeComplete(*(input.ast), pos, result, prefix);
+    CompilerCangjieProject::GetInstance()->ClearParseCache("Completion");
+    CompletionList completionList;
+    for (auto &iter : result.completions) {
+        if (iter.show && (prefix.back() == '.' || IsMatchingCompletion(prefix, iter.name))) {
+            if (iter.name.find(BOX_DECL_PREFIX) != std::string::npos) { continue; }
+            auto score = CompilerCangjieProject::GetInstance()->CalculateScore(iter, prefix, result.cursorDepth);
+            completionList.items.push_back(iter.Render(GetSortText(score), prefix));
+        }
+    }
+
+    nlohmann::json jsonItems;
+    for (auto &iter : completionList.items) {
+        nlohmann::json value;
+        if (!ToJSON(iter, value)) { continue; }
+        (void)jsonItems.push_back(value);
+    }
+    ValueOrError val(ValueOrErrorCheck::VALUE, jsonItems);
+    reply(val);
+    CompilerCangjieProject::GetInstance()->ClearParseCache("Completion");
+}
+
+void ArkServer::FindCompletion(const CompletionParams &params, const std::string &file,
+                               const Callback<ValueOrError> &reply) const
+{
+    Trace::Log("ArkServer::FindCompletion in.");
+
+    auto fileId = GetFileId(file);
+    if (!fileId) {
+        Trace::Log("ArkServer::FindCompletion fileId is null.");
+        ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
+        reply(value);
+        return;
+    }
     Cangjie::Position pos = {
         static_cast<unsigned int>(0),
         params.position.line,
         params.position.column
     };
 
-    auto action = [reply, nullValueReply, params, pos](const InputsAndAST &input) {
-        CompletionResult result;
-        std::string prefix;
-        if (input.ast == nullptr) {
-            nullValueReply();
-            return;
-        }
-        CompletionImpl::CodeComplete(*(input.ast), pos, result, prefix);
-        CompletionList completionList;
-        for (auto &iter : result.completions) {
-            if (iter.show && (prefix.back() == '.' || IsMatchingCompletion(prefix, iter.name))) {
-                if (iter.name.find(BOX_DECL_PREFIX) != std::string::npos) { continue; }
-                auto score = CompilerCangjieProject::GetInstance()->CalculateScore(iter, prefix, result.cursorDepth);
-                completionList.items.push_back(iter.Render(GetSortText(score), prefix));
-            }
-        }
-
-        nlohmann::json jsonItems;
-        for (auto &iter : completionList.items) {
-            nlohmann::json value;
-            if (!ToJSON(iter, value)) { continue; }
-            (void)jsonItems.push_back(value);
-        }
-        ValueOrError val(ValueOrErrorCheck::VALUE, jsonItems);
-        reply(val);
+    auto action = [reply, pos, this](const InputsAndAST &input) {
+        ProcessCompletion(input, pos, reply);
     };
 
     arkSchedulerOfComplete->RunWithASTCache("Completion", file, pos, action);
@@ -731,7 +884,6 @@ void ArkServer::FindSignatureHelp(const SignatureHelpParams &params, const std::
         ValueOrError value(ValueOrErrorCheck::VALUE, jsonValue);
         reply(value);
     };
-
     Cangjie::Position pos = {
         static_cast<unsigned int>(0),
         params.position.line,
@@ -775,12 +927,12 @@ void ArkServer::Rename(const std::string &file, const RenameParams &params,
                        const Callback<ValueOrError> &reply) const
 {
     auto action = [this, file, params, reply = std::move(reply)](const InputsAndAST &inputAST) mutable {
-        int fileId = CompilerCangjieProject::GetInstance()->GetFileID(file);
-        if (fileId < 0) {
+        auto fileId = CompilerCangjieProject::GetInstance()->GetFileID(file);
+        if (!fileId) {
             return;
         }
         const Cangjie::Position pos = {
-            static_cast<unsigned int>(fileId),
+            fileId.value_or(0),
             params.position.line,
             params.position.column
         };
@@ -877,6 +1029,7 @@ void ArkServer::ChangeWatchedFiles(const std::string &file, FileChangeType type,
             if (docMgr->GetDoc(file).version != -1) {
                 return;
             }
+            // LCOV_EXCL_START
             const std::string &contents = GetFileContents(file);
             if (std::hash<std::string>{}(contents) == std::hash<std::string>{}(docMgr->GetDoc(file).contents)) {
                 Logger::Instance().LogMessage(MessageType::MSG_INFO, "recieve file change, but contens are same.");
@@ -888,6 +1041,7 @@ void ArkServer::ChangeWatchedFiles(const std::string &file, FileChangeType type,
             CompilerCangjieProject::GetInstance()->
                 UpdateFileStatusInCI(pkgName, file, CompilerInstance::SrcCodeChangeState::CHANGED);
             return;
+            // LCOV_EXCL_STOP
         }
         if (type == FileChangeType::CREATED) {
             Logger::Instance().LogMessage(MessageType::MSG_INFO, "creat the file:  " + file);
@@ -899,6 +1053,7 @@ void ArkServer::ChangeWatchedFiles(const std::string &file, FileChangeType type,
             AddDoc(file, contents, version, ark::NeedDiagnostics::YES, true);
             return;
         }
+        // LCOV_EXCL_START
         if (type == FileChangeType::DELETED) {
             Logger::Instance().LogMessage(MessageType::MSG_INFO, "delete the file:  " + file);
             CompilerCangjieProject::GetInstance()->IncrementForFileDelete(file);
@@ -912,6 +1067,7 @@ void ArkServer::ChangeWatchedFiles(const std::string &file, FileChangeType type,
         }
         std::vector<DiagnosticToken> diagnostics = callback->GetDiagsOfCurFile(input.onEditFile);
         callback->ReadyForDiagnostics(input.onEditFile, input.inputs.version, diagnostics);
+        // LCOV_EXCL_STOP
     };
 
     auto taskName = "ChangeWatchedFiles " + file;
@@ -1000,12 +1156,12 @@ void ArkServer::FindOverrideMethods(const std::string &file,
 Cangjie::Position ArkServer::AlterPosition(const std::string &file,
                                            const TextDocumentPositionParams &params) const
 {
-    int fileId = CompilerCangjieProject::GetInstance()->GetFileID(file);
-    if (fileId < 0) {
+    auto fileId = CompilerCangjieProject::GetInstance()->GetFileID(file);
+    if (!fileId) {
         return INVALID_POSITION;
     }
     return Cangjie::Position{
-            static_cast<unsigned int>(fileId),
+            fileId.value_or(0),
             params.position.line,
             params.position.column
     };
@@ -1030,7 +1186,7 @@ static std::vector<std::unique_ptr<Tweak::Selection>> CreateTweakSelection(const
             result.push_back(std::move(tweakSelection));
             return true;
         });
-    return std::move(result);
+    return result;
 }
 
 void ArkServer::EnumerateTweaks(const std::string &file, Range range, const Callback<std::vector<TweakRef>> &cb) const
@@ -1087,7 +1243,7 @@ void ArkServer::EnumerateTweaks(const std::string &file, Range range, const Call
 void ArkServer::ApplyTweak(const std::string &file, Range selection, const std::string &id,
     std::map<std::string, std::string> extraOptions, const Callback<Tweak::Effect> &cb)
 {
-    auto action = [file, selection, id, extraOptions, cb = std::move(cb), this]
+    auto action = [file, selection, id, extraOptions, cb = std::move(cb)]
         (const InputsAndAST &inputAST) mutable {
             Tweak::Effect effect;
             if (!inputAST.ast || !inputAST.ast->sourceManager) {

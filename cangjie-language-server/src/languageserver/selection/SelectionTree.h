@@ -57,7 +57,7 @@ public:
         return Root ? &(*Root) : nullptr;
     }
 
-    const Scope SelectedScope() const
+    Scope SelectedScope() const
     {
         return scope;
     }

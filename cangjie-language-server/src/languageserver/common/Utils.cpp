@@ -7,6 +7,7 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "Utils.h"
+#include "ItemResolverUtil.h"
 #include "cangjie/Basic/Version.h"
 #include "cangjie/Basic/StringConvertor.h"
 #include "Inherit/InheritDeclUtil.h"
@@ -340,22 +341,30 @@ void MatchBracket(const std::string &type, size_t &index, int &count)
 std::string GetVarDeclType(Ptr<VarDecl> decl, SourceManager *sourceManager)
 {
     std::string type;
-    if ((!decl->ty || GetString(*decl->ty) == "UnknownType") && decl->type) {
+    if ((!decl->GetTy() || GetString(*decl->GetTy()) == "UnknownType") && decl->type) {
         type = sourceManager->GetContentBetween(decl->type->begin, decl->type->end);
         std::string realType = ReplaceTuple(type);
         type = realType.empty() ? type : realType;
         return type;
     }
-    if (!decl->ty) {
+    if (!decl->GetTy()) {
         return type;
     }
-    if (decl->ty->kind == TypeKind::TYPE_FUNC) {
-        ItemResolverUtil::GetDetailByTy(decl->ty, type, true);
+    if (decl->GetTy()->kind == TypeKind::TYPE_FUNC) {
+        if (decl->type) {
+            type = ItemResolverUtil::ResolveTypeSignature(*decl->type);
+        } else {
+            ItemResolverUtil::GetDetailByTy(decl->GetTy(), type, true);
+        }
         std::string realType = ReplaceTuple(type);
         type = realType.empty() ? type : realType;
         return type;
     }
-    type = GetString(*decl->ty);
+    if (decl->type && !Ty::IsInitialTy(decl->type->aliasTy)) {
+        type = ItemResolverUtil::ResolveTypeSignature(*decl->type);
+    } else {
+        type = GetString(*decl->GetTy());
+    }
     std::string realType = ReplaceTuple(type);
     type = realType.empty() ? type : realType;
     return type;
@@ -425,8 +434,8 @@ bool IsFuncSignatureIdentical(const Cangjie::AST::FuncDecl &funcDecl1, const Can
     if (funcDecl1.identifier != funcDecl2.identifier) {
         return false;
     }
-    auto funcTy1 = dynamic_cast<FuncTy *>(funcDecl1.ty.get());
-    auto funcTy2 = dynamic_cast<FuncTy *>(funcDecl2.ty.get());
+    auto funcTy1 = dynamic_cast<FuncTy *>(funcDecl1.GetTy().get());
+    auto funcTy2 = dynamic_cast<FuncTy *>(funcDecl2.GetTy().get());
     if (!funcTy1 || !funcTy2 || !IsFuncParameterTypesIdentical(*funcTy1, *funcTy2) ||
         !(CheckTypeCompatibility(funcTy1->retTy, funcTy2->retTy) == TypeCompatibility::IDENTICAL)) {
         return false;
@@ -488,7 +497,7 @@ Range GetRangeFromNode(Ptr<const Node> p, const std::vector<Cangjie::Token> &tok
         range = GetMacroRange<MacroExpandExpr>(*p);
     } else if (p->astKind == ASTKind::FUNC_ARG) {
         range = GetNamedFuncArgRange(*p);
-    } else if (p->ty && !p->ty->typeArgs.empty()) {
+    } else if (p->GetTy() && !p->GetTy()->typeArgs.empty()) {
         range = GetIdentifierRange(p);
     } else if (p->astKind == ASTKind::REF_TYPE) {
         range = GetRefTypeRange(p);
@@ -599,10 +608,10 @@ void AddTopDecl(const std::string &curPkg,
                 Ptr<InheritableDecl> inheritableDecl)
 {
     for (auto &in : inheritableDecl->inheritedTypes) {
-        if (!in->ty || in->ty->name.empty()) {
+        if (!in->GetTy() || in->GetTy()->name.empty()) {
             continue;
         }
-        if (superDecl.find(in->ty->name) != superDecl.end()) {
+        if (superDecl.find(in->GetTy()->name) != superDecl.end()) {
             users.push_back(memDecl.get());
             return;
         }
@@ -610,10 +619,10 @@ void AddTopDecl(const std::string &curPkg,
     auto extendDecls = CompilerCangjieProject::GetInstance()->GetExtendDecls(inheritableDecl, curPkg);
     for (auto extendDecl : extendDecls) {
         for (auto &in : extendDecl->inheritedTypes) {
-            if (!in->ty || in->ty->name.empty()) {
+            if (!in->GetTy() || in->GetTy()->name.empty()) {
                 continue;
             }
-            if (superDecl.find(in->ty->name) != superDecl.end()) {
+            if (superDecl.find(in->GetTy()->name) != superDecl.end()) {
                 users.push_back(memDecl.get());
                 return;
             }
@@ -626,7 +635,7 @@ std::vector<Ptr<Decl>> GetAimSubDecl(const std::string &curPkg,
                                      const std::string &editPkg)
 {
     std::vector<Ptr<Decl>> users{};
-    if (curPkg.empty() || !IsFromCIMap(curPkg) && !IsFromCIMapNotInSrc(curPkg)) {
+    if (curPkg.empty() || (!IsFromCIMap(curPkg) && !IsFromCIMapNotInSrc(curPkg))) {
         return users;
     }
     auto instance = CompilerCangjieProject::GetInstance();
@@ -980,11 +989,19 @@ std::vector<std::string> GetFuncParamsTypeName(Ptr<const Cangjie::AST::FuncDecl>
     std::vector<std::string> paramsLists;
     for (auto &paramList : decl->funcBody->paramLists) {
         for (auto &param : paramList->params) {
-            if (param == nullptr || param->ty == nullptr) {
+            if (param == nullptr || param->GetTy() == nullptr) {
                 (void)paramsLists.emplace_back("");
                 continue;
             }
-            (void)paramsLists.emplace_back(GetString(*param->ty));
+
+            std::string paramType;
+            if (param->type) {
+                paramType = ItemResolverUtil::ResolveTypeSignature(*param->type);
+            }
+            if (paramType.empty()) {
+                paramType = GetString(*param->GetTy());
+            }
+            (void)paramsLists.emplace_back(paramType);
         }
     }
     return paramsLists;
@@ -1040,13 +1057,17 @@ std::string GetConstructorIdentifier(const Decl &decl, bool getTargetName)
 std::string GetVarDeclType(Ptr<const VarDecl> decl)
 {
     std::string detail;
-    if (decl == nullptr || decl->ty == nullptr) {
+    if (decl == nullptr || decl->GetTy() == nullptr) {
         return detail;
     }
-    if (decl->ty->kind != TypeKind::TYPE_FUNC) {
-        detail = GetString(*decl->ty);
+    if (decl->GetTy()->kind != TypeKind::TYPE_FUNC) {
+        if (decl->type) {
+            detail = ItemResolverUtil::ResolveTypeSignature(*decl->type);
+        } else {
+            detail = GetString(*decl->GetTy());
+        }
     }
-    auto funcTy = dynamic_cast<FuncTy *>(decl->ty.get());
+    auto funcTy = dynamic_cast<FuncTy *>(decl->GetTy().get());
     if (funcTy == nullptr) {
         return detail;
     }
@@ -1104,6 +1125,7 @@ bool IsModifierBeforeDecl(Ptr<const Decl> decl, const Position &pos)
 
 Range GetProperRange(const Ptr<Node>& node, const std::vector<Cangjie::Token> &tokens, bool converted)
 {
+    (void)converted;
     Range range;
     if (node->astKind == ASTKind::FUNC_ARG) {
         if (auto funcArg = dynamic_cast<FuncArg *>(node.get())) {
@@ -1358,7 +1380,7 @@ bool DeleteCharForPosition(std::string& text, int row, int column)
 {
     if (row < 1 || column < 1) {
         return false;
-    }
+    };
     int r = 1, c = 1;
     for (size_t i = 0; i < text.length(); i++) {
         if (r == row && c == column) {
@@ -1482,7 +1504,7 @@ std::string GetSysCapFromDecl(const Decl &decl)
 
 TokenKind FindPreFirstValidTokenKind(const ark::ArkAST &input, int index)
 {
-    if (index >= input.tokens.size()) {
+    if (index < 0 || static_cast<size_t>(index) >= input.tokens.size()) {
         return TokenKind::INIT;
     }
     while (--index > 0) {
@@ -1548,6 +1570,18 @@ std::vector<std::string> GetAllFilePathUnderCurrentPath(const std::string& path,
     return allFiles;
 }
 
+std::string NormalizeStringToGBK(const std::string& data)
+{
+    auto strGBK = data;
+#ifdef _WIN32
+    auto ret = Cangjie::StringConvertor::NormalizeStringToGBK(strGBK);
+    if (ret.has_value()) {
+        strGBK = ret.value();
+    }
+#endif
+    return strGBK;
+}
+
 bool IsCommonSpecificSymbol(Ptr<Cangjie::AST::Decl> decl)
 {
     if (!decl) {
@@ -1580,18 +1614,6 @@ std::string GetRealFilePathInCommonSpecific(Ptr<Cangjie::AST::Decl> decl)
         return symFromIndex.location.fileUri;
     }
     return decl->curFile->filePath;
-}
-
-std::string NormalizeStringToGBK(const std::string& data)
-{
-    auto strGBK = data;
-#ifdef _WIN32
-    auto ret = Cangjie::StringConvertor::NormalizeStringToGBK(strGBK);
-    if (ret.has_value()) {
-        strGBK = ret.value();
-    }
-#endif
-    return strGBK;
 }
 
 Ptr<TypeAliasDecl> GetLastAliasRealTargetVisit(Ptr<TypeAliasDecl> decl, std::unordered_set<Ptr<TypeAliasDecl>> &visited)

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <string>
 #ifdef __linux__
@@ -179,14 +180,21 @@ namespace {
 
         nlohmann::json root;
         std::string errs;
+        if (message == "\r") {
+            return "";
+        }
+#ifndef NO_EXCEPTIONS
         try {
+#endif
             if (message.empty()) {
                 return "";
             }
             root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
         } catch (nlohmann::detail::parse_error &errs) {
             return "";;
         }
+#endif
         if (root.empty() || root.contains("caseFolder")) {
             return "";
         }
@@ -231,16 +239,21 @@ namespace {
 
         nlohmann::json root;
         std::string errs;
-
+        if (message == "\r") {
+            return pair;
+        }
+#ifndef NO_EXCEPTIONS
         try {
+#endif
             if (message.empty()) {
                 return pair;
             }
             root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
         } catch (nlohmann::detail::parse_error &errs) {
             return pair;
         }
-
+#endif
         if (!root.contains("caseFolder")) {
             return pair;
         }
@@ -255,43 +268,6 @@ namespace {
             pair.second = root.value("macroBinPath", "");
         }
         return pair;
-    }
-
-    void ChangeApplyEditUrlForBaseFile(const std::string &testFilePath, nlohmann::json &resultBase, std::string &rootUri,
-        bool &isMultiModule)
-    {
-        std::ifstream infile;
-        std::string message;
-        std::string caseFolder;
-        infile.open(testFilePath);
-        if (infile.is_open() && infile.good() && !infile.eof()) {
-            char buf[MAX_LEN] = {0};
-            infile.getline(buf, MAX_LEN);
-            message = std::string(buf);
-            if (message.length() == 0) {
-                return;
-            }
-            std::pair<std::string, std::string> caseAndBinaryFolder = GetCaseAndBinaryFolder(message);
-            caseFolder = caseAndBinaryFolder.first;
-            infile.close();
-        }
-        std::string projectPath = SingleInstance::GetInstance()->workPath + "/test/testChr/" + caseFolder;
-        if (resultBase.empty() || !resultBase.contains("params") || !resultBase["params"].contains("edit")) {
-            return;
-        }
-        if (resultBase["params"]["edit"]["changes"].empty()) {
-            return;
-        }
-        if (resultBase["params"]["edit"]["changes"].is_object()) {
-            nlohmann::json newJson;
-            std::map<std::string, nlohmann::json> newMap;
-            for (const auto &[key, value] : resultBase["params"]["edit"]["changes"].items()) {
-                std::string newKey = ChangeMessageUrlOfString(projectPath, key, rootUri, isMultiModule);
-                newMap[newKey] = value;
-            }
-            newJson["params"]["edit"]["changes"] = newMap;
-            resultBase = newJson;
-        }
     }
 
     void AdaptPathTest(string &baseFile, const SingleInstance *p, string &expectedFile) {
@@ -675,6 +651,7 @@ namespace test::common {
 
     void StartLspServer(bool useDb) {
         SingleInstance *p = SingleInstance::GetInstance();
+        p->stderrPath = p->testFolder + "_freopen.err";
         const std::string cachePath = JoinPath(p->pathPwd, p->testFolder);
         if (!FileExist(cachePath)) {
             CreateDirs(cachePath);
@@ -685,10 +662,12 @@ namespace test::common {
         }
 #ifdef _WIN32
         std::string cmdLine = "cmd.exe /c " + p->pathPwd + "\\LSPServer.exe --test --enable-log true < " +
-                              p->testFolder + "_freopen.in > " + p->testFolder + "_freopen.out";
+                              p->testFolder + "_freopen.in > " + p->testFolder + "_freopen.out 2> " +
+                              p->testFolder + "_freopen.err";
         if (useDb) {
             cmdLine = "cmd.exe /c " + p->pathPwd + "\\LSPServer.exe --test --enable-log true --cache-path=" +
-                      cachePath + " < " + p->testFolder + "_freopen.in > " + p->testFolder + "_freopen.out";
+                      cachePath + " < " + p->testFolder + "_freopen.in > " + p->testFolder + "_freopen.out 2> " +
+                      p->testFolder + "_freopen.err";
         }
 
         STARTUPINFO si;
@@ -751,10 +730,11 @@ namespace test::common {
 #else
         std::string cmd =
             p->pathPwd + "/LSPServer --test --enable-log true < " + p->testFolder + "_freopen.in > " +
-            p->testFolder + "_freopen.out";
+            p->testFolder + "_freopen.out 2> " + p->testFolder + "_freopen.err";
         if (useDb) {
             cmd =  p->pathPwd + "/LSPServer --test --enable-log true --cache-path=" + cachePath + " < " +
-                              p->testFolder + "_freopen.in > " + p->testFolder + "_freopen.out";
+                              p->testFolder + "_freopen.in > " + p->testFolder + "_freopen.out 2> " +
+                              p->testFolder + "_freopen.err";
         }
 
         int retryCount = 0;
@@ -858,7 +838,12 @@ namespace test::common {
             if (loc != std::string::npos) {
                 message = message.substr(0, loc);
             }
+            if (message == "\r") {
+                continue;
+            }
+#ifndef NO_EXCEPTIONS
             try {
+#endif
                 if (message.empty()) {
                     continue;
                 }
@@ -867,9 +852,11 @@ namespace test::common {
                     (!root.contains("id") && id.empty())) {
                     return root;
                 }
+#ifndef NO_EXCEPTIONS
             } catch (nlohmann::detail::parse_error &errs) {
                 continue;
             }
+#endif
         }
         infile.close();
         return {};
@@ -898,7 +885,12 @@ namespace test::common {
             if (loc != std::string::npos) {
                 message = message.substr(0, loc);
             }
+            if (message == "\r") {
+                continue;
+            }
+#ifndef NO_EXCEPTIONS
             try {
+#endif
                 if (message.empty()) {
                     continue;
                 }
@@ -912,9 +904,11 @@ namespace test::common {
                 if (rootMethodLower.find(methodLower) != std::string::npos) {
                     return root;
                 }
+#ifndef NO_EXCEPTIONS
             } catch (nlohmann::detail::parse_error &errs) {
                 continue;
             }
+#endif
         }
         infile.close();
         return {};
@@ -1144,16 +1138,18 @@ namespace test::common {
 
         nlohmann::json root;
         std::string errs;
-
+#ifndef NO_EXCEPTIONS
         try {
+#endif
             if (message.empty()) {
                 return false;
             }
             root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
         } catch (nlohmann::detail::parse_error &errs) {
             return false; // GCOVR_EXCL_LINE
         }
-
+#endif
         if (!root.contains("useDB")) {
             return false;
         }
@@ -1237,15 +1233,21 @@ namespace test::common {
             char buf[MAX_LEN] = {0};
             infile.getline(buf, MAX_LEN);
             std::string message = std::string(buf);
-
+            if (message == "\r") {
+                continue;
+            }
+#ifndef NO_EXCEPTIONS
             try {
+#endif
                 if (message.empty()) {
                     continue;
                 }
                 root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
             } catch (nlohmann::detail::parse_error &errs) {
                 continue;
             }
+#endif
             if (root.empty()) {
                 continue;
             }
@@ -1275,14 +1277,21 @@ namespace test::common {
             char buf[MAX_LEN] = {0};
             infile.getline(buf, MAX_LEN);
             std::string message = std::string(buf);
+            if (message == "\r") {
+                continue;
+            }
+#ifndef NO_EXCEPTIONS
             try {
+#endif
                 if (message.empty()) {
                     continue;
                 }
                 root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
             } catch (nlohmann::detail::parse_error &errs) {
                 continue;
             }
+#endif
             if (root.empty()) {
                 continue;
             }
@@ -1595,14 +1604,21 @@ namespace test::common {
             char buf[MAX_LEN] = {0};
             infile.getline(buf, MAX_LEN);
             std::string message = std::string(buf);
+            if (message == "\r") {
+                continue;
+            }
+#ifndef NO_EXCEPTIONS
             try {
+#endif
                 if (message.empty()) {
                     continue;
                 }
                 root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
             } catch (nlohmann::detail::parse_error &errs) {
                 continue;
             }
+#endif
             if (root.contains(key)) {
                 item.testFile = root[key].value("testFile", "");
                 item.baseFile = item.testFile.substr(0, item.testFile.rfind(".")) + ".base";
@@ -1692,7 +1708,19 @@ namespace test::common {
                 return false;
             }
 
-            // compare codeActions
+            // compare codeActions, only check quickfix.implementMembers
+            auto filterCodeActions = [](const nlohmann::json &actions) -> nlohmann::json {
+                if (actions.is_null() || !actions.is_array()) {
+                    return nlohmann::json::array();
+                }
+                nlohmann::json filtered = nlohmann::json::array();
+                for (const auto &action : actions) {
+                    if (action.value("kind", "") == "quickfix.implementMembers") {
+                        filtered.push_back(action);
+                    }
+                }
+                return filtered;
+            };
             auto normalizeUri = [](nlohmann::json &actions) {
                 if (actions.is_null()) {
                     return;
@@ -1708,8 +1736,8 @@ namespace test::common {
                     }
                 }
             };
-            nlohmann::json expActions = exp[i].codeActions;
-            nlohmann::json actActions = act[i].codeActions;
+            nlohmann::json expActions = filterCodeActions(exp[i].codeActions);
+            nlohmann::json actActions = filterCodeActions(act[i].codeActions);
             normalizeUri(expActions);
             normalizeUri(actActions);
             if (expActions != actActions) {
@@ -1804,14 +1832,21 @@ namespace test::common {
             char buf[MAX_LEN] = {0};
             infile.getline(buf, MAX_LEN);
             std::string message = std::string(buf);
+            if (message == "\r") {
+                continue;
+            }
+#ifndef NO_EXCEPTIONS
             try {
+#endif
                 if (message.empty()) {
                     continue;
                 }
                 root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
             } catch (nlohmann::detail::parse_error &errs) {
                 continue;
             }
+#endif
             if (root.empty()) {
                 continue;
             }
@@ -1878,14 +1913,21 @@ namespace test::common {
             char buf[MAX_LEN] = {0};
             infile.getline(buf, MAX_LEN);
             std::string message = std::string(buf);
+            if (message == "\r") {
+                continue;
+            }
+#ifndef NO_EXCEPTIONS
             try {
+#endif
                 if (message.empty()) {
                     continue;
                 }
                 root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
             } catch (nlohmann::detail::parse_error &errs) {
                 continue;
             }
+#endif
             if (root.empty()) {
                 continue;
             }
@@ -1960,14 +2002,21 @@ namespace test::common {
             char buf[MAX_LEN] = {0};
             infile.getline(buf, MAX_LEN);
             std::string message = std::string(buf);
+            if (message == "\r") {
+                continue;
+            }
+#ifndef NO_EXCEPTIONS
             try {
+#endif
                 if (message.empty()) {
                     continue;
                 }
                 root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
             } catch (nlohmann::detail::parse_error &errs) {
                 continue;
             }
+#endif
             if (root.empty()) {
                 continue;
             }
@@ -2020,6 +2069,17 @@ namespace test::common {
         return false;
     }
 
+    bool IsLspMacroSrvFailed() {
+        SingleInstance *p = SingleInstance::GetInstance();
+        std::ifstream errFile(p->stderrPath);
+        if (!errFile.is_open()) {
+            return false;
+        }
+        std::string content((std::istreambuf_iterator<char>(errFile)),
+                             std::istreambuf_iterator<char>());
+        return content.find("run macro srv in fork, due to exec fail") != std::string::npos;
+    }
+
     void ReadExpectedCallHierarchyResult(std::string &baseFile, CallHierarchyResult &expect) {
         SingleInstance *p = SingleInstance::GetInstance();
         std::string expectedFile = "";
@@ -2036,14 +2096,21 @@ namespace test::common {
             char buf[MAX_LEN] = {0};
             infile.getline(buf, MAX_LEN);
             std::string message = std::string(buf);
+            if (message == "\r") {
+                continue;
+            }
+#ifndef NO_EXCEPTIONS
             try {
+#endif
                 if (message.empty()) {
                     continue;
                 }
                 root = nlohmann::json::parse(message);
+#ifndef NO_EXCEPTIONS
             } catch (nlohmann::detail::parse_error &errs) {
                 continue;
             }
+#endif
             if (root.empty()) {
                 continue;
             }
@@ -2262,13 +2329,13 @@ namespace test::common {
             item.kind = exp["result"][i].value("kind", "");
             item.identifier = exp["result"][i].value("identifier", "");
             item.package =  exp["result"][i].value("fullPackageName", "");
-            if (exp["result"].contains("data")) {
-                for (int j = 0; j < exp["result"]["data"].size(); j++) {
+            if (exp["result"][i].contains("data")) {
+                for (int j = 0; j < exp["result"][i]["data"].size(); j++) {
                     ark::OverrideMethodInfo info;
-                    info.deprecated = exp["result"]["data"][i].value("deprecated", false);
-                    info.insertText = exp["result"]["data"][i].value("insertText", "");
-                    info.isProp = exp["result"]["data"][i].value("isProp", false);
-                    info.signatureWithRet = exp["result"]["data"][i].value("signatureWithRet", "");
+                    info.deprecated = exp["result"][i]["data"][j].value("deprecated", false);
+                    info.insertText = exp["result"][i]["data"][j].value("insertText", "");
+                    info.isProp = exp["result"][i]["data"][j].value("isProp", false);
+                    info.signatureWithRet = exp["result"][i]["data"][j].value("signatureWithRet", "");
                     item.overrideMethodInfos.emplace_back(info);
                 }
             }

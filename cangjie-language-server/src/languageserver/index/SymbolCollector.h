@@ -36,7 +36,7 @@ public:
 
     void Preamble(const Package& package);
 
-    void Build(const Package& package, const std::string &packagePath = "");
+    void Build(const Package& package, const std::string &packagePath="");
 
     const std::vector<Symbol>* GetSymbolMap() const
     {
@@ -120,7 +120,7 @@ private:
         if (scopes.empty()) {
             return;
         }
-        if (auto [scopeNode, _] = scopes.back(); scopeNode == &node) {
+        if (scopes.back().first == &node) {
             scopes.pop_back();
         }
     }
@@ -130,7 +130,7 @@ private:
         if (crossRegisterScopes.empty()) {
             return;
         }
-        if (auto [scopeNode, _] = crossRegisterScopes.back(); scopeNode == &node) {
+        if (crossRegisterScopes.back().first == &node) {
             crossRegisterScopes.pop_back();
         }
     }
@@ -229,10 +229,18 @@ private:
                 return fd->outerDecl->identifier.GetRawText();
             }
             CJC_NULLPTR_CHECK(fd->funcBody);
-            return fd->funcBody->retType && fd->funcBody->retType->ty ? fd->funcBody->retType->ty->String() : "Invalid";
+            std::string retType;
+            if (fd->funcBody->retType) {
+                retType = fd->funcBody->retType->ToString();
+            }
+            if (!retType.empty()) {
+                return retType;
+            }
+            return fd->funcBody->retType && fd->funcBody->retType->GetTy()
+                ? fd->funcBody->retType->GetTy()->String() : "Invalid";
         } else {
-            CJC_NULLPTR_CHECK(decl.ty);
-            return decl.ty->String();
+            CJC_NULLPTR_CHECK(decl.GetTy());
+            return decl.GetTy()->String();
         }
     }
 
@@ -241,7 +249,7 @@ private:
         SymbolID containerId = INVALID_SYMBOL_ID;
         CJC_ASSERT(!scopes.empty());
         Ptr<const Decl> decl;
-        for (size_t i = scopes.size() - 1; i >= 0; i--) {
+        for (size_t i = scopes.size(); i-- > 0;) {
             decl = DynamicCast<const Decl*>(scopes[i].first);
             if (decl && decl->astKind == Cangjie::AST::ASTKind::VAR_DECL) {
                 continue;

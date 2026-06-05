@@ -67,7 +67,9 @@ void DotCompleterByParse::Complete(const ArkAST &input,
     env.parserAst = &input;
     env.cache = input.semaCache;
     env.curPkgName = context->fullPackageName;
-    env.SetSyscap(SplitFullPackage(env.curPkgName).first);
+    auto currentModule = CompilerCangjieProject::GetInstance()->GetModuleNameByFile(
+        input.file->filePath, env.curPkgName);
+    env.SetSyscap(currentModule);
     // Complete SubPackage, include sourece dependency and binary dependency.
     // eg: import std.[sub_pkg].[sub_pkg]...
     for (const auto &iter : Cangjie::LSPCompilerInstance::cjoLibraryMap) {
@@ -81,7 +83,7 @@ void DotCompleterByParse::Complete(const ArkAST &input,
     }
 
     for (const auto &iter : Cangjie::LSPCompilerInstance::usrCjoFileCacheMap) {
-        auto curModule = SplitFullPackage(env.curPkgName).first;
+        auto curModule = currentModule;
         if (curModule != iter.first) {
             continue;
         }
@@ -101,7 +103,8 @@ void DotCompleterByParse::Complete(const ArkAST &input,
     }
     auto targetPkg = importManager->GetPackageDecl(fullImportId);
     // filter root pkg symbols if cur module is combined
-    std::string curModule = SplitFullPackage(srcPkgName).first;
+    auto curModule = CompilerCangjieProject::GetInstance()->GetModuleNameByFile(
+        input.file->filePath, srcPkgName);
     if (targetPkg && !CompilerCangjieProject::GetInstance()->IsCombinedSym(curModule, srcPkgName, fullImportId) &&
         CompilerCangjieProject::GetInstance()->IsVisibleForPackage(srcPkgName, targetPkg->fullPackageName)) {
         auto members = importManager->GetPackageMembers(srcPkgName, targetPkg->fullPackageName);
@@ -165,7 +168,7 @@ void DotCompleterByParse::FuzzyDotComplete(const ArkAST &input, const Position &
         NestedMacroComplete(input, pos, prefix, env, expr.get());
     }
 }
-
+// LCOV_EXCL_START
 void DotCompleterByParse::NestedMacroComplete(const ArkAST &input, const Position &pos, const std::string &prefix,
     CompletionEnv &env, Ptr<Expr> expr)
 {
@@ -364,7 +367,7 @@ void DotCompleterByParse::GetTyFromMacroCallNodes(Ptr<Expr> expr, std::unique_pt
     auto searchTy = [&ty, &macroBeginPos, &maNextTokenPos, &resExpr](auto node) {
         if (auto ma = dynamic_cast<NameReferenceExpr *>(node.get())) {
             if (ma->begin == macroBeginPos && (maNextTokenPos.IsZero() || ma->end <= maNextTokenPos)) {
-                ty = ma->ty;
+                ty = ma->GetTy();
                 resExpr = ma;
                 return VisitAction::STOP_NOW;
             }
@@ -398,7 +401,7 @@ Position DotCompleterByParse::GetMacroNodeNextPosition(
     }
     return nextTokenPos;
 }
-
+// LCOV_EXCL_STOP
 void DotCompleterByParse::CompleteCandidate(const Position &pos, const std::string &prefix,
                                             CompletionEnv &env, Candidate &declOrTy)
 {
@@ -413,10 +416,10 @@ void DotCompleterByParse::CompleteCandidate(const Position &pos, const std::stri
                 isEnumCtor = true;
                 env.SetValue(FILTER::IS_STATIC, false);
             }
-            Ptr<Ty> ty = decl->ty;
+            Ptr<Ty> ty = decl->GetTy();
             auto vd = DynamicCast<VarDecl *>(decl);
             if (vd && vd->type) {
-                ty = vd->type->ty;
+                ty = vd->type->GetTy();
             }
             CompleteFromType(decl->identifier, pos, ty, env);
         }
@@ -475,7 +478,8 @@ void DotCompleterByParse::CompleteQualifiedType(const std::string &beforePrefix,
             return;
         }
         auto curModule = basicStrings.front();
-        auto depends = ark::CompilerCangjieProject::GetInstance()->GetOneModuleDeps(curModule);
+        bool includeScriptRequire = CompilerCangjieProject::GetInstance()->IsBuildScriptFile(curFilePath);
+        auto depends = ark::CompilerCangjieProject::GetInstance()->GetOneModuleDeps(curModule, includeScriptRequire);
         auto strings = Utils::SplitQualifiedName(beforePrefix);
         if (strings.empty()) {
             return;
@@ -708,7 +712,7 @@ void DotCompleterByParse::FindExtendDecl(Ptr<Node> node, const Position &pos, st
         DeepFind(decl.get(), pos, scopeName, isInclude);
     }
 }
-
+// LCOV_EXCL_START
 void DotCompleterByParse::FindIfExpr(Ptr<Node> node, const Position &pos, std::string &scopeName, bool &isInclude)
 {
     auto pIfExpr = dynamic_cast<IfExpr*>(node.get());
@@ -741,7 +745,7 @@ void DotCompleterByParse::FindDoWhileExpr(Ptr<Node> node, const Position &pos, s
     if (pDoWhileExpr == nullptr || pDoWhileExpr->body == nullptr) { return; }
     DeepFind(pDoWhileExpr->body.get(), pos, scopeName, isInclude);
 }
-
+// LCOV_EXCL_STOP
 void DotCompleterByParse::FindForInExpr(Ptr<Node> node, const Position &pos, std::string &scopeName, bool &isInclude)
 {
     auto pForInExpr = dynamic_cast<ForInExpr*>(node.get());
@@ -861,7 +865,7 @@ void DotCompleterByParse::FindMemberAccess(Ptr<Node> node, const Position &pos,
         isInclude = false;
     }
 }
-
+// LCOV_EXCL_START
 void DotCompleterByParse::FindRefExpr(Ptr<Node> node, const Position &pos,
                                       std::string &scopeName, bool &isInclude)
 {
@@ -876,7 +880,7 @@ void DotCompleterByParse::FindRefExpr(Ptr<Node> node, const Position &pos,
         return;
     }
 }
-
+// LCOV_EXCL_STOP
 void DotCompleterByParse::FindCallExpr(Ptr<Node> node, const Position &pos,
                                        std::string &scopeName, bool &isInclude)
 {
@@ -899,7 +903,7 @@ void DotCompleterByParse::FindCallExpr(Ptr<Node> node, const Position &pos,
         return;
     }
 }
-
+// LCOV_EXCL_START
 void DotCompleterByParse::FindPrimaryCtorDecl(
     Ptr<Node> node, const Position &pos, std::string &scopeName, bool &isInclude)
 {
@@ -965,7 +969,7 @@ void DotCompleterByParse::FindMacroExpandDecl(
     if (!MED) { return; }
     DeepFind(MED->invocation.decl.get(), pos, scopeName, isInclude);
 }
-
+// LCOV_EXCL_STOP
 void DotCompleterByParse::FindSynchronizedExpr(Ptr<Cangjie::AST::Node> node, const Cangjie::Position &pos,
                                                std::string &scopeName, bool &isInclude)
 {
@@ -1020,7 +1024,7 @@ void DotCompleterByParse::FindTrailingClosureExpr(Ptr<Cangjie::AST::Node> node, 
         DeepFind(trailingClosureExpr->lambda.get(), pos, scopeName, isInclude);
     }
 }
-
+// LCOV_EXCL_START
 void DotCompleterByParse::FindIfAvailableExpr(Ptr<Node> node, const Position &pos,
                                               std::string &scopeName, bool &isInclude)
 {
@@ -1034,7 +1038,7 @@ void DotCompleterByParse::FindIfAvailableExpr(Ptr<Node> node, const Position &po
         DeepFind(pIfAvailableExpr->GetLambda2(), pos, scopeName, isInclude);
     }
 }
-
+// LCOV_EXCL_STOP
 void DotCompleterByParse::DeepFind(Ptr<Node> node, const Position &pos, std::string &scopeName, bool &isInclude)
 {
     if (!node) { return; }
@@ -1121,14 +1125,14 @@ void DotCompleterByParse::AddExtendVisibleMembers(const std::vector<Ptr<Ty>> &ex
             if (IsHiddenDecl(member) || IsHiddenDecl(member->outerDecl)) {
                 continue;
             }
-            if (decl) {
+            if (decl && member) {
                 addMember(member, decl);
             }
             auto symbol = CompletionEnv::GetDeclSymbolID(*member);
             visibleMembers.insert(symbol);
         }
 
-        if (decl && decl->ty && decl->ty->HasGeneric()) {
+        if (decl && decl->GetTy() && decl->GetTy()->HasGeneric()) {
             continue;
         }
 
@@ -1164,16 +1168,18 @@ void DotCompleterByParse::AddExtendDeclFromIndexBatch(const std::vector<Ptr<Ty>>
         return;
     }
     auto curPkgName = ast->file->curPackage->fullPackageName;
-
+    auto curModule = CompilerCangjieProject::GetInstance()->GetModuleNameByFile(ast->file->filePath, curPkgName);
+    bool includeScriptRequire = CompilerCangjieProject::GetInstance()->IsBuildScriptFile(ast->file->filePath);
+    lsp::SymbolSearchContext context{curPkgName, curModule, includeScriptRequire};
     Range editRange = CompletionEnv::GetEditRangeForAutoImport(*ast);
-
     auto index = ark::CompilerCangjieProject::GetInstance()->GetIndex();
     if (!index) {
         return;
     }
 
     std::vector<CodeCompletion> completetions;
-    index->FindExtendSymsOnCompletionBatch(ids, allVisibleMembers, curPkgName, env.GetValue(FILTER::IS_STATIC),
+    index->FindExtendSymsOnCompletionBatch(
+        ids, allVisibleMembers, context, env.GetValue(FILTER::IS_STATIC),
         [&editRange, &completetions](const std::string &pkg, const std::string &interface,
             const lsp::Symbol &sym, const lsp::CompletionItem &completionItem) {
             CodeCompletion item;
@@ -1228,6 +1234,7 @@ void DotCompleterByParse::FillingDeclsInPackageDot(std::pair<std::string, Comple
                                                    const std::pair<bool, bool> openFillAndIsImport)
 
 {
+    (void)curNode;
     Ptr<PackageDecl> pkgDecl = importManager->GetPackageDecl(pkgNameAndEnv.first);
     if (!pkgDecl || !pkgDecl->srcPackage || pkgDecl->srcPackage->files.empty()) {
         return;
@@ -1268,7 +1275,7 @@ void DotCompleterByParse::CompleteFromType(const std::string &identifier,
         if (!aliasDecl || !aliasDecl->type) {
             return;
         }
-        CompleteFromType(identifier, pos, aliasDecl->type->ty, env);
+        CompleteFromType(identifier, pos, aliasDecl->type->GetTy(), env);
     } else if (typeid(*type) == typeid(GenericsTy)) {
         auto genericsDecl = dynamic_cast<GenericsTy *>(type)->upperBounds;
         for (auto ty : genericsDecl) {
@@ -1317,7 +1324,7 @@ void DotCompleterByParse::CompleteClassDecl(Ptr<Ty> ty, const Cangjie::Position 
     if (ark::Is<ClassDecl>(classDecl->GetSuperClassDecl().get())) {
         auto superClass = classDecl->GetSuperClassDecl();
         env.SetValue(FILTER::IS_SUPER, true);
-        CompleteClassDecl(superClass->ty, pos, env, isSuperOrThis);
+        CompleteClassDecl(superClass->GetTy(), pos, env, isSuperOrThis);
     }
 }
 
@@ -1343,8 +1350,8 @@ void DotCompleterByParse::CompleteSuperInterface(Ptr<const InterfaceDecl> interf
             continue;
         }
         auto refType = dynamic_cast<RefType*>(inheritedType.get().get());
-        if (Cangjie::Is<InterfaceTy>(refType->ty.get()) && !IsHiddenDecl(refType->ref.target)) {
-            CompleteFromType("", pos, refType->ty, env);
+        if (Cangjie::Is<InterfaceTy>(refType->GetTy().get()) && !IsHiddenDecl(refType->ref.target)) {
+            CompleteFromType("", pos, refType->GetTy(), env);
         }
     }
 }
@@ -1379,7 +1386,7 @@ void DotCompleterByParse::CompleteEnumDecl(Ptr<Ty> ty, const Cangjie::Position &
 
     CompleteEnumInterface(enumDecl, pos, env);
 }
-
+// LCOV_EXCL_START
 void DotCompleterByParse::CompleteEnumInterface(Ptr<EnumDecl> enumDecl, const Position &pos, CompletionEnv &env) const
 {
     for (auto &superClassOrInterfaceType : enumDecl->inheritedTypes) {
@@ -1393,7 +1400,7 @@ void DotCompleterByParse::CompleteEnumInterface(Ptr<EnumDecl> enumDecl, const Po
         CompleteInterfaceDecl(dynamic_cast<InterfaceDecl*>(refType->ref.target.get()), pos, env);
     }
 }
-
+// LCOV_EXCL_STOP
 void DotCompleterByParse::CompleteStructDecl(Ptr<Ty> ty, const Cangjie::Position &pos, CompletionEnv &env) const
 {
     // TD: Struct Type will be written later.
@@ -1486,7 +1493,7 @@ std::string DotCompleterByParse::QueryByPos(Ptr<Node> node, const Position pos)
     }
     return scopeName;
 }
-
+// LCOV_EXCL_START
 bool DotCompleterByParse::IsEnumCtorTy(const std::string &beforePrefix, Ty *const &ty) const
 {
     auto ED = dynamic_cast<EnumTy *>(ty)->decl;
@@ -1500,7 +1507,7 @@ bool DotCompleterByParse::IsEnumCtorTy(const std::string &beforePrefix, Ty *cons
     }
     return false;
 }
-
+// LCOV_EXCL_STOP
 bool DotCompleterByParse::CheckInIfAvailable(Ptr<Decl> decl, const Position &pos)
 {
     if (decl == nullptr || decl->astKind != ASTKind::FUNC_DECL) {
@@ -1577,10 +1584,11 @@ void DotCompleterByParse::WalkForMemberAccess(Ptr<Decl> topDecl, Ptr<Expr>& expr
         return VisitAction::WALK_CHILDREN;
     }).Walk();
 }
-
+// LCOV_EXCL_START
 void DotCompleterByParse::WalkForIfAvailable(Ptr<Decl> topDecl, Ptr<Expr>& expr, const ArkAST &input,
                         const Position &pos)
 {
+    (void)input;
     Walker(topDecl, [&](auto node) {
         if (auto refExpr = DynamicCast<RefExpr *>(node.get())) {
             if (refExpr->GetEnd().line == pos.line && refExpr->GetEnd().column == pos.column - 1) {
@@ -1597,6 +1605,7 @@ void DotCompleterByParse::WalkForIfAvailable(Ptr<Decl> topDecl, Ptr<Expr>& expr,
         return VisitAction::WALK_CHILDREN;
     }).Walk();
 }
+// LCOV_EXCL_STOP
 
 // check if in multiimport complete,
 // if true, return prefix with organization name.

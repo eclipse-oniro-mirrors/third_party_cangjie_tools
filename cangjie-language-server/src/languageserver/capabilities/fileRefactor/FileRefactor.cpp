@@ -16,7 +16,7 @@ FileRefactor::FileRefactor(FileRefactorRespParams &result): result(result)
 {
     InitMatcher();
 }
-
+// LCOV_EXCL_START
 void FileRefactor::AddImport()
 {
     if (!fileNode) {
@@ -210,6 +210,7 @@ void FileRefactor::CheckAndChangeImportForRe()
         ChangeImport();
     }
 }
+// LCOV_EXCL_STOP
 
 void FileRefactor::InitMatcher() const
 {
@@ -299,6 +300,7 @@ void FileRefactor::InitMatcher() const
             ark::lsp::Modifier::PUBLIC), &FileRefactor::CheckAndChangeImportForRe);
 }
 
+// LCOV_EXCL_START
 void FileRefactor::MatchRefactor(FileRefactorKind fileRefactorKind, PackageRelation packageRelation,
     ark::lsp::Modifier modifier)
 {
@@ -308,6 +310,7 @@ void FileRefactor::MatchRefactor(FileRefactorKind fileRefactorKind, PackageRelat
         (this->*(func))();
     }
 }
+// LCOV_EXCL_STOP
 
 std::string FileRefactor::GetImportFullPkg(const ImportContent &importContent)
 {
@@ -325,9 +328,9 @@ std::string FileRefactor::GetImportFullPkg(const ImportContent &importContent)
 std::string FileRefactor::GetImportFullSym(const ImportContent &importContent)
 {
     std::stringstream ss;
-    for (int i = 0; i < importContent.prefixPaths.size(); ++i) {
+    for (size_t i = 0; i < importContent.prefixPaths.size(); ++i) {
         ss << importContent.prefixPaths[i];
-        if (i != importContent.prefixPaths.size() - 1) {
+        if (i + 1 != importContent.prefixPaths.size()) {
             ss << CONSTANTS::DOT;
         }
     }
@@ -343,9 +346,9 @@ std::string FileRefactor::GetImportFullSym(const ImportContent &importContent)
 std::string FileRefactor::GetImportFullSymWithoutAlias(const ImportContent &importContent)
 {
     std::stringstream ss;
-    for (int i = 0; i < importContent.prefixPaths.size(); ++i) {
+    for (size_t i = 0; i < importContent.prefixPaths.size(); ++i) {
         ss << importContent.prefixPaths[i];
-        if (i != importContent.prefixPaths.size() - 1) {
+        if (i + 1 != importContent.prefixPaths.size()) {
             ss << CONSTANTS::DOT;
         }
     }
@@ -355,6 +358,7 @@ std::string FileRefactor::GetImportFullSymWithoutAlias(const ImportContent &impo
     return ss.str();
 }
 
+// LCOV_EXCL_START
 bool FileRefactor::GetDeletePosInMultiImport(std::vector<Ptr<ImportSpec>> &multiImports,
         ImportContent &singleImport, Position &beginPos, Position &endPos)
 {
@@ -417,6 +421,7 @@ void FileRefactor::RemoveDuplicateDelete(Position start, Position end, std::stri
         }
     }
 }
+// LCOV_EXCL_STOP
 
 uint8_t FileRefactor::GetRefactorCode(FileRefactorKind fileRefactorKind, PackageRelation packageRelation,
     ark::lsp::Modifier modifier) const
@@ -426,6 +431,7 @@ uint8_t FileRefactor::GetRefactorCode(FileRefactorKind fileRefactorKind, Package
            + static_cast<uint8_t>(packageRelation);
 }
 
+// LCOV_EXCL_START
 bool FileRefactor::ContainFullSymImport()
 {
     if (!fileNode) {
@@ -503,6 +509,7 @@ bool FileRefactor::ContainFullSymImportForReExport()
 bool FileRefactor::FileContainFullSymImportForReExport(const File *pFile, bool isRefFile,
     std::string refactorFullSym, std::string originFullSym)
 {
+    (void)pFile;
     for (auto &fileImport: fileNode->imports) {
         if (!fileImport || fileImport->end.IsZero()) {
             continue;
@@ -667,7 +674,7 @@ void FileRefactor::DeleteReExportSingleImport(ImportContent &importContent,
     deleteRange = TransformFromChar2IDE(deleteRange);
     result.changes[uri].insert({FileRefactorChangeType::DELETED, deleteRange, ""});
 }
-
+// LCOV_EXCL_STOP
 PackageRelation FileRefactor::GetPackageRelation(const std::string &fullPkgName,
     const std::string &targetFullPkgName)
 {

@@ -20,8 +20,6 @@ struct CodeSnippet {
     std::string snippet;
 };
 
-struct IfImportInfo;
-
 class KeywordCompleter {
 public:
     static void Complete(CompletionResult &result, const IfImportInfo &ifImportInfo);

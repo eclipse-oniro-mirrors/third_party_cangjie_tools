@@ -33,8 +33,8 @@ CROSS_COMPILE_MAP = {
 def run_cmd(cmd, cwd=BASE_DIR):
     try:
         logging.info(f"running cmd: {' '.join(cmd)}")
-        env = os.environ.copy()
-        env["ZERO_AR_DATE"] = "1"
+        env = os.environ.copy()	 
+        env["ZERO_AR_DATE"] = "1" 
         output = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, env=env)
         while True:
             line = output.stdout.readline()
@@ -88,8 +88,8 @@ def build(args):
     generator = "Ninja"
     if IS_WINDOWS:
         try:
-            env = os.environ.copy()
-            env["ZERO_AR_DATE"] = "1"
+            env = os.environ.copy()	 
+            env["ZERO_AR_DATE"] = "1" 
             output = subprocess.Popen(["ninja", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
             output.communicate()
             if output.returncode == 0:

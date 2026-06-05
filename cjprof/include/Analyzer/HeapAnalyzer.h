@@ -69,6 +69,7 @@ public:
         uint32_t edgeCount;
         uint32_t nodeIndex;
         uint32_t arrayLen;
+        bool isPinned = false;
         bool IsRootGlobal() const {
             return rootType == RootType::GLOBAL;
         }
@@ -160,8 +161,13 @@ public:
     void ShowObject();
     void ShowReference(const std::string &objNameList, int maxDepth, bool incoming = false);
     RawHeapSnapshot GetRawHeapSnapshot();
+    bool StartReportServer(int port = 8080);
+    static void SetProgramStartTime();
+    void SetDumpReport(bool dump) { m_dumpReport = dump; }
 
 private:
+    bool m_dumpReport = false;
+
     struct Object {
         Hprof::ID id;
         std::string name;
@@ -169,6 +175,7 @@ private:
         uint64_t retainedSize = 0;
         std::unordered_set<Hprof::ID> outRef;
         std::unordered_set<Hprof::ID> inRef;
+        uint8_t category = 0;
 
         Object(Hprof::ID id)
         {
@@ -192,6 +199,7 @@ private:
     void AnalyzeInstance();
     void AnalyzeArray();
     void AnalyzeThread();
+    void FilterPlaceholderObjects();
     std::shared_ptr<Object> GetObject(Hprof::ID id);
 
     inline uint64_t Align(uint64_t size)
@@ -205,6 +213,7 @@ private:
     std::vector<std::shared_ptr<Object>> m_objects;
     std::vector<Thread> m_threads;
     uint32_t m_fileSize;
+    std::string m_filePath;
     std::unordered_map<Hprof::ID, std::shared_ptr<HeapAnalyzer::Object>> objects_cache;
 };
 

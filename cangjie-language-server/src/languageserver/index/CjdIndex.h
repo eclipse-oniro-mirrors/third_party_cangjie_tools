@@ -19,6 +19,7 @@
 #include "cangjie/Basic/Version.h"
 
 namespace Cangjie {
+// LCOV_EXCL_START
 class DCompilerInstance final : public LSPCompilerInstance {
 public:
     explicit DCompilerInstance(ark::Callbacks *cb, CompilerInvocation &invocation,
@@ -52,7 +53,7 @@ struct DPkgInfo : public PkgInfo {
         compilerInvocation->globalOptions.enableAddCommentToAst = true;
     }
 };
-
+// LCOV_EXCL_STOP
 class CjdIndexer {
 public:
     explicit CjdIndexer(Callbacks *cb,
@@ -60,11 +61,11 @@ public:
                         const std::string& ohosCjdPath,
                         const std::string& cjdCachePath,
                         bool enablePackaged = true)
-        : callback(cb),
+        : enablePackaged(enablePackaged),
           stdCjdPath(stdCjdPath),
           ohosCjdPath(ohosCjdPath),
           cjdCachePath(JoinPath(cjdCachePath, CANGJIE_VERSION)),
-          enablePackaged(enablePackaged)
+          callback(cb)
     {
         if (CreateDirs(this->cjdCachePath) == -1) {
             Trace::Log("cjd cache dir build failed");

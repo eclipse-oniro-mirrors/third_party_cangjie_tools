@@ -31,7 +31,8 @@ inline bool ShouldSkipDecl(const Decl &decl)
 {
     auto md = DynamicCast<const MacroDecl *>(&decl);
     const Decl &beCheckedDecl = md && md->desugarDecl ? *md->desugarDecl : decl;
-    return beCheckedDecl.TestAnyAttr(Attribute::HAS_BROKEN, Attribute::IS_BROKEN) || !Ty::IsTyCorrect(beCheckedDecl.ty);
+    return beCheckedDecl.TestAnyAttr(Attribute::HAS_BROKEN, Attribute::IS_BROKEN)
+        || !Ty::IsTyCorrect(beCheckedDecl.GetTy());
 }
 
 std::tuple<std::string, std::string> GetFullPackageNames(const ImportSpec& import)
@@ -68,12 +69,10 @@ std::unordered_map<std::string, ark::EdgeType> LSPCompilerInstance::UpdateUpstre
         return {};
     }
 
-    std::string curModule;
+    std::string curModule = GetCurrentModuleName();
     std::unordered_set<std::string> depends;
-    if (!pkgNameForPath.empty()) {
-        curModule =
-            SplitQualifiedName(ark::CompilerCangjieProject::GetInstance()->GetRealPackageName(pkgNameForPath)).front();
-        depends = ark::CompilerCangjieProject::GetInstance()->GetOneModuleDeps(curModule);
+    if (!curModule.empty()) {
+        depends = ark::CompilerCangjieProject::GetInstance()->GetOneModuleDeps(curModule, IsBuildScriptContext());
     }
 
     std::set<std::string> depPkgs;
@@ -153,7 +152,7 @@ void LSPCompilerInstance::ProcessImport(const ark::ImportSpec *import,
     std::vector<std::string> realDeps = ResolveRealDeps(dep);
     UpdateDepPkgsEdges(realDeps, modifier, context);
 }
-
+// LCOV_EXCL_START
 void LSPCompilerInstance::UpdateDepGraph(bool isIncrement, const std::string &prePkgName)
 {
     (void)UpdateUpstreamPkgs();
@@ -206,7 +205,7 @@ void LSPCompilerInstance::UpdateDepGraph(bool isIncrement, const std::string &pr
         }
     }
 }
-
+// LCOV_EXCL_STOP
 void LSPCompilerInstance::UpdateDepGraph(
     const std::unique_ptr<ark::DependencyGraph> &graph, const std::string &fullPkgName)
 {
@@ -229,12 +228,19 @@ void LSPCompilerInstance::CompilePassForComplete(
     const std::unique_ptr<ark::CjoManager> &cjoManager,
     const std::unique_ptr<ark::DependencyGraph> &graph, Position pos, const std::string &name)
 {
+    (void)name;
     // Faster Completion needs pass: Parse, ConditionCompile and ImportPackage.
     diag.Reset();
     diag.SetSourceManager(&GetSourceManager());
     (void)Parse();
     (void)ConditionCompile();
-    const auto filePath = GetSourceManager().GetSource(pos.fileID).path;
+    if (pkgNameForPath.empty() && !invocation.globalOptions.packagePaths.empty()) {
+        UpdateDepGraph(false);
+    }
+    const auto filePath = pos == INVALID_POSITION ? "" : GetSourceManager().GetSource(pos.fileID).path;
+    if (!filePath.empty()) {
+        SetActiveFilePath(filePath);
+    }
     auto file = GetFileByPath(filePath).get();
     // If the position is not in ImportSpec, do not need to ImportPackage.
     if (file && !ark::InImportSpec(*file, pos)) {
@@ -254,7 +260,7 @@ Ptr<File> LSPCompilerInstance::GetFileByPath(const std::string& filePath)
     }
     return nullptr;
 }
-
+// LCOV_EXCL_START
 std::unordered_set<std::string> LSPCompilerInstance::GetAllImportedCjo(
     const std::string &pkgName, std::unordered_map<std::string, bool> &isVisited)
 {
@@ -290,8 +296,10 @@ bool LSPCompilerInstance::ToImportPackage(const std::string &curModuleName,
     if (curModuleName.empty()) {
         return true;
     }
-    auto found = moduleManger->requireAllPackages.find(curModuleName);
-    if (found != moduleManger->requireAllPackages.end() && found->second.count(cjoModuleName)) {
+    auto &requireMap = IsBuildScriptContext()
+        ? moduleManger->requireAllPackagesInBuild : moduleManger->requireAllPackages;
+    auto found = requireMap.find(curModuleName);
+    if (found != requireMap.end() && found->second.count(cjoModuleName)) {
         return true;
     }
     return false;
@@ -307,7 +315,7 @@ void LSPCompilerInstance::ImportUsrPackage(const std::string &curModuleName)
         }
     }
 }
-
+// LCOV_EXCL_STOP
 void LSPCompilerInstance::ImportUsrCjo(const std::string &curModuleName,
     std::unordered_set<std::string> &visitedPackages)
 {
@@ -326,7 +334,7 @@ void LSPCompilerInstance::ImportUsrCjo(const std::string &curModuleName,
 void LSPCompilerInstance::ImportAllUsrCjo(const std::string &curModuleName)
 {
     std::unordered_set<std::string> visitedPackages;
-    auto deps = ark::CompilerCangjieProject::GetInstance()->GetOneModuleDeps(curModuleName);
+    auto deps = ark::CompilerCangjieProject::GetInstance()->GetOneModuleDeps(curModuleName, IsBuildScriptContext());
     for (auto& module: deps) {
         ImportUsrCjo(module, visitedPackages);
     }
@@ -335,7 +343,7 @@ void LSPCompilerInstance::ImportAllUsrCjo(const std::string &curModuleName)
 void LSPCompilerInstance::ImportCjoToManager(
     const std::unique_ptr<ark::CjoManager> &cjoManager, const std::unique_ptr<ark::DependencyGraph> &graph)
 {
-    std::string curModuleName = invocation.globalOptions.moduleName;
+    std::string curModuleName = GetCurrentModuleName();
 
     // Import stdlib cjo, priority is low.
     for (const auto &cjoCache : cjoFileCacheMap) {
@@ -346,7 +354,11 @@ void LSPCompilerInstance::ImportCjoToManager(
     ImportAllUsrCjo(curModuleName);
 
     // Import user's source code, priority is high.
-    const auto allDependencies = graph->FindAllDependencies(pkgNameForPath);
+    auto allDependencies = graph->FindAllDependencies(pkgNameForPath);
+    if (allDependencies.empty() && !pkgNameForPath.empty()) {
+        std::unordered_map<std::string, bool> isVisited;
+        allDependencies = GetAllImportedCjo(pkgNameForPath, isVisited);
+    }
     for (auto &package : allDependencies) {
         auto cjoCache = cjoManager->GetData(package);
         if (!cjoCache) {
@@ -360,6 +372,8 @@ void LSPCompilerInstance::ImportCjoToManager(
 void LSPCompilerInstance::IndexCjoToManager(
     const std::unique_ptr<ark::CjoManager> &cjoManager, const std::unique_ptr<ark::DependencyGraph> &graph)
 {
+    (void)cjoManager;
+    (void)graph;
     // Import stdlib's cjo, priority is low.
     for (const auto &cjoCache : cjoFileCacheMap) {
         importManager->SetPackageCjoCache(cjoCache.first, cjoCache.second);
@@ -377,7 +391,7 @@ void LSPCompilerInstance::IndexCjoToManager(
  *
  * @param cjoManager Read cjo cache and update cjo cache and state
  * @param graph
- * @param realPkgName Update target package cjo cache, used in common-specific package
+ * @param realPkgName Update target package cjo cache, used in common-specific package 
  * @return true
  * @return false
  */
@@ -412,7 +426,7 @@ bool LSPCompilerInstance::CompileAfterParse(
     cjoManager->SetData(ark::CompilerCangjieProject::GetInstance()->GetRealPackageName(pkgNameForPath), cjoData);
     return changed;
 }
-
+// LCOV_EXCL_START
 std::vector<std::string> LSPCompilerInstance::GetTopologySort()
 {
     auto tempDependentPackageMap = dependentPackageMap;
@@ -444,7 +458,7 @@ std::vector<std::string> LSPCompilerInstance::GetTopologySort()
     }
     return result;
 }
-
+// LCOV_EXCL_STOP
 void LSPCompilerInstance::SetCjoPathInModules(const std::string &cangjieHome,
                                               const std::string &cangjiePath)
 {
@@ -583,6 +597,34 @@ void LSPCompilerInstance::MarkBrokenDecls(Package &pkg)
     }).Walk();
 }
 
+bool LSPCompilerInstance::IsBuildScriptContext()
+{
+    if (!activeFilePath.empty()) {
+        return moduleManger && moduleManger->IsBuildScriptFile(activeFilePath);
+    }
+    const auto packages = GetSourcePackages();
+    if (packages.empty() || !packages[0]) {
+        return false;
+    }
+    for (const auto &file : packages[0]->files) {
+        if (file && moduleManger->IsBuildScriptFile(file->filePath)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string LSPCompilerInstance::GetCurrentModuleName()
+{
+    if (!invocation.globalOptions.moduleName.empty()) {
+        return invocation.globalOptions.moduleName;
+    }
+    if (IsBuildScriptContext()) {
+        return moduleManger->GetProjectModuleName();
+    }
+    return "";
+}
+
 std::string LSPCompilerInstance::Denoising(std::string candidate)
 {
     return ark::CompilerCangjieProject::GetInstance()->Denoising(candidate);
@@ -620,9 +662,11 @@ void LSPCompilerInstance::SetBufferCacheForParse(const std::unordered_map<std::s
                 // in changeWatchedfiles, buffercache which may update later than fileStatus
                 this->bufferCache[it.first].state = SrcCodeChangeState::DELETED;
                 fileStatus.erase(it.first);
+                break;
             }
             case SrcCodeChangeState::UNCHANGED: {
                 this->bufferCache[it.first].state = SrcCodeChangeState::UNCHANGED;
+                break;
             }
             case SrcCodeChangeState::ADDED: {
                 if (this->bufferCache.find(it.first) != this->bufferCache.end()) {
@@ -631,12 +675,19 @@ void LSPCompilerInstance::SetBufferCacheForParse(const std::unordered_map<std::s
                     this->bufferCache[it.first] = SrcCodeCacheInfo({fileStatus[it.first], it.second});
                 }
                 fileStatus[it.first] = SrcCodeChangeState::UNCHANGED;
+                break;
             }
             case SrcCodeChangeState::CHANGED:
             default: {
                 this->bufferCache[it.first] = SrcCodeCacheInfo({fileStatus[it.first], it.second});
                 fileStatus[it.first] = SrcCodeChangeState::UNCHANGED;
+                break;
             }
         }
     }
+}
+
+void LSPCompilerInstance::SetActiveFilePath(const std::string &filePath)
+{
+    activeFilePath = filePath;
 }

@@ -28,10 +28,13 @@ template <typename Func, typename... Args>
 bool ExecuteCompilerApi(const std::string &name, Func func, Args &&...args)
 {
     ark::Logger::Instance().CollectKernelLog(std::this_thread::get_id(), name, "start");
+#ifndef NO_EXCEPTIONS
     try {
+#endif
         Trace::Wlog("#### execute " + name + " start ####");
         std::invoke(func, std::forward<Args>(args)...);
         Trace::Wlog("#### execute " + name + " end ####");
+#ifndef NO_EXCEPTIONS
     } catch (std::exception &e) {
         ark::Logger::Instance().LogMessage(ark::MessageType::MSG_ERROR,
             "Func " + name + e.what());
@@ -41,6 +44,7 @@ bool ExecuteCompilerApi(const std::string &name, Func func, Args &&...args)
             "Func " + name + "Caught an unknown exception");
         return false;
     }
+#endif
     ark::Logger::Instance().CollectKernelLog(std::this_thread::get_id(), name, "end");
     return true;
 }
@@ -159,6 +163,8 @@ public:
 
     void SetBufferCacheForParse(const std::unordered_map<std::string, std::string> &buffer);
 
+    void SetActiveFilePath(const std::string &filePath);
+
     ark::Callbacks *callback = nullptr;
     std::string pkgNameForPath; // Full Package Name
     std::string pkgNameForCj;
@@ -167,8 +173,9 @@ public:
     std::mutex fileStatusLock;
     std::unordered_map<std::string, SrcCodeChangeState> fileStatus;
     const std::unique_ptr<ark::ModuleManager> &moduleManger;
-    std::unique_ptr<DiagnosticEngine> diagOwned;
+    std::string activeFilePath;
     std::string upstreamSourceSetName;
+    std::unique_ptr<DiagnosticEngine> diagOwned;
 
     static inline std::shared_mutex mtx;
     static inline PackageMap dependentPackageMap;
@@ -199,6 +206,10 @@ private:
                        DependencyContext &context);
 
     static void MarkBrokenDecls(AST::Package &pkg);
+
+    bool IsBuildScriptContext();
+
+    std::string GetCurrentModuleName();
 };
 } // namespace Cangjie
 #endif // CANGJIE_FRONTEND_LSPCOMPILERINSTANCE_H

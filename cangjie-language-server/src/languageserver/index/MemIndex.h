@@ -65,23 +65,23 @@ struct PkgSymsRequest {
 struct RefsRequest {
     std::unordered_set<SymbolID> ids;
     RefKind filter = RefKind::ALL;
-    std::optional<uint32_t> limit;
+    std::optional<uint32_t> limit = std::nullopt;
 };
 
 struct FileRefsRequest {
-    unsigned int fileID;
+    unsigned int fileID = 0;
     std::string fileUri;
     std::string fullPkgName;
     RefKind filter = RefKind::ALL;
-    std::optional<uint32_t> limit;
+    std::optional<uint32_t> limit = std::nullopt;
 };
 
 
 struct RelationsRequest {
-    SymbolID id;
+    SymbolID id = INVALID_SYMBOL_ID;
     RelationKind predicate;
     /// If set, limit the number of relations returned from the index.
-    std::optional<uint32_t> limit;
+    std::optional<uint32_t> limit = std::nullopt;
 };
 
 struct FuncSigRequest {
@@ -89,6 +89,12 @@ struct FuncSigRequest {
     std::string funcName;
     std::string retType;
     std::vector<std::string> funcParams;
+};
+
+struct SymbolSearchContext {
+    std::string curPkgName;
+    std::string curModule;
+    bool includeScriptRequire = false;
 };
 
 enum class PackageRelation { NONE, CHILD, PARENT, SAME_MODULE };
@@ -129,24 +135,24 @@ public:
 
     virtual void FindImportSymsOnCompletion(
         const std::pair<std::unordered_set<SymbolID>, std::unordered_set<SymbolID>>& filterSyms,
-        const std::string &curPkgName, const std::string &curModule, const std::string &prefix,
+        const SymbolSearchContext &context, const std::string &prefix,
         std::function<void(const std::string &, const Symbol &, const CompletionItem &)> callback) = 0;
 
-    virtual void FindImportSymsOnQuickFix(const std::string &curPkgName, const std::string &curModule,
+    virtual void FindImportSymsOnQuickFix(const SymbolSearchContext &context,
         const std::unordered_set<SymbolID> &importDeclSyms,
         const std::string& identifier,
         const std::function<void(const std::string &, const Symbol &)>& callback) = 0;
 
     virtual void FindExtendSymsOnCompletion(const SymbolID &dotCompleteSym,
         const std::unordered_set<SymbolID> &visibleMembers,
-        const std::string &curPkgName, const std::string &curModule,
+        const SymbolSearchContext &context,
         const std::function<void(const std::string &, const std::string &,
             const Symbol &, const CompletionItem &)>& callback) =0;
 
     virtual void FindExtendSymsOnCompletionBatch(
         const std::unordered_set<SymbolID> &ids,
         const std::unordered_set<SymbolID> &allVisibleMembers,
-        const std::string &curPkgName, bool filterStatic,
+        const SymbolSearchContext &context, bool filterStatic,
         const std::function<void(const std::string &, const std::string &,
             const Symbol &, const CompletionItem &)>& callback) =0;
 
@@ -188,19 +194,19 @@ public:
 
     void FindImportSymsOnCompletion(
         const std::pair<std::unordered_set<SymbolID>, std::unordered_set<SymbolID>>& filterSyms,
-        const std::string &curPkgName, const std::string &curModule, const std::string &prefix,
+        const SymbolSearchContext &context, const std::string &prefix,
         std::function<void(const std::string &, const Symbol &, const CompletionItem &)> callback) override;
 
     void FindExtendSymsOnCompletion(const SymbolID &dotCompleteSym,
         const std::unordered_set<SymbolID> &visibleMembers,
-        const std::string &curPkgName, const std::string &curModule,
+        const SymbolSearchContext &context,
         const std::function<void(const std::string &, const std::string &,
             const Symbol &, const CompletionItem &)>& callback) override;
 
     void FindExtendSymsOnCompletionBatch(
         const std::unordered_set<SymbolID> &ids,
         const std::unordered_set<SymbolID> &symAndVisibleMembers,
-        const std::string &curPkgName, bool filterStatic,
+        const SymbolSearchContext &context, bool filterStatic,
         const std::function<void(const std::string &, const std::string &,
             const Symbol &, const CompletionItem &)>& callback) override;
 
@@ -212,7 +218,7 @@ public:
     void RefsFindReference(const RefsRequest &req, Ref &definition,
         std::function<void(const Ref &)> callback) const override;
 
-    void FindImportSymsOnQuickFix(const std::string &curPkgName, const std::string &curModule,
+    void FindImportSymsOnQuickFix(const SymbolSearchContext &context,
         const std::unordered_set<SymbolID> &importDeclSyms,
         const std::string& identifier,
         const std::function<void(const std::string &, const Symbol &)>& callback) override;
@@ -260,8 +266,8 @@ public:
     }
 
     Symbol GetAimSymbol(const Decl &decl) override;
-    void GetFuncByName(const FuncSigRequest &req,
-                       std::function<void(const Symbol &)> callback) const override {}
+    void GetFuncByName(const FuncSigRequest & /*req*/,
+                       std::function<void(const Symbol &)> /*callback*/) const override {}
 };
 
 } // namespace lsp

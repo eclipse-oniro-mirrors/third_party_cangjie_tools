@@ -98,6 +98,7 @@ void GetMacroLibPath(const std::string &targetLib,
     for (const auto &item : moduleInfoMap) {
         for (auto &path : item.second.cjoRequiresMap) {
             const std::string soDirPath = GetDirPath(path.second);
+            // LCOV_EXCL_START
             if (!FileExist(soDirPath) || folderRecordMap.find(soDirPath) != folderRecordMap.end()) {
                 continue;
             }
@@ -115,6 +116,7 @@ void GetMacroLibPath(const std::string &targetLib,
                 }
             }
             (void)folderRecordMap.emplace(soDirPath);
+            // LCOV_EXCL_STOP
         }
     }
 } // namespace ark

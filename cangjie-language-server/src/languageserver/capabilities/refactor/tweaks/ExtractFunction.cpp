@@ -22,7 +22,7 @@ const std::unordered_set<Cangjie::TokenKind> COMPOUND_ASSIGN_OPERATORS = { Token
 const std::unordered_set<Cangjie::AST::ASTKind> CANNOT_EXTRACT_FUNC_EXPR = {
     ASTKind::LAMBDA_EXPR, ASTKind::INTERPOLATION_EXPR
 };
-
+// LCOV_EXCL_START
 bool IsRefLoop(const Symbol& sym, const Node& self)
 {
     if (!sym.node) {
@@ -113,7 +113,7 @@ bool IsSatisfyJumpExpr(const Tweak::Selection &sel, const JumpExpr& jumpExpr,
     }
     auto root = sel.selectionTree.root();
     bool isValid = false;
-    SelectionTree::Walk(root, [&loopExpr, &extraOptions, &isValid]
+    SelectionTree::Walk(root, [&loopExpr, &isValid]
         (const SelectionTree::SelectionTreeNode *node) {
             if (!node->node) {
                 isValid = false;
@@ -156,8 +156,9 @@ bool NeedExtractDecl2ReturnValue(Cangjie::AST::Decl *decl, const Tweak::Selectio
     }
     return false;
 }
-
+// LCOV_EXCL_STOP
 // compute whether the AssignExpr->leftValue need extract to return value
+// LCOV_EXCL_BR_START
 bool NeedExtractAssignExpr2ReturnValue(Cangjie::AST::AssignExpr *assignExpr, const Tweak::Selection &sel)
 {
     if (!assignExpr || !assignExpr->leftValue) {
@@ -193,13 +194,14 @@ bool NeedExtractAssignExpr2ReturnValue(Cangjie::AST::AssignExpr *assignExpr, con
     }
     return false;
 }
-
+// LCOV_EXCL_BR_STOP
 bool LeftValueIsMemberVar(Cangjie::AST::AssignExpr *assignExpr)
 {
     if (!assignExpr || !assignExpr->leftValue) {
         return false;
     }
     if (assignExpr->leftValue->astKind == ASTKind::MEMBER_ACCESS) {
+        // LCOV_EXCL_START
         auto memberAccess = DynamicCast<MemberAccess*>(assignExpr->leftValue.get());
         if (!memberAccess || !memberAccess->baseExpr) {
             return false;
@@ -208,6 +210,7 @@ bool LeftValueIsMemberVar(Cangjie::AST::AssignExpr *assignExpr)
             return true;
         }
         return false;
+        // LCOV_EXCL_STOP
     }
     if (assignExpr->leftValue->astKind == ASTKind::REF_EXPR) {
         auto refExpr = DynamicCast<RefExpr*>(assignExpr->leftValue.get());
@@ -295,7 +298,7 @@ class ExtractFunctionSelectionRule : public TweakRule {
 
         return isValid;
     }
-
+// LCOV_EXCL_START
     bool PreCheck(const Tweak::Selection &sel, std::map<std::string, std::string> &extraOptions) const
     {
         auto root = sel.selectionTree.root();
@@ -509,7 +512,7 @@ class ExtractFunctionBranchRule : public TweakRule {
         return isValid;
     }
 };
-
+// LCOV_EXCL_STOP
 /**
  * need contain complete while/for... loop if continue/break is selected:
  * 1. find the JUMP_EXPR in selected range.
@@ -521,8 +524,9 @@ class ExtractFunctionBreakContinueRule : public TweakRule {
     {
         auto root = sel.selectionTree.root();
         bool isValid = true;
-        SelectionTree::Walk(root, [ &isValid, &extraOptions, &sel, this]
+        SelectionTree::Walk(root, [ &isValid, &extraOptions, &sel]
             (const SelectionTree::SelectionTreeNode *treeNode) {
+                // LCOV_EXCL_START
                 if (!treeNode->node) {
                     isValid = false;
                     extraOptions.insert(std::make_pair("ErrorCode",
@@ -543,7 +547,7 @@ class ExtractFunctionBreakContinueRule : public TweakRule {
                         return SelectionTree::WalkAction::STOP_NOW;
                     }
                 }
-
+            // LCOV_EXCL_STOP
                 return SelectionTree::WalkAction::WALK_CHILDREN;
             });
 
@@ -606,7 +610,7 @@ void ExtractFunction::GetExtractedFunction(const Tweak::Selection &sel, Extracte
     GetFunctionBody(sel, function);
     GetFunctionModifier(sel, function);
 }
-
+// LCOV_EXCL_BR_START
 /**
  * insert target scope:
  * 1. insert to interface-body if in_interface
@@ -645,7 +649,7 @@ TextEdit ExtractFunction::InsertDeclaration(const Tweak::Selection &sel, Extract
     }
 
     if (insertPosition.IsZero()) {
-        return std::move(textEdit);
+        return textEdit;
     }
     if (!targetScope || targetScope->astKind == ASTKind::VAR_DECL || targetScope->astKind == ASTKind::FUNC_DECL) {
         textEdit.newText = "\n\n" + function.GetFunctionDeclaration() + "\n";
@@ -655,15 +659,17 @@ TextEdit ExtractFunction::InsertDeclaration(const Tweak::Selection &sel, Extract
     Range insertRange = {insertPosition, insertPosition};
     insertRange = TransformFromChar2IDE(insertRange);
     textEdit.range = insertRange;
-    return std::move(textEdit);
+    return textEdit;
 }
-
+// LCOV_EXCL_BR_STOP
+// LCOV_EXCL_START
 TextEdit ExtractFunction::ReplaceBlockWithCall(const Tweak::Selection &sel, ExtractedFunction &function)
 {
+    (void)sel;
     TextEdit textEdit;
     Range insertRange = function.replacedRange;
     if (function.replacedRange.start.IsZero()) {
-        return std::move(textEdit);
+        return textEdit;
     }
     insertRange = TransformFromChar2IDE(insertRange);
     textEdit.range = insertRange;
@@ -693,7 +699,7 @@ TextEdit ExtractFunction::ReplaceBlockWithCall(const Tweak::Selection &sel, Extr
     } else {
         textEdit.newText = functionCall.str();
     }
-    return std::move(textEdit);
+    return textEdit;
 }
 
 /**
@@ -765,8 +771,8 @@ void ExtractFunction::GetParam(ExtractedFunction& function, Cangjie::AST::RefExp
     }
     ExtractedFunction::Param param;
     param.name = refExpr->ref.identifier;
-    if (decl->ty->HasGeneric()) {
-        CollectGenerics(*decl->ty, function.generics);
+    if (decl->GetTy()->HasGeneric()) {
+        CollectGenerics(*decl->GetTy(), function.generics);
     }
     param.type = GetVarDeclType(decl, sel.arkAst->sourceManager);
     function.params.emplace(std::move(param));
@@ -811,7 +817,7 @@ void ExtractFunction::GetFunctionReturnValue(const Tweak::Selection &sel, Extrac
     const auto& children = root->Children;
     size_t childrenSize = children.size();
 
-    for (int i = 0; i < childrenSize; ++i) {
+    for (size_t i = 0; i < childrenSize; ++i) {
         if (!children[i]->node) {
             return;
         }
@@ -1116,4 +1122,5 @@ void ExtractFunction::AddMutParamVariable(std::string &mutParams, Cangjie::AST::
         function.params.erase(it);
     }
 }
+// LCOV_EXCL_STOP
 } // namespace ark

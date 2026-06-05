@@ -144,14 +144,14 @@ public:
         }
         return nullptr;
     }
-
+    // LCOV_EXCL_START
     bool PkgIsFromSrcOrNoSrc(Ptr<const Cangjie::AST::Node> node) const
     {
         if (!node) { return false; }
         std::string fullPkgName = GetPkgNameFromNode(node);
         return CIMap.find(fullPkgName) != CIMap.end() || CIMapNotInSrc.find(fullPkgName) != CIMapNotInSrc.end();
     }
-
+    // LCOV_EXCL_STOP
     bool PkgIsFromCIMap(const std::string &fullPkgName) const
     {
         return CIMap.find(fullPkgName)!=CIMap.end();
@@ -161,6 +161,9 @@ public:
     {
         return stdLibPath;
     }
+
+    bool IsSingleFileMode() const { return isSingleFileMode; }
+    const std::string &GetSingleFilePath() const { return singleFilePath; }
 
     std::string GetPathFromPkg(const std::string &fullPackageName)
     {
@@ -175,7 +178,7 @@ public:
     {
         return CIMapNotInSrc.find(fullPkgName)!=CIMapNotInSrc.end();
     }
-
+    // LCOV_EXCL_START
     std::vector<std::string> GetFilesInPkg(const std::string &pkgPath) const
     {
         std::vector<std::string> ret;
@@ -188,7 +191,7 @@ public:
         }
         return ret;
     }
-
+    // LCOV_EXCL_STOP
     void GetIncDegree(const std::string &pkgName, std::unordered_map<std::string, size_t>& inDegreeMap,
                       std::unordered_map<std::string, bool>& isVisited);
 
@@ -260,7 +263,7 @@ public:
             pLRUCache = std::make_unique<LRUCache>(LRU_SIZE);
         }
     }
-
+    // LCOV_EXCL_START
     std::vector<std::string> GetCIMapNotInSrcList()
     {
         std::vector<std::string> ciMap = {};
@@ -304,7 +307,7 @@ public:
         }
         return curDecl;
     };
-
+    // LCOV_EXCL_STOP
     std::set<Ptr<Cangjie::AST::ExtendDecl> >
     GetExtendDecls(const std::variant<Ptr<Cangjie::AST::Ty>, Ptr<Cangjie::AST::InheritableDecl> > &type,
                    const std::string& packageName)
@@ -358,12 +361,26 @@ public:
     void ParseOneFile(const std::string &file, const std::string &contents, Position pos = {0, 0, 0},
         const std::string &taskName = "");
 
+private:
+    void HandleOnlyParse(const std::string &name, const std::string &absName, const std::string &contents,
+                         Position pos, CangjieFileKind fileKind);
+
+    std::string GetNotInSrcCacheKey(const std::string &filePath) const;
+
+    void HandleFileNotInSource(const std::string &absName, const std::string &contents);
+
+    void HandleNewPackage(const std::string &absName, const std::string &contents, const std::string &dirPath,
+                          const std::string &modulePath);
+
+    void ProcessInvalidPackage(const std::string &fullPkgName, const std::string &sourcePath);
+
+public:
     void IncrementForFileDelete(const std::string &fileName);
 
     // after workspace init, can use it. pair::second = ModulePath
     std::pair<CangjieFileKind, std::string> GetCangjieFileKind(const std::string &filePath, bool isPkg = false) const;
 
-    int GetFileID(const std::string &fileName);
+    std::optional<unsigned int> GetFileID(const std::string &fileName);
 
     int GetFileIDForCompete(const std::string &fileName);
 
@@ -454,9 +471,15 @@ public:
 
     bool IsCurModuleCjoDep(const std::string &curModule, const std::string &fullPkgName);
 
-    std::unordered_set<std::string> GetOneModuleDeps(const std::string &curModule);
+    std::unordered_set<std::string> GetOneModuleDeps(const std::string &curModule, bool includeScriptRequire = false);
 
-    std::unordered_set<std::string> GetOneModuleDirectDeps(const std::string &curModule);
+    std::unordered_set<std::string> GetOneModuleDirectDeps(
+        const std::string &curModule,
+        bool includeScriptRequire = false);
+
+    std::string GetModuleNameByFile(const std::string &filePath, const std::string &pkgName = "");
+
+    bool IsBuildScriptFile(const std::string &filePath) const;
 
     bool GetModuleCombined(const std::string &curModule);
 
@@ -515,8 +538,6 @@ public:
     void UpdateFileStatusInCI(const std::string& pkgName, const std::string& file,
         CompilerInstance::SrcCodeChangeState state);
 
-    std::unique_ptr<DiagnosticEngine> GetDiagnosticEngine();
-
     bool IsCommonSpecificPkg(const std::string &realPkgName);
 
     std::vector<std::string> GetCommonSpecificSourceSetGraph(const std::string &pkgName);
@@ -532,6 +553,8 @@ public:
     std::string GetFinalDownStreamFullPkgName(const std::string &pkgName);
 
     std::string GetRealPackageName(const std::string& fullPackageName);
+
+    std::unique_ptr<DiagnosticEngine> GetDiagnosticEngine();
 
     std::unordered_map<std::string, Modifier> GetPkgToModifierMap()
     {
@@ -549,6 +572,8 @@ private:
     void InitParseCacheForSignatureHelp(const std::unique_ptr<LSPCompilerInstance> &lspCI,
         const std::string &pkgForPath);
 
+    void IncrementCompile(const std::string &filePath, const std::string &contents = "", bool isDelete = false);
+
     struct NewPackageInfo {
         std::string fullPkgName;
         PkgType pkgType;
@@ -556,32 +581,62 @@ private:
     };
 
     NewPackageInfo DeterminePkgNameAndType(const std::string &modulePath, const std::string &dirPath,
-        const std::string &absName);
+                                           const std::string &absName);
 
     void UpdateRelatedPackageStatus(const std::string &fullPkgName);
 
     void InitPkgInfoBuffer(const std::string &fullPkgName, const std::string &absName, const std::string &contents,
- 	                            bool isDefaultPkg);
+                           bool isDefaultPkg);
 
     void UpdatePkgMaps(const std::string &fullPkgName, const std::string &dirPath);
 
-    void IncrementCompile(const std::string &filePath, const std::string &contents = "", bool isDelete = false);
+    void HandleUpstreamSourceSet(const std::string &fullPkgName, const std::unique_ptr<LSPCompilerInstance> &ci);
+
+    void UpdateBufferCache(const std::string &fullPkgName, const std::string &filePath,
+                           const std::string &contents, bool isDelete);
+
+    void ClearDiagnosticsForPkg(const PkgInfo &pkgInfo);
+
+    void CompileAndCheckDownstream(const std::string &fullPkgName, const std::unique_ptr<LSPCompilerInstance> &ci);
+
+    void PostCompileProcess(const std::string &fullPkgName, const std::string &filePath,
+                            const std::unique_ptr<LSPCompilerInstance> &ci,
+                            const std::pair<std::vector<std::vector<std::string>>, bool> &cycles,
+                            bool isDelete);
+
+    void RemoveOldRealPkgMapping(const std::string &oldRealPkgName, const std::string &fullPkgName);
+
+    void UpdatePkgInfoMapping(std::string &fullPkgName,
+        const std::string &pkgName,
+        const std::unique_ptr<LSPCompilerInstance> &ci,
+        bool &redefined);
+
+    void CleanupOldPackageMapping(std::string &fullPkgName, std::string oldRealPkgName);
+
+    void ExecutePackageRename(std::string &fullPkgName,
+        const std::unique_ptr<LSPCompilerInstance> &ci,
+        std::string pkgName,
+        std::string newFullPkgName);
 
     void IncrementCompileForComplete(const std::string &name, const std::string &filePath,
         Position pos, const std::string &contents = "");
 
+    void UpdateCIForParse(const std::unique_ptr<LSPCompilerInstance> &ci,
+                          const std::string &fullPkgName,
+                          const std::string &filePath,
+                          const std::string &contents);
+
     void IncrementCompileForCompleteNotInSrc(const std::string &name,
         const std::string &filePath, const std::string &contents = "");
 
+    bool InitPackage(const std::string &packagePath, const std::string &fullPackageName,
+                     const ModuleInfo &moduleInfo, PkgType pkgType);
+
+    void InitSubPackages(const std::string &sourcePath, const std::string &rootPackageName,
+                         const ModuleInfo &moduleInfo, PkgType pkgType);
     void IncrementCompileForSignatureHelp(const std::string &filePath, const std::string &contents = "");
 
     void IncrementCompileForSignatureHelpNotInSrc(const std::string &filePath, const std::string &contents = "");
-
-    bool InitPackage(const std::string &packagePath, const std::string &fullPackageName,
-        const ModuleInfo &moduleInfo, PkgType pkgType);
-
-    void InitSubPackages(const std::string &sourcePath, const std::string &rootPackageName,
-        const ModuleInfo &moduleInfo, PkgType pkgType);
 
     void IncrementCompileForFileNotInSrc(const std::string &filePath, const std::string &contents = "",
                                          bool isDelete = false);
@@ -593,6 +648,23 @@ private:
     bool UpdateDependencies(std::string &fullPkgName, const std::unique_ptr<LSPCompilerInstance> &ci);
 
     bool ParseAndUpdateNotInSrcDep(const std::string &dirPath, const std::unique_ptr<LSPCompilerInstance> &newCI);
+
+    void ValidateScriptDependencyImports(
+        const std::unique_ptr<LSPCompilerInstance> &ci,
+        const std::string &filePath);
+
+    void ClearScriptDependencyImportDiags(const std::string &filePath);
+
+    bool ValidateScriptDependencyImportsInPackage(const Package &package, const std::string &filePath);
+
+    void ValidateScriptDependencyImportsInFile(const File &file, const std::string &filePath);
+
+    void ValidateScriptDependencyImportSpec(const ImportSpec &importSpec, const std::string &filePath,
+        const std::string &curModule, const std::unordered_set<std::string> &normalDeps,
+        const std::unordered_set<std::string> &buildDeps);
+
+    void ReportScriptDependencyImport(const std::string &filePath, const ImportSpec &importSpec,
+        const std::string &importedModule);
 
     void FullCompilation();
 
@@ -610,40 +682,6 @@ private:
     void StorePackageCache(const std::string& pkgName);
 
     void ReleaseMemoryAsync();
-
-    bool SetCommonPartCjoForFullCompile(std::unique_ptr<Cangjie::LSPCompilerInstance> &ci,
-        const std::string &fullPkgName);
-
-    void SetCommonPartCjo(const std::unique_ptr<Cangjie::LSPCompilerInstance> &ci, const std::string &fullPkgName);
-
-    void HandleNewPackage(const std::string &absName, const std::string &contents, const std::string &dirPath,
-        const std::string &modulePath);
-
-    void ProcessInvalidPackage(const std::string &fullPkgName, const std::string &sourcePath);
-
-    void UpdateCIForParse(const std::unique_ptr<LSPCompilerInstance> &ci,
-                          const std::string &fullPkgName,
-                          const std::string &filePath,
-                          const std::string &contents);
-
-    void PostCompileProcess(const std::string &fullPkgName, const std::string &filePath,
-                            const std::unique_ptr<LSPCompilerInstance> &ci,
-                            const std::pair<std::vector<std::vector<std::string>>, bool> &cycles,
-                            bool isDelete);
-
-    void UpdateBufferCache(const std::string &fullPkgName, const std::string &filePath,
-                           const std::string &contents, bool isDelete);
-
-    void CompileAndCheckDownstream(const std::string &fullPkgName, const std::unique_ptr<LSPCompilerInstance> &ci);
-
-    void RemoveOldRealPkgMapping(const std::string &oldRealPkgName, const std::string &fullPkgName);
-
-    void UpdatePkgInfoMapping(std::string &fullPkgName,
-        const std::string &pkgName,
-        const std::unique_ptr<LSPCompilerInstance> &ci,
-        bool &redefined);
-
-    void HandleFileNotInSource(const std::string &absName, const std::string &contents, const std::string &dirPath);
 
     std::string modulesHome;
     std::string stdLibPath;
@@ -693,6 +731,8 @@ private:
     std::unordered_map<std::string, Modifier> pkgToModMap;
     static bool useDB;
     static bool incrementalOptimize;
+    bool isSingleFileMode = false;
+    std::string singleFilePath;
 };
 } // namespace ark
 

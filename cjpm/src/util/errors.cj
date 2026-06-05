@@ -9,6 +9,7 @@
 package cjpm.util
 
 import std.collection.*
+import std.env.exit
 
 public class CliFailError <: Exception {
     public CliFailError(error: String) {
@@ -18,6 +19,10 @@ public class CliFailError <: Exception {
     public init(errors: Iterable<String>) {
         this(String.join(errors |> collectArray, delimiter: '\n\n'))
     }
+}
+
+private class AssertionError <: Exception {
+    AssertionError(error: String) { super(error) }
 }
 
 @When[debug]
@@ -31,7 +36,12 @@ public func assertion(lambda: () -> Bool, errmesg: () -> String): Unit {
     }
     if (hasFailed) {
         let output = res ?? errmesg()
-        throw Exception("It's caught!: ${output}")
+        try {
+            throw AssertionError("Assert Failed: ${output}")
+        } catch (ae: AssertionError) {
+            ae.printStackTrace()
+            exit(1)
+        }
     }
 }
 

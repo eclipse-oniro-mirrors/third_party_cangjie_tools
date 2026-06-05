@@ -33,6 +33,8 @@ private:
         bool showThread = false;
         bool showReference = false;
         bool incomingRef = false;
+        bool dumpReport = false;
+        int reportPort = 8080;
         std::string input = "cjprof.data";
         std::string output = "cjprof.data";
         std::string objNameList;

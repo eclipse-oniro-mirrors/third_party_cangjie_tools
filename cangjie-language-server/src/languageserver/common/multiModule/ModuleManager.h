@@ -30,16 +30,19 @@ public:
     void WorkspaceModeParser(const std::string &workspace = "");
 
     std::unordered_set<std::string> GetAllRequiresOneModule(
-        const std::string &require, std::unordered_map<std::string, bool> &isVisited);
+        const std::string &require, std::unordered_map<std::string, bool> &isVisited, bool includeScriptRequire);
+    std::unordered_set<std::string> GetBuildScriptRequiresOneModule(const std::string &moduleName);
 
     void SetCommonSpecificPath(const nlohmann::json &jsonData, const std::string &modulePath);
     void SetPackageRequires(const nlohmann::json &jsonData, const std::string &modulePath);
 
     void SetRequireAllPackages();
+    std::string GetProjectModuleName() const;
+    bool IsBuildScriptFile(const std::string &filePath) const;
 
     std::string GetExpectedPkgName(const Cangjie::AST::File &file);
 
-    bool IsCommonSpecificModule(const std::string &filePath);
+    bool isCommonSpecificModule(const std::string &filePath);
 
     std::string projectRootPath;
     nlohmann::json multiModuleOption;
@@ -47,8 +50,12 @@ public:
     std::unordered_map<std::string, ModuleInfo> moduleInfoMap;
     // key: moduleName, value: requires
     std::unordered_map<std::string, std::unordered_set<std::string>> requirePackages;
+    // key: moduleName, value: script requires
+    std::unordered_map<std::string, std::unordered_set<std::string>> scriptRequirePackages;
     // key: moduleName, value: allRequires
     std::unordered_map<std::string, std::unordered_set<std::string>> requireAllPackages;
+    // key: moduleName, value: self + script requires closure in build.cj
+    std::unordered_map<std::string, std::unordered_set<std::string>> requireAllPackagesInBuild;
     // key: moduleName, value: modulePaths with same moduleName
     std::unordered_map<std::string, std::vector<std::string>> duplicateModules;
     // key: moduleName, value: cur module is combined

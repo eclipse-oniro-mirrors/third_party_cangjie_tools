@@ -1028,7 +1028,8 @@ func parallelCompileTests(
             )
             let flag = packageTestIfNeeded(pkgInfo, testConfig, pkgDesc)
             sem.release()
-            logger.log(pkgInfo.outLogFile, pkgInfo.errLogFile)
+            logger.log((pkgInfo.outLogFile, pkgInfo.errLogFile))
+            logger.release()
             return flag
         })
     }

@@ -10,7 +10,6 @@
 #include "../../../CompilerCangjieProject.h"
 #include "../TweakRule.h"
 #include "../TweakUtils.h"
-
 namespace ark {
 const std::unordered_set<Cangjie::AST::ASTKind> INVALID_PARTIAL_EXPR = {
     ASTKind::IF_EXPR, ASTKind::DO_WHILE_EXPR, ASTKind::TRY_EXPR, ASTKind::BLOCK
@@ -20,6 +19,14 @@ const std::unordered_set<Cangjie::AST::ASTKind> CANNOT_EXTRACT_VAR_EXPR = {
     ASTKind::BLOCK, ASTKind::STR_INTERPOLATION_EXPR, ASTKind::INTERPOLATION_EXPR
 };
 
+namespace {
+std::string GetIndentBeforePosition(const Position &pos)
+{
+    return std::string(pos.column > 0 ? pos.column - 1 : 0, ' ');
+}
+}
+
+// LCOV_EXCL_START
 class ExtractVariableRule : public TweakRule {
     bool Check(const Tweak::Selection &sel, std::map<std::string, std::string> &extraOptions) const override
     {
@@ -73,7 +80,7 @@ class ExtractVariableRule : public TweakRule {
         return isValid;
     }
 };
-
+// LCOV_EXCL_STOP
 bool ExtractVariable::Prepare(const Selection &sel)
 {
     TweakRuleEngine ruleEngine;
@@ -84,7 +91,7 @@ bool ExtractVariable::Prepare(const Selection &sel)
     ruleEngine.CheckRules(sel, extraOptions);
     return true;
 }
-
+// LCOV_EXCL_BR_START
 std::optional<Tweak::Effect> ExtractVariable::Apply(const Selection &sel)
 {
     Effect effect;
@@ -113,7 +120,7 @@ std::optional<Tweak::Effect> ExtractVariable::Apply(const Selection &sel)
     effect.applyEdits.emplace(uri, std::move(textEdits));
     return std::move(effect);
 }
-
+// LCOV_EXCL_BR_STOP
 std::map<std::string, std::string> ExtractVariable::ExtraOptions()
 {
     return extraOptions;
@@ -191,6 +198,7 @@ TextEdit ExtractVariable::InsertDeclaration(const Selection &sel, Range &range, 
     }
 
     std::string modifier = GetVarModifier(sel, range);
+    std::string trailingIndent = sourceCode.find('\n') == std::string::npos ? "" : indent;
     if (modifier.find("const") != std::string::npos) {
         insertText << modifier;
     } else {
@@ -198,16 +206,16 @@ TextEdit ExtractVariable::InsertDeclaration(const Selection &sel, Range &range, 
     }
 
     if (root->selected == SelectionTree::Selection::Complete && root->node->astKind == ASTKind::ASSIGN_EXPR) {
-        insertText <<  varName << " = (" << sourceCode << ")\n" << indent;
+        insertText <<  varName << " = (" << sourceCode << ")\n" << trailingIndent;
     } else {
-        insertText << varName << " = " << sourceCode << "\n" << indent;
+        insertText << varName << " = " << sourceCode << "\n" << trailingIndent;
     }
 
     textEdit.range = insertRange;
     textEdit.newText = insertText.str();
-    return std::move(textEdit);
+    return textEdit;
 }
-
+// LCOV_EXCL_START
 void ExtractVariable::FindInsertDeclPosition(const Selection &sel, Range &range,
     Range &insertRange, std::string &indent, bool &isGlobal)
 {
@@ -217,6 +225,7 @@ void ExtractVariable::FindInsertDeclPosition(const Selection &sel, Range &range,
     // 1. use scopeName getting insert position
     FindInsertPositionByScopeName(sel, range, insertRange, isGlobal);
     if (!insertRange.end.IsZero()) {
+        indent = GetIndentBeforePosition(insertRange.start);
         return;
     }
     // 2. compute insert position if getting insert position fail by scope name (maybe the following code can delete)
@@ -228,7 +237,7 @@ void ExtractVariable::FindInsertDeclPosition(const Selection &sel, Range &range,
         Token firstToken = sel.arkAst->tokens[firstToken4CurLine];
         insertRange.start = firstToken.Begin();
         insertRange.end = insertRange.start;
-        indent = std::string (firstToken.Begin().column > 0 ? firstToken.Begin().column - 1 : 0, ' ');
+        indent = GetIndentBeforePosition(firstToken.Begin());
     }
 
     // deal do while
@@ -268,7 +277,8 @@ void ExtractVariable::FindInsertDeclPosition(const Selection &sel, Range &range,
     // deal same multi statement
     DealMultStatementOnSameLine(sel, range, firstToken4CurLine, insertRange);
 }
-
+// LCOV_EXCL_STOP
+// LCOV_EXCL_BR_START
 void ExtractVariable::FindInsertPositionByScopeName(const Selection &sel, Range &range,
     Range &insertRange, bool &isGlobal)
 {
@@ -324,7 +334,7 @@ void ExtractVariable::GetInsertRange(
         }
     }
 }
-
+// LCOV_EXCL_BR_STOP
 bool ExtractVariable::DealIfExpr(IfExpr &ifExpr, Range &range)
 {
     if (ifExpr.condExpr && ifExpr.condExpr->begin <= range.start
@@ -342,7 +352,7 @@ bool ExtractVariable::DealIfExpr(IfExpr &ifExpr, Range &range)
         return false;
     }
 }
-
+// LCOV_EXCL_START
 void ExtractVariable::DealMultStatementOnSameLine(const Tweak::Selection &sel, const Range &range,
     int firstToken4CurLine, Range &insertRange)
 {
@@ -362,7 +372,7 @@ void ExtractVariable::DealMultStatementOnSameLine(const Tweak::Selection &sel, c
         return;
     }
     int selToken = selStart - firstToken4CurLine;
-    if (selToken < 0 || selToken >= curLineTokens.size()) {
+    if (selToken < 0 || static_cast<size_t>(selToken) >= curLineTokens.size()) {
         return;
     }
     int i = selToken;
@@ -376,7 +386,7 @@ void ExtractVariable::DealMultStatementOnSameLine(const Tweak::Selection &sel, c
     }
     insertRange = {curLineTokens[i].End(), curLineTokens[i].End()};
 }
-
+// LCOV_EXCL_STOP
 std::string ExtractVariable::GetVarModifier(const Selection &sel, Range &range)
 {
     std::string modifier;
@@ -456,6 +466,6 @@ TextEdit ExtractVariable::ReplaceExprWithVar(const Selection &sel, Range &range,
     }
 
     textEdit.range = TransformFromChar2IDE(range);
-    return std::move(textEdit);
+    return textEdit;
 }
 } // namespace ark

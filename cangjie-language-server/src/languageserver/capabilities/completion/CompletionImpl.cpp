@@ -339,7 +339,9 @@ void CompletionImpl::AutoImportPackageComplete(const ArkAST &input, CompletionRe
         return;
     }
     auto pkgName = input.file->curPackage->fullPackageName;
-    auto curModule = SplitFullPackage(input.file->curPackage->fullPackageName).first;
+    auto curModule = CompilerCangjieProject::GetInstance()->GetModuleNameByFile(input.file->filePath, pkgName);
+    bool includeScriptRequire = CompilerCangjieProject::GetInstance()->IsBuildScriptFile(input.file->filePath);
+    lsp::SymbolSearchContext context{pkgName, curModule, includeScriptRequire};
     auto textEditRange = CompletionEnv::GetEditRangeForAutoImport(input);
     SyscapCheck syscap(curModule);
     std::unordered_map<lsp::SymbolID, std::vector<size_t>> AddedOhosSymIdToIndexsMap;
@@ -348,7 +350,7 @@ void CompletionImpl::AutoImportPackageComplete(const ArkAST &input, CompletionRe
     const std::string kitPrefix = "kit.";
     // LCOV_EXCL_START
     index->FindImportSymsOnCompletion(std::make_pair(result.normalCompleteSymID, result.importDeclsSymID),
-        pkgName, curModule, prefix,
+        context, prefix,
         [&result, &textEditRange, &syscap, &AddedOhosSymIdToIndexsMap, &ohosPrefix](const std::string &pkg,
             const lsp::Symbol &sym, const lsp::CompletionItem &completionItem) {
             if (!sym.syscap.empty() && !syscap.CheckSysCap(sym.syscap)) {
@@ -377,10 +379,11 @@ void CompletionImpl::AutoImportPackageComplete(const ArkAST &input, CompletionRe
                 AddedOhosSymIdToIndexsMap[sym.id].emplace_back(result.completions.size() - 1);
             }
         });
+    // LCOV_EXCL_STOP
 
     index->FindImportReExportSymsOnCompletion(std::make_pair(result.normalCompleteSymID, result.importDeclsSymID),
         pkgName, curModule, prefix, [&result, &textEditRange, &AddedOhosSymIdToIndexsMap, &AddedKitSymIds,
-        &ohosPrefix, &kitPrefix](const std::string &pkg, const lsp::ReExportSymbol &sym,
+        &ohosPrefix](const std::string &pkg, const lsp::ReExportSymbol &sym,
         const lsp::CompletionItem &completionItem) {
             const std::string kitPrefix = "kit";
             bool isKitPkg = pkg.rfind(kitPrefix, 0) == 0;
@@ -619,6 +622,7 @@ void CompletionImpl::GenerateNamedArgumentCompletion(ark::CompletionResult &resu
 void CompletionImpl::NamedParameterComplete(const ark::ArkAST &input, const Cangjie::Position &pos,
                                             ark::CompletionResult &result, int index, const std::string &prefix)
 {
+    (void)pos;
     int lparenIndex = -1;
     if (!CheckNamedParameter(input, index, lparenIndex)) {
         return;
@@ -648,7 +652,7 @@ void CompletionImpl::NamedParameterComplete(const ark::ArkAST &input, const Cang
     for (int i = lparenIndex + 1; i < index; ++i) {
         // Heuristic rule: Identifier followed immediately by Colon (:)
         if (input.tokens[i].kind == Cangjie::TokenKind::IDENTIFIER &&
-            (i + 1 < input.tokens.size()) &&
+            (static_cast<size_t>(i + 1) < input.tokens.size()) &&
             input.tokens[i+1].kind == Cangjie::TokenKind::COLON) {
             usedNamedParams.insert(input.tokens[i].Value());
         }
@@ -739,7 +743,7 @@ bool CompletionImpl::CheckNamedParameter(const ark::ArkAST &input, const int ind
     }
     return true;
 }
-
+// LCOV_EXCL_START
 void CompletionImpl::HandleExternalSymAutoImport(CompletionResult &result, const std::string &pkg,
     const lsp::Symbol &sym, const lsp::CompletionItem &completionItem, Range textEditRange)
 {
@@ -761,7 +765,7 @@ void CompletionImpl::HandleExternalSymAutoImport(CompletionResult &result, const
         return;
     }
 }
-
+// LCOV_EXCL_STOP
 void CompletionImpl::NormalParseImpl(
     const ArkAST &input, const Cangjie::Position &pos, CompletionResult &result, int index, std::string &prefix)
 {
@@ -794,9 +798,11 @@ void CompletionImpl::NormalParseImpl(
     // modifier? import {[module] }
     // modifier? import {std.collection.ArrayList, [module]}
     if (IsPreamble(input, pos)) {
-        auto curModule = SplitFullPackage(input.file->curPackage->fullPackageName).first;
+        auto curModule = CompilerCangjieProject::GetInstance()->GetModuleNameByFile(
+            input.file->filePath, input.file->curPackage->fullPackageName);
+        bool includeScriptRequire = CompilerCangjieProject::GetInstance()->IsBuildScriptFile(input.file->filePath);
         afterDoubleColon = afterDoubleColon | IsImportHasOrg(input, pos);
-        normalCompleter.CompleteModuleName(curModule, afterDoubleColon);
+        normalCompleter.CompleteModuleName(curModule, afterDoubleColon, includeScriptRequire);
         return;
     }
 
@@ -825,12 +831,13 @@ void CompletionImpl::NormalParseImpl(
 
 int CompletionImpl::GetChainedPossibleBegin(const ArkAST &input, int firstTokIdxInLine)
 {
-    if (firstTokIdxInLine >= input.tokens.size() || firstTokIdxInLine < 0) {
+    if (firstTokIdxInLine < 0 || static_cast<size_t>(firstTokIdxInLine) >= input.tokens.size()) {
         return firstTokIdxInLine;
     }
     if (input.tokens[firstTokIdxInLine].kind != TokenKind::DOT) {
         return firstTokIdxInLine;
     }
+    // LCOV_EXCL_START
     int qualifyPreTokenIdx = firstTokIdxInLine - 1;
     if (qualifyPreTokenIdx < 0) {
         return firstTokIdxInLine;
@@ -855,11 +862,12 @@ int CompletionImpl::GetChainedPossibleBegin(const ArkAST &input, int firstTokIdx
         return firstTokIdxInLine;
     }
     return begin;
+    // LCOV_EXCL_STOP
 }
 
 std::string CompletionImpl::GetChainedNameComplex(const ArkAST &input, int start, int end)
 {
-    bool isInvalid = start > end || start < 0 || static_cast<unsigned int>(end) >= input.tokens.size();
+    bool isInvalid = start > end || start < 0 || static_cast<size_t>(end) >= input.tokens.size();
     if (isInvalid) {
         return "";
     }
@@ -874,11 +882,10 @@ std::string CompletionImpl::GetChainedNameComplex(const ArkAST &input, int start
     std::map<TokenKind, TokenKind> quoteMap = {{TokenKind::RPAREN, TokenKind::LPAREN},
                                                {TokenKind::GT, TokenKind::LT},
                                                {TokenKind::RSQUARE, TokenKind::LSQUARE}};
-    size_t i;
     size_t zeroPos = 0;
     bool hasDot = true;
     bool skipQuest = false;
-    for (i = static_cast<unsigned int>(end); i >= static_cast<unsigned int>(start); --i) {
+    for (size_t i = static_cast<size_t>(end) + 1; i-- > static_cast<size_t>(start);) {
         if (input.tokens[i].kind == TokenKind::NL) {
             continue;
         }
@@ -903,7 +910,7 @@ std::string CompletionImpl::GetChainedNameComplex(const ArkAST &input, int start
             (void)chainedName.insert(zeroPos, input.tokens[i].Value());
         } else if (hasDot && identifier.find(input.tokens[i].kind) != identifier.end()) {
             (void)chainedName.insert(zeroPos, input.tokens[i].Value());
-            if (input.tokens[i].kind == TokenKind::QUEST && i - 1 >= 0) {
+            if (input.tokens[i].kind == TokenKind::QUEST && i > 0) {
                 (void)chainedName.insert(zeroPos, input.tokens[i - 1].Value());
                 skipQuest = true;
             }

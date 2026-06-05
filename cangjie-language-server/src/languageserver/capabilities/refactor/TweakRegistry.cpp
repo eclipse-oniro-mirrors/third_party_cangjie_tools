@@ -10,13 +10,13 @@
 #include "../../logger/Logger.h"
 #include "Tweak.h"
 #include "tweaks/ExtractFunction.h"
+#include "tweaks/IntroduceField.h"
+#include "tweaks/IntroduceParameter.h"
 #include "tweaks/ExtractVariable.h"
 #include "tweaks/IntroduceConstant.h"
 #include "tweaks/InlineFunction.h"
 #include "tweaks/InlineVariable.h"
 #include "tweaks/ExtractInterface.h"
-#include "tweaks/IntroduceField.h"
-#include "tweaks/IntroduceParameter.h"
 
 namespace ark {
 #define REGISTER_TWEAK(TweakClass) \
@@ -54,8 +54,8 @@ std::vector<std::string>& TweakRegistry::GetRegisteredIds()
 
 void TweakRegistry::RegisterTweak(const std::string &id, TweakRegistry::Creator creator)
 {
-    auto [_, inserted] = GetRegistry().emplace(id, std::move(creator));
-    if (inserted) {
+    auto insertResult = GetRegistry().emplace(id, std::move(creator));
+    if (insertResult.second) {
         GetRegisteredIds().push_back(id);
     }
 }

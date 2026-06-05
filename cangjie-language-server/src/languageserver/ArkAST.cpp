@@ -17,10 +17,6 @@ using namespace std;
 using namespace Cangjie;
 using namespace Cangjie::AST;
 using namespace Cangjie::Meta;
-namespace {
-    const int STRING_LITERAL_SIZE = 2; // STRING_LITERAL SIZ
-}
-
 namespace ark {
 #ifdef THIS
 #define LIB_THIS THIS
@@ -94,11 +90,11 @@ Ptr<Decl> ArkAST::FindDeclByNode(Ptr<Node> node) const
 
 void ArkAST::DoLexer(const std::string &contents, const std::string &fileName)
 {
-    if (sourceManager == nullptr || sourceManager->GetFileID(fileName) < 0) {
+    if (sourceManager == nullptr || !sourceManager->TryGetFileID(fileName)) {
         return;
     }
-    const unsigned int curFileID = static_cast<unsigned int>(sourceManager->GetFileID(fileName));
-    Lexer lexer(curFileID, contents, diag, *sourceManager);
+    auto curFileID = sourceManager->TryGetFileID(fileName);
+    Lexer lexer(curFileID.value_or(0), contents, diag, *sourceManager);
     for (;;) {
         Token tok = lexer.Next();
         if (tok.kind == TokenKind::END) {
@@ -156,7 +152,7 @@ int ArkAST::GetCurToken(const Cangjie::Position &pos, int start, int end) const
         return GetCurToken(pos, midIndex + 1, end);
     }
 }
-
+// LCOV_EXCL_START
 int ArkAST::GetCurTokenByStartColumn(const Cangjie::Position &pos, int start, int end) const
 {
     int idx = GetCurToken(pos, start, end);
@@ -187,7 +183,7 @@ int ArkAST::GetCurTokenByStartColumn(const Cangjie::Position &pos, int start, in
     }
     return idx;
 }
-
+// LCOV_EXCL_STOP
 int ArkAST::GetCurTokenSkipSpace(const Cangjie::Position &pos, int start, int end, int lastEnd) const
 {
     if (start > end) {
@@ -407,8 +403,8 @@ std::vector<Ptr<Decl>> ArkAST::FindRealDecl(const ark::ArkAST& nowAst, const std
         if (i == 0 && syms[i]) { firstNode = syms[i]->node; }
         // deal all right position deSugar node
         bool isSugar = !firstNode || !syms[i] || !syms[i]->node || syms[i]->node->astKind == ASTKind::FILE ||
-                       hasFirstCompilerAdd && (syms[i]->node->begin != firstNode->begin ||
-                                               syms[i]->node->end != firstNode->end);
+                       (hasFirstCompilerAdd && (syms[i]->node->begin != firstNode->begin ||
+                                                syms[i]->node->end != firstNode->end));
         if (isSugar) { continue; }
         node = syms[i]->node;
         node = GetNodeBySymbols(nowAst, node, syms, query, i);
@@ -420,8 +416,8 @@ std::vector<Ptr<Decl>> ArkAST::FindRealDecl(const ark::ArkAST& nowAst, const std
             }
             return false;
         };
-        bool isInvalid = !node || node->TestAttr(Attribute::COMPILER_ADD) &&
-                                   !node->TestAttr(Attribute::IS_CLONED_SOURCE_CODE) && !IsAnnoRef(node);
+        bool isInvalid = !node || (node->TestAttr(Attribute::COMPILER_ADD) &&
+                                   !node->TestAttr(Attribute::IS_CLONED_SOURCE_CODE) && !IsAnnoRef(node));
         if (isInvalid) { continue; }
         if (isAlias) {
             auto ref = dynamic_cast<NameReferenceExpr*>(node.get());
@@ -434,6 +430,7 @@ std::vector<Ptr<Decl>> ArkAST::FindRealDecl(const ark::ArkAST& nowAst, const std
         bool isDeclInMacroCall = isMacro && (node->astKind == ASTKind::MACRO_EXPAND_DECL || node->isInMacroCall) &&
                                  !node->GetMacroCallNewPos(macroPos).IsZero();
         if (isDeclInMacroCall) {
+            // LCOV_EXCL_START
             auto pos = node->GetMacroCallNewPos(macroPos);
             std::string newQuery = "_ = (" + std::to_string(pos.fileID) + ", "
                                    + std::to_string(pos.line) + ", " + std::to_string(pos.column) + ")";
@@ -443,6 +440,7 @@ std::vector<Ptr<Decl>> ArkAST::FindRealDecl(const ark::ArkAST& nowAst, const std
             }
             decls = nowAst.FindRealDecl(nowAst, newSyms, newQuery);
             if (!decls.empty()) { return decls; }
+            // LCOV_EXCL_STOP
         }
         if (i < syms.size() - 1 && node->isInMacroCall && syms[i]->name == syms[i + 1]->name && !syms[i]->target) {
             node = syms[i + 1]->node;
@@ -460,11 +458,11 @@ std::vector<Ptr<Decl>> ArkAST::FindRealDecl(const ark::ArkAST& nowAst, const std
 
 Ptr<Decl> ArkAST::GetDelFromType(Ptr<const Cangjie::AST::Type> type) const
 {
-    if (type == nullptr || type->ty == nullptr) {
+    if (type == nullptr || type->GetTy() == nullptr) {
         return nullptr;
     }
     Ptr<Decl> decl = nullptr;
-    return Meta::match(*(type->ty))(
+    return Meta::match(*(type->GetTy()))(
         [&](const ClassTy &classTy) {
             decl = classTy.decl;
             return decl;

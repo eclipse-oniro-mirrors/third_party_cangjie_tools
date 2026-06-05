@@ -7,8 +7,8 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "PositionResolver.h"
-#include <codecvt>
 #include "../CompilerCangjieProject.h"
+#include "cangjie/Utils/Unicode.h"
 
 namespace ark {
 bool IsUTF8(const std::string &str)
@@ -47,19 +47,58 @@ bool IsUTF8(const std::string &str)
 
 std::basic_string<char32_t> UTF8ToChar32(const std::string &str)
 {
-    try {
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return conv.from_bytes(str);
-    } catch (const std::exception& e) {
-        // deal with illegal utf-8 string
+    if (str.empty()) {
         return std::u32string();
     }
+    std::vector<Unicode::UTF32> utf32(str.size());
+    const auto *sourceStart = reinterpret_cast<const Unicode::UTF8 *>(str.data());
+    const auto *sourceEnd = sourceStart + str.size();
+    auto *targetStart = utf32.data();
+    auto *targetEnd = targetStart + utf32.size();
+    auto result = Unicode::ConvertUTF8toUTF32(&sourceStart, sourceEnd, &targetStart, targetEnd);
+    if (result != Unicode::ConversionResult::OK) {
+        return std::u32string();
+    }
+    std::u32string char32Str;
+    char32Str.reserve(static_cast<size_t>(targetStart - utf32.data()));
+    for (auto *it = utf32.data(); it < targetStart; ++it) {
+        char32Str.push_back(static_cast<char32_t>(*it));
+    }
+    return char32Str;
 }
 
 std::string Char32ToUTF8(const std::basic_string<char32_t>& str)
 {
-    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-    return conv.to_bytes(str);
+    std::vector<Unicode::UTF32> utf32;
+    utf32.reserve(str.size());
+    for (auto ch : str) {
+        utf32.push_back(ch);
+    }
+    std::string result;
+    if (!Cangjie::Unicode::ConvertUTF32ToUTF8String(Unicode::ArrayRef(utf32),
+        result)) {
+        return "";
+        }
+    return result;
+}
+
+static int GetUTF8PrefixBytesByColumns(const std::string &str, int columns)
+{
+    if (columns <= 0) {
+        return 0;
+    }
+    int bytes = 0;
+    int consumedColumns = 0;
+    for (const auto ch : UTF8ToChar32(str)) {
+        std::string curChar = Char32ToUTF8(std::u32string{ch});
+        int charColumns = CountUnicodeCharacters(curChar);
+        if (consumedColumns + charColumns > columns) {
+            break;
+        }
+        bytes += static_cast<int>(curChar.size());
+        consumedColumns += charColumns;
+    }
+    return bytes;
 }
 
 int GetFirstTokenOnCurLine(const std::vector<Cangjie::Token> &tokens, int declLine)
@@ -263,23 +302,20 @@ void PositionIDEToUTF8(const std::vector<Cangjie::Token> &tokens, Cangjie::Posit
         if (!IsUTF8(tokens[begin].Value())) {
             break;
         }
-        if (tokens[begin].Begin().column - redundantCharacters > pos.column) {
-            if (begin - 1 >= 0 &&
-                tokens[begin - 1].Begin().column + static_cast<int>(tokens[begin - 1].Value().size()) >
-                pos.column + redundantCharacters) {
-                // token end > trigger pos, the trigger position in on the [begin - 1] token
-                auto offset = static_cast<int>(static_cast<int>(tokens[begin - 1].Value().size()) -
-                                               CountUnicodeCharacters(tokens[begin - 1].Value()));
-                auto validStr = tokens[begin - 1].Value().substr(0,  pos.column - tokens[begin - 1].Begin().column +
-                                                                      redundantCharacters);
-                redundantCharacters = redundantCharacters - offset +
-                                      static_cast<int>(
-                                          static_cast<int>(validStr.size()) - CountUnicodeCharacters(validStr));
-            }
+        int tokenBeginColumn = tokens[begin].Begin().column - redundantCharacters;
+        int tokenColumns = CountUnicodeCharacters(tokens[begin].Value());
+        if (tokenBeginColumn > pos.column) {
+            break;
+        }
+        if (!IsMultiLine(tokens[begin]) && tokens[begin].Begin().line == pos.line &&
+            pos.column <= tokenBeginColumn + tokenColumns) {
+            int prefixColumns = pos.column - tokenBeginColumn;
+            int prefixBytes = GetUTF8PrefixBytesByColumns(tokens[begin].Value(), prefixColumns);
+            redundantCharacters += prefixBytes - prefixColumns;
             break;
         }
         auto offset = static_cast<int>(static_cast<int>(tokens[begin].Value().size()) -
-                                       CountUnicodeCharacters(tokens[begin].Value()));
+                                       tokenColumns);
         redundantCharacters += offset;
         begin++;
     }

@@ -6,21 +6,22 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
-#include "IntroduceField.h"
-#include "../../../common/Utils.h"
-#include "../TweakRule.h"
-#include "../TweakUtils.h"
 #include <algorithm>
 #include <cctype>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
 #include <cangjie/AST/Walker.h>
+#include "../../../common/Utils.h"
+#include "../TweakRule.h"
+#include "../TweakUtils.h"
+#include "IntroduceField.h"
 
 namespace ark {
 const std::unordered_set<Cangjie::AST::ASTKind> CANNOT_INTRODUCE_FIELD_EXPR = {
     ASTKind::BLOCK, ASTKind::STR_INTERPOLATION_EXPR, ASTKind::INTERPOLATION_EXPR
 };
+constexpr int BLANK_LINE_NEWLINE_COUNT = 2;
 
 static bool CanUseAsFieldInitializer(const Tweak::Selection &sel, Cangjie::AST::FuncDecl &funcDecl)
 {
@@ -527,7 +528,7 @@ static bool HasBlankLineAfterOwnerLeftCurl(const Tweak::Selection &sel,
         return false;
     }
     std::string gap = sel.arkAst->sourceManager->GetContentBetween(*leftCurlPos, insertRange.start);
-    return std::count(gap.begin(), gap.end(), '\n') >= 2;
+    return std::count(gap.begin(), gap.end(), '\n') >= BLANK_LINE_NEWLINE_COUNT;
 }
 
 static std::string GetMemberFieldPrefix(const Range &insertRange,

@@ -7,8 +7,6 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "CallHierarchyImpl.h"
-#include <map>
-#include <string>
 
 using namespace std;
 using namespace Cangjie;
@@ -49,8 +47,14 @@ CallHierarchyItem DeclToCallHierarchyItem(Ptr<const Decl> decl)
             result.name += funcParamsTypeName[i];
         }
         result.name += ")";
-        bool hasRetType = funcDecl->funcBody && funcDecl->funcBody->retType && funcDecl->funcBody->retType->ty;
-        result.name += hasRetType ? " : " + GetString(*funcDecl->funcBody->retType->ty) : "";
+        bool hasRetType = funcDecl->funcBody && funcDecl->funcBody->retType && funcDecl->funcBody->retType->GetTy();
+        result.name += hasRetType ? " : " : "";
+
+        std::string retType = ItemResolverUtil::ResolveTypeSignature(*funcDecl->funcBody->retType);
+        if (retType.empty()) {
+            retType = GetString(*funcDecl->funcBody->retType->GetTy());
+        }
+        result.name += retType;
     }
     if (varDecl) {
         result.name += GetVarDeclType(varDecl);
@@ -79,12 +83,12 @@ void DealAnonymousConstructorRange(Range& range, const lsp::Symbol&containerSym)
     if (!containerSym.location.IsZeroLoc() || containerSym.name != "init") {
         return;
     }
- 
+
     auto index = CompilerCangjieProject::GetInstance()->GetIndex();
     if (!index) {
         return;
     }
-    
+
     lsp::SymbolID outerId = 0;
     index->Relations({containerSym.id, lsp::RelationKind::CONTAINED_BY},
                     [&outerId](const lsp::Relation& rel) {
