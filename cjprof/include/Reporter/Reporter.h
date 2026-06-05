@@ -9,8 +9,9 @@
 #ifndef REPORTER_H
 #define REPORTER_H
 
-#include <vector>
+#include <cstdint>
 #include <string>
+#include <vector>
 
 class Reporter {
 public:

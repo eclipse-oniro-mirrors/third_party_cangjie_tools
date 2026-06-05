@@ -23,7 +23,6 @@ import std.collection.{ HashMap }
     }*/
 
 public class MessagePackage {
-    
     protected MessagePackage(var arkts_object: JSObject) { }
     
     
@@ -42,11 +41,11 @@ public class MessagePackage {
     }
     
     
-    func toJSValue(context: JSContext): JSValue {
+    func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): MessagePackage {
+    static func fromJSValue(_: JSContext, input: JSValue): MessagePackage {
         MessagePackage(input.asObject())
     }
 }
@@ -56,7 +55,6 @@ public class MessagePackage {
     }*/
 
 public class PushReporter {
-    
     protected PushReporter(var arkts_object: JSObject) { }
     
     
@@ -71,11 +69,11 @@ public class PushReporter {
             }).toJSValue()] })
     }
     
-    func toJSValue(context: JSContext): JSValue {
+    func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): PushReporter {
+    static func fromJSValue(_: JSContext, input: JSValue): PushReporter {
         PushReporter(input.asObject())
     }
 }

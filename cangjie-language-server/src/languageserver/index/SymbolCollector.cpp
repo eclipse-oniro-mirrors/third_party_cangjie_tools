@@ -24,9 +24,11 @@ using namespace Cangjie;
 using namespace AST;
 Ptr<Decl> GetRealDecl(Ptr<Decl> decl)
 {
+    // LCOV_EXCL_START
     if (auto fd = DynamicCast<FuncDecl *>(decl); fd && fd->propDecl) {
         return fd->propDecl;
     }
+    // LCOV_EXCL_STOP
     return decl;
 }
 
@@ -37,8 +39,8 @@ TypeSubst GenerateTypeMapping(Ptr<const Generic> generic, const std::vector<Ptr<
         return mapping;
     }
     for (size_t i = 0; i < typeArgs.size(); ++i) {
-        if (Ty::IsTyCorrect(generic->typeParameters[i]->ty) && Ty::IsTyCorrect(typeArgs[i])) {
-            if (auto genParam = DynamicCast<GenericsTy*>(generic->typeParameters[i]->ty)) {
+        if (Ty::IsTyCorrect(generic->typeParameters[i]->GetTy()) && Ty::IsTyCorrect(typeArgs[i])) {
+            if (auto genParam = DynamicCast<GenericsTy*>(generic->typeParameters[i]->GetTy())) {
                 mapping[genParam] = typeArgs[i];
             }
         }
@@ -191,7 +193,7 @@ bool IsExportExtendSuper(Ptr<ClassLikeDecl> decl)
 
 bool CheckExtendExported(const ExtendDecl* decl)
 {
-    auto extendedDecl = Ty::GetDeclPtrOfTy<InheritableDecl>(decl->ty);
+    auto extendedDecl = Ty::GetDeclPtrOfTy<InheritableDecl>(decl->GetTy());
     bool isInSamePkg = extendedDecl && extendedDecl->fullPackageName == decl->fullPackageName;
     auto isUpperBoundExport = [decl]() {
         bool isUpperboundAllExported = true;
@@ -391,7 +393,7 @@ VisitAction SymbolCollector::CollectPreAction(Ptr<Node> node, const std::string&
     if (auto invocation = node->GetConstInvocation()) {
         CreateMacroRef(*node, *invocation);
     }
-    if (!Ty::IsTyCorrect(node->ty)) {
+    if (!Ty::IsTyCorrect(node->GetTy())) {
         if (!ShouldPassInCjdIndexing(node)) {
             return VisitAction::WALK_CHILDREN;
         }
@@ -445,7 +447,8 @@ void SymbolCollector::CreateBaseSymbol(const Decl &decl, const std::string &file
     }
     CJC_ASSERT(!scopes.empty());
     std::string curScope;
-    for (auto [_, scope] : scopes) {
+    for (const auto &scopeEntry : scopes) {
+        const auto &scope = scopeEntry.second;
         curScope += scope;
     }
     curScope.pop_back(); // Pop back last delimiter char.
@@ -574,6 +577,7 @@ void SymbolCollector::CreateCrossSymbolByInterop(const Decl &decl)
         const auto invocation = member->GetConstInvocation();
         bool isInvisible = false;
         auto realDecl = &invocation->decl;
+        // LCOV_EXCL_START
         while (realDecl && realDecl->get()->astKind == ASTKind::MACRO_EXPAND_DECL
             && realDecl->get()->GetConstInvocation()) {
             // realDecl is macro expand node, check its name, invocation and attr
@@ -588,6 +592,7 @@ void SymbolCollector::CreateCrossSymbolByInterop(const Decl &decl)
             // get next decl for realDecl
             realDecl = &realDecl->get()->GetConstInvocation()->decl;
         }
+        // LCOV_EXCL_STOP
         if (isInvisible || !realDecl) {
             continue;
         }
@@ -615,7 +620,7 @@ void SymbolCollector::CreateCrossSymbolByRegister(const NameReferenceExpr &ref, 
     }
     const auto &registerIdentify = callExpr->args.at(0);
     const auto &registerTarget = callExpr->args.at(1);
-    bool isInvalidRegister = !registerIdentify || !registerTarget || !registerTarget->ty || !registerTarget->expr;
+    bool isInvalidRegister = !registerIdentify || !registerTarget || !registerTarget->GetTy() || !registerTarget->expr;
     if (isInvalidRegister) {
         return;
     }
@@ -724,7 +729,6 @@ void SymbolCollector::DealRegisterClass(const FuncArg &registerIdentify, const F
             crossSym.name = remove_quotes(registerIdentify.ToString());
             crossSym.crossType = CrossType::ARK_TS_WITH_REGISTER;
             crossSym.location = {registerTarget.begin, registerTarget.begin + 1, registerTarget.curFile->filePath};
-            crossSym.declaration = {registerIdentify.begin, registerIdentify.end, registerTarget.curFile->filePath};
             (void) crsSymsMap.emplace_back(crossSym);
             UpdateCrossScope(*lambdaExpr->funcBody->body, CrossRegisterType::CLASS_REGISTER,
                 registerIdentify.ToString());
@@ -734,7 +738,7 @@ void SymbolCollector::DealRegisterClass(const FuncArg &registerIdentify, const F
 void SymbolCollector::DealRegisterFunc(const FuncArg &registerIdentify, const FuncArg &registerTarget)
 {
     // public static func registerFunc(name: String, lambda: JSLambda): Unit
-    if (registerTarget.ty->String() == JS_LAMBDA_TY) {
+    if (registerTarget.GetTy()->String() == JS_LAMBDA_TY) {
         if (registerTarget.expr->astKind == ASTKind::LAMBDA_EXPR) {
             CrossSymbol crossSym;
             crossSym.id = INVALID_SYMBOL_ID;
@@ -765,7 +769,7 @@ void SymbolCollector::DealRegisterFunc(const FuncArg &registerIdentify, const Fu
             return;
         }
     }
-    if (registerTarget.ty->String() != FUNC_REGISTER_TY) {
+    if (registerTarget.GetTy()->String() != FUNC_REGISTER_TY) {
         return;
     }
     // public static func registerFunc(name: String, register: FuncRegister): Unit
@@ -1111,7 +1115,7 @@ void SymbolCollector::DealCrossClassSymbol(const NameReferenceExpr &clazzRef, co
     // registerClass clazz in func, this func used to ref_expr
     Ptr<const Decl> decl;
     if (!scopes.empty()) {
-        for (size_t i = scopes.size() - 1; i >= 0; i--) {
+        for (size_t i = scopes.size(); i-- > 0;) {
             decl = DynamicCast<const Decl*>(scopes[i].first);
             if (decl && decl->astKind == ASTKind::VAR_DECL) {
                 continue;
@@ -1120,7 +1124,7 @@ void SymbolCollector::DealCrossClassSymbol(const NameReferenceExpr &clazzRef, co
             break;
         }
     }
-    if (!decl || !decl->curFile || !decl->ty) {
+    if (!decl || !decl->curFile || !decl->GetTy()) {
         return;
     }
     DealClassSymbolInFunc(*decl, clazzRef, identifier);
@@ -1238,6 +1242,7 @@ struct ExtendInfo {
 
 void SymbolCollector::CreateExtend(const Decl &decl, const std::string &filePath)
 {
+    (void)filePath;
     auto extendDecl = DynamicCast<ExtendDecl *>(&decl);
     bool isInvalidExtend = !extendDecl || !IsExportedExtendDecl(extendDecl) || !extendDecl->extendedType ||
         extendDecl->inheritedTypes.empty();
@@ -1245,8 +1250,8 @@ void SymbolCollector::CreateExtend(const Decl &decl, const std::string &filePath
         return;
     }
     auto target = GetRealTarget(extendDecl->extendedType->GetTarget());
-    bool validTargetOrPrimaryTy = (!target || (target->ty && target->ty->HasGeneric())) &&
-                                  !extendDecl->extendedType->ty->IsPrimitive();
+    bool validTargetOrPrimaryTy = (!target || (target->GetTy() && target->GetTy()->HasGeneric())) &&
+                                  !extendDecl->extendedType->GetTy()->IsPrimitive();
     if (validTargetOrPrimaryTy) {
         return;
     }
@@ -1254,21 +1259,21 @@ void SymbolCollector::CreateExtend(const Decl &decl, const std::string &filePath
     if (target) {
         symbolID = GetDeclSymbolID(*target);
     } else {
-        symbolID = GetPrimaryTypeSymbolId(extendDecl->extendedType->ty);
+        symbolID = GetPrimaryTypeSymbolId(extendDecl->extendedType->GetTy());
     }
     auto fullPackageName = extendDecl->fullPackageName;
     std::vector<ExtendInfo> extendVec;
     std::map<std::string, ExtendInfo> extendInfoMap;
     for (auto &member : extendDecl->members) {
         bool skip = IsHiddenDecl(member) || !member->IsExportedDecl() || member->TestAttr(Attribute::OPERATOR);
-        if (skip) {
+        if ( skip ) {
             continue;
         }
         std::string signature = ItemResolverUtil::ResolveSignatureByNode(*member);
-        auto modifier = GetDeclModifier(*member);
         auto extendSymbolID = GetDeclSymbolID(*member);
         bool isStatic = member->TestAttr(Attribute::STATIC);
-        ExtendInfo info = {.id=extendSymbolID, .name=signature, .isStatic=isStatic};
+        ExtendInfo info = {.id = extendSymbolID, .name = signature, .isStatic = isStatic,
+                           .modifier = {}, .interfaceName = ""};
         extendVec.emplace_back(info);
         extendInfoMap.insert_or_assign(signature, extendVec.back());
     }
@@ -1309,7 +1314,6 @@ void SymbolCollector::CreateExtend(const Decl &decl, const std::string &filePath
             return;
         }
         auto interfaceModifier = GetDeclModifier(*targetDecl);
-        auto extendSymbolID = GetDeclSymbolID(*targetDecl);
         std::vector<Ptr<Decl>> members;
         collectInheritMember(*targetDecl, members);
         std::string interfaceName = ItemResolverUtil::ResolveSignatureByNode(*targetDecl);
@@ -1442,7 +1446,8 @@ void SymbolCollector::CreateImportRef(const File &fileNode)
             return;
         }
         const auto id2members = this->importMgr.GetPackageMembers(srcPkgName, targetPkg->fullPackageName);
-        for (const auto &[_, memberDecls] : id2members) {
+        for (const auto &id2member : id2members) {
+            const auto &memberDecls = id2member.second;
             for (const auto& memberDecl: memberDecls) {
                 if (const auto declPtr = dynamic_cast<const Decl *>(memberDecl.get());
                     declPtr == nullptr || (!isAllImport && declPtr->identifier != importContent.identifier)) {
@@ -1542,6 +1547,8 @@ void SymbolCollector::CreateReExportSymbolFromSingleImport(const File &file,
     if (addedReExportSymbols.count({identifier, id})) {
         return;
     }
+    auto rawId = refDecl->identifier;
+    refDecl->identifier = identifier;
     ReExportSymbol reExportSym;
     reExportSym.id = id;
     reExportSym.name = identifier;
@@ -1551,6 +1558,7 @@ void SymbolCollector::CreateReExportSymbolFromSingleImport(const File &file,
     CollectReExportCompletionItem(*refDecl, reExportSym);
     reExportSymsMap.emplace_back(reExportSym);
     addedReExportSymbols.insert({identifier, id});
+    refDecl->identifier = rawId;
 }
 
 void SymbolCollector::CreateReExportSymbolFromAliasImport(const File &file,
@@ -1627,6 +1635,8 @@ void SymbolCollector::CreateReExportSymbolFromAllImport(const File &file,
             if (addedReExportSymbols.count({identifier, id})) {
                 continue;
             }
+            auto rawId = decl->identifier;
+            decl->identifier = identifier;
             ReExportSymbol reExportSym;
             reExportSym.id = id;
             reExportSym.name = identifier;
@@ -1636,6 +1646,7 @@ void SymbolCollector::CreateReExportSymbolFromAllImport(const File &file,
             CollectReExportCompletionItem(*decl, reExportSym);
             reExportSymsMap.emplace_back(reExportSym);
             addedReExportSymbols.insert({identifier, id});
+            decl->identifier = rawId;
             break;
         }
     }
@@ -1720,11 +1731,11 @@ void SymbolCollector::CreateMacroRef(const Node &node, const MacroInvocation &in
     if (!node.curFile) {
         return;
     }
-    auto begin = invocation.identifierPos;
+    auto begin = invocation.macroCallDiagInfo.identifierPos;
     if (!invocation.fullNameDotPos.empty()) {
         begin = invocation.fullNameDotPos.back() + 1;
     }
-    auto end = begin + CountUnicodeCharacters(invocation.identifier);
+    auto end = begin + CountUnicodeCharacters(invocation.macroCallDiagInfo.identifier);
     SymbolLocation loc{begin, end, node.curFile->filePath};
     Ref refInfo{.location = loc, .kind = RefKind::REFERENCE, .container = GetContextID()};
     (void)symbolRefMap[GetDeclSymbolID(*invocation.target)].emplace_back(refInfo);
@@ -1780,8 +1791,8 @@ void SymbolCollector::CollectRelations(
 {
     for (auto &id : inheritableDecls) {
         for (auto &type : id->inheritedTypes) {
-            auto decl = Ty::GetDeclPtrOfTy(type->ty);
-            if (decl == nullptr || type->ty->IsObject()) { // Ignore core object.
+            auto decl = Ty::GetDeclPtrOfTy(type->GetTy());
+            if (decl == nullptr || type->GetTy()->IsObject()) { // Ignore core object.
                 continue;
             }
             auto subject = GetDeclSymbolID(*decl);
@@ -1789,8 +1800,8 @@ void SymbolCollector::CollectRelations(
             auto object = GetDeclSymbolID(*id);
             if (auto ed = DynamicCast<const ExtendDecl *>(id.get())) {
                 predicate = RelationKind::EXTEND;
-                auto beingExtendDecl = Ty::GetDeclPtrOfTy(ed->extendedType->ty);
-                if (beingExtendDecl == nullptr || ed->extendedType->ty->IsObject()) { // Ignore core object.
+                auto beingExtendDecl = Ty::GetDeclPtrOfTy(ed->extendedType->GetTy());
+                if (beingExtendDecl == nullptr || ed->extendedType->GetTy()->IsObject()) { // Ignore core object.
                     continue;
                 }
                 object = GetDeclSymbolID(*beingExtendDecl);
@@ -1800,7 +1811,7 @@ void SymbolCollector::CollectRelations(
         }
 
         for (auto &member : id->GetMemberDecls()) {
-            if (!Ty::IsTyCorrect(member->ty)) {
+            if (!Ty::IsTyCorrect(member->GetTy())) {
                 continue;
             }
             (void)relations.emplace_back(Relation{.subject = GetDeclSymbolID(*member),
@@ -1846,12 +1857,12 @@ Ptr<Decl> SymbolCollector::FindOverriddenMember(const Decl &member, const Inheri
     Ptr<Decl> found = nullptr;
     for (auto &it : id.GetMemberDeclPtrs()) {
         CJC_NULLPTR_CHECK(it);
-        if (!Ty::IsTyCorrect(it->ty) || !satisfy(*it)) {
+        if (!Ty::IsTyCorrect(it->GetTy()) || !satisfy(*it)) {
             continue;
         }
-        auto memberTy = tyMgr.GetInstantiatedTy(it->ty, typeMapping);
+        auto memberTy = tyMgr.GetInstantiatedTy(it->GetTy(), typeMapping);
         if (member.astKind == ASTKind::PROP_DECL) {
-            if (memberTy == member.ty) {
+            if (memberTy == member.GetTy()) {
                 found = it;
             }
             break;
@@ -1864,7 +1875,7 @@ Ptr<Decl> SymbolCollector::FindOverriddenMember(const Decl &member, const Inheri
             memberTy = tyMgr.GetInstantiatedTy(memberTy, mapping);
         }
         if (tyMgr.IsFuncParameterTypesIdentical(*StaticCast<FuncTy *>(memberTy),
-                                                *StaticCast<FuncTy *>(member.ty))) {
+                                                *StaticCast<FuncTy *>(member.GetTy()))) {
             found = it;
             break;
         }
@@ -1886,12 +1897,12 @@ Ptr<Decl> SymbolCollector::FindOverriddenMemberFromSuperClass(const Decl &member
     while (current != nullptr) {
         Ptr<ClassDecl> sd = nullptr;
         for (auto &it : current->inheritedTypes) {
-            if (!Ty::IsTyCorrect(it->ty) || !it->ty->IsClass()) {
+            if (!Ty::IsTyCorrect(it->GetTy()) || !it->GetTy()->IsClass()) {
                 continue;
             }
-            sd = StaticCast<ClassDecl *>(Ty::GetDeclPtrOfTy(it->ty));
+            sd = StaticCast<ClassDecl *>(Ty::GetDeclPtrOfTy(it->GetTy()));
             CJC_NULLPTR_CHECK(sd); // When ty is class and correct, sd must be non-null.
-            typeMapping.merge(GenerateTypeMapping(sd->GetGeneric(), it->ty->typeArgs));
+            typeMapping.merge(GenerateTypeMapping(sd->GetGeneric(), it->GetTy()->typeArgs));
             if (auto parent = FindOverriddenMember(member, *sd, typeMapping, condition)) {
                 return parent;
             }
@@ -1915,18 +1926,18 @@ std::vector<Ptr<Decl>> SymbolCollector::FindImplMemberFromInterface(const Decl &
         auto [curDecl, mapping] = workList.front();
         workList.pop();
         for (auto &it : curDecl->inheritedTypes) {
-            if (!Ty::IsTyCorrect(it->ty)) {
+            if (!Ty::IsTyCorrect(it->GetTy())) {
                 continue;
             }
-            auto interfaceDecl = DynamicCast<InterfaceDecl *>(Ty::GetDeclPtrOfTy(it->ty));
+            auto interfaceDecl = DynamicCast<InterfaceDecl *>(Ty::GetDeclPtrOfTy(it->GetTy()));
             if (interfaceDecl == nullptr) {
                 continue;
             }
-            if (auto [_, success] = searched.emplace(interfaceDecl); !success) {
+            if (auto insertResult = searched.emplace(interfaceDecl); !insertResult.second) {
                 continue;
             }
             auto currentMapping =
-                GenerateTypeMapping(interfaceDecl->GetGeneric(), it->ty->typeArgs);
+                GenerateTypeMapping(interfaceDecl->GetGeneric(), it->GetTy()->typeArgs);
             currentMapping.insert(mapping.begin(), mapping.end());
             if (auto found =
                     FindOverriddenMember(member, *interfaceDecl, currentMapping, condition)) {

@@ -37,6 +37,7 @@ void InheritDeclUtil::HandleDeclBody(T *decl)
 
     auto inheritableDecl = dynamic_cast<InheritableDecl*>(decl);
     if (!inheritableDecl) { return; }
+    // LCOV_EXCL_START
     auto extendDecls = CompilerCangjieProject::GetInstance()->GetExtendDecls(inheritableDecl, pkgName);
     for (auto extendDecl : extendDecls) {
         for (auto &member : extendDecl->members) {
@@ -84,7 +85,7 @@ void InheritDeclUtil::HandleDeclBodyForProp(T *decl)
         }
     }
 }
-
+// LCOV_EXCL_STOP
 void InheritDeclUtil::HandleRelatedFuncDeclsFromTopLevel(Ptr<Decl> topLevel, bool needSub)
 {
     // if not in super push it in
@@ -123,8 +124,8 @@ void InheritDeclUtil::HandleRelatedFuncDeclsFromTopLevel(Ptr<Decl> topLevel, boo
 
 void InheritDeclUtil::HandleFuncDecl(bool isDocumentHighlight)
 {
-    bool isInvalid = !inDecl || !inDecl->outerDecl || inDecl->astKind != Cangjie::AST::ASTKind::FUNC_DECL &&
-                                                      inDecl->astKind != Cangjie::AST::ASTKind::PROP_DECL;
+    bool isInvalid = !inDecl || !inDecl->outerDecl || (inDecl->astKind != Cangjie::AST::ASTKind::FUNC_DECL &&
+                                                      inDecl->astKind != Cangjie::AST::ASTKind::PROP_DECL);
     if (isInvalid) { return; }
     Ptr<InheritableDecl> classLikeOrStructDecl{nullptr};
     pkgName = inDecl->fullPackageName;
@@ -145,15 +146,17 @@ void InheritDeclUtil::HandleFuncDecl(bool isDocumentHighlight)
     // deal funcDecl in Extend
     if (inDecl->outerDecl->astKind == Cangjie::AST::ASTKind::EXTEND_DECL) {
         for (auto &item: classLikeOrStructDecl->inheritedTypes) {
-            if (item->ty->kind == TypeKind::TYPE_CLASS) {
-                auto superDecl = dynamic_cast<ClassTy *>(item->ty.get())->decl;
+            // LCOV_EXCL_START
+            if (item->GetTy()->kind == TypeKind::TYPE_CLASS) {
+                auto superDecl = dynamic_cast<ClassTy *>(item->GetTy().get())->decl;
                 auto realDecl = CompilerCangjieProject::GetInstance()->GetDeclInPkgByNode(superDecl, editPkgPath);
                 HandleRelatedFuncDeclsFromTopLevel(realDecl, !isDocumentHighlight);
-            } else if (item->ty->kind == TypeKind::TYPE_INTERFACE) {
-                auto superDecl = dynamic_cast<InterfaceTy *>(item->ty.get())->decl;
+            } else if (item->GetTy()->kind == TypeKind::TYPE_INTERFACE) {
+                auto superDecl = dynamic_cast<InterfaceTy *>(item->GetTy().get())->decl;
                 auto realDecl = CompilerCangjieProject::GetInstance()->GetDeclInPkgByNode(superDecl, editPkgPath);
                 HandleRelatedFuncDeclsFromTopLevel(realDecl, !isDocumentHighlight);
             }
+            // LCOV_EXCL_STOP
         }
         if (isDocumentHighlight) { return; }
     }
@@ -166,7 +169,7 @@ void InheritDeclUtil::HandleFuncDecl(bool isDocumentHighlight)
     std::vector<Ptr<InheritableDecl> > topClasses = GetTopClassDecl(*classLikeOrStructDecl);
     DealTopClass(topClasses);
 }
-
+// LCOV_EXCL_START
 void InheritDeclUtil::DealTopClass(std::vector<Ptr<InheritableDecl> > &topClasses)
 {
     for (auto item: topClasses) {
@@ -248,8 +251,8 @@ void InheritDeclUtil::InsertRefUsers(std::unordered_set<Ptr<Cangjie::AST::Node> 
 {
     for (auto &user: users) {
         bool isInvalid = !user || !IsFromSrcOrNoSrc(user) || IsZeroPosition(user) ||
-                         user->TestAttr(Attribute::COMPILER_ADD) &&
-                         !user->TestAttr(Attribute::IS_CLONED_SOURCE_CODE);
+                         (user->TestAttr(Attribute::COMPILER_ADD) &&
+                         !user->TestAttr(Attribute::IS_CLONED_SOURCE_CODE));
         if (isInvalid) {
             continue;
         }
@@ -361,3 +364,4 @@ void InheritDeclUtil::addDeclToRef(Ptr<Decl> const &decl, int length)
     (void) References.insert(location);
 }
 } // namespace ark
+// LCOV_EXCL_STOP

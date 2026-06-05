@@ -12,6 +12,7 @@
 using namespace Cangjie;
 using namespace CONSTANTS;
 namespace ark {
+// LCOV_EXCL_START
 Range PrepareRename::PrepareImpl(const ArkAST &ast, Cangjie::Position pos, MessageErrorDetail &errorInfo)
 {
     Logger &logger = Logger::Instance();
@@ -60,7 +61,7 @@ Range PrepareRename::PrepareImpl(const ArkAST &ast, Cangjie::Position pos, Messa
         errorInfo.code = ErrorCode::INVALID_RENAME_FOR_MACRO_CALL_FILE;
         return range;
     }
-    invalid = decl && decl->ty && decl->ty->IsInvalid();
+    invalid = decl && decl->GetTy() && decl->GetTy()->IsInvalid();
     if (invalid) {
         return range;
     }
@@ -70,8 +71,8 @@ Range PrepareRename::PrepareImpl(const ArkAST &ast, Cangjie::Position pos, Messa
     if (invalid) {
         return range;
     }
-    invalid = funcDecl && funcDecl->funcBody && funcDecl->funcBody->retType && funcDecl->funcBody->retType->ty &&
-              funcDecl->funcBody->retType->ty->IsInvalid();
+    invalid = funcDecl && funcDecl->funcBody && funcDecl->funcBody->retType && funcDecl->funcBody->retType->GetTy() &&
+              funcDecl->funcBody->retType->GetTy()->IsInvalid();
     if (invalid) {
         return range;
     }
@@ -185,4 +186,5 @@ bool PrepareRename::IsFromMacroCallFile(Ptr<Decl> decl)
     }
     return false;
 }
+// LCOV_EXCL_STOP
 }

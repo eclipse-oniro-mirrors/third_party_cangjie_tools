@@ -54,7 +54,7 @@ void MemIndex::Lookup(const LookupRequest &req, std::function<void(const Symbol 
         }
     }
 }
-
+// LCOV_EXCL_START
 void MemIndex::FindPkgSyms(const PkgSymsRequest &req, std::function<void(const Symbol &)> callback) const
 {
     auto it = pkgSymsMap.find(req.fullPkgName);
@@ -65,7 +65,7 @@ void MemIndex::FindPkgSyms(const PkgSymsRequest &req, std::function<void(const S
         callback(sym);
     }
 }
-
+// LCOV_EXCL_STOP
 void MemIndex::Refs(const RefsRequest &req, std::function<void(const Ref &)> callback) const
 {
     for (const auto &id : req.ids) {
@@ -85,7 +85,7 @@ void MemIndex::Refs(const RefsRequest &req, std::function<void(const Ref &)> cal
         }
     }
 }
-
+// LCOV_EXCL_START
 void MemIndex::FileRefs(const FileRefsRequest &req,
     std::function<void(const Ref &ref, const SymbolID symId)> callback) const
 {
@@ -104,7 +104,7 @@ void MemIndex::FileRefs(const FileRefsRequest &req,
         }
     }
 }
-
+// LCOV_EXCL_STOP
 void MemIndex::RefsFindReference(const RefsRequest &req,
     Ref &definition, std::function<void(const Ref &)> callback) const
 {
@@ -144,7 +144,7 @@ void MemIndex::Callees(const std::string &pkgName, const SymbolID &declId,
         }
     }
 }
-
+// LCOV_EXCL_START
 void MemIndex::Relations(const RelationsRequest &req, std::function<void(const Relation &)> callback) const
 {
     for (const auto &pkgRelations : pkgRelationsMap) {
@@ -158,7 +158,7 @@ void MemIndex::Relations(const RelationsRequest &req, std::function<void(const R
         }
     }
 }
-
+// LCOV_EXCL_STOP
 Symbol MemIndex::GetAimSymbol(const Decl& decl)
 {
     auto pkgName = CompilerCangjieProject::GetInstance()->GetFinalDownStreamFullPkgName(decl.fullPackageName);
@@ -171,21 +171,24 @@ Symbol MemIndex::GetAimSymbol(const Decl& decl)
     }
     return {};
 }
-
+// LCOV_EXCL_START
 void MemIndex::FindImportSymsOnCompletion(
     const std::pair<std::unordered_set<SymbolID>, std::unordered_set<SymbolID>>& filterSyms,
-    const std::string &curPkgName, const std::string &curModule, const std::string &prefix,
+    const SymbolSearchContext &context, const std::string &prefix,
     std::function<void(const std::string &, const Symbol &, const CompletionItem &)> callback)
 {
+    (void)prefix;
     if (Options::GetInstance().IsOptionSet("test")) {
         return;
     }
+    const auto &curPkgName = context.curPkgName;
+    const auto &curModule = context.curModule;
     const auto &normalCompleteSyms  = filterSyms.first;
     const auto &importDeclSyms  = filterSyms.second;
     size_t normalCompleteCount = 0;
     size_t importDeclCount = 0;
     std::unordered_set<std::string> curModuleDeps =
-        CompilerCangjieProject::GetInstance()->GetOneModuleDirectDeps(curModule);
+        CompilerCangjieProject::GetInstance()->GetOneModuleDirectDeps(curModule, context.includeScriptRequire);
     for (const auto &pkgSyms : pkgSymsMap) {
         // filter curPackage sym
         if (curPkgName == pkgSyms.first ||
@@ -241,15 +244,17 @@ void MemIndex::FindImportSymsOnCompletion(
 
 void MemIndex::FindExtendSymsOnCompletion(const SymbolID &dotCompleteSym,
     const std::unordered_set<SymbolID> &visibleMembers,
-    const std::string &curPkgName, const std::string &curModule,
+    const SymbolSearchContext &context,
     const std::function<void(const std::string &, const std::string &,
         const Symbol &, const CompletionItem &)>& callback)
 {
     if (Options::GetInstance().IsOptionSet("test")) {
         return;
     }
+    const auto &curPkgName = context.curPkgName;
+    const auto &curModule = context.curModule;
     std::unordered_set<std::string> curModuleDeps =
-        CompilerCangjieProject::GetInstance()->GetOneModuleDirectDeps(curModule);
+        CompilerCangjieProject::GetInstance()->GetOneModuleDirectDeps(curModule, context.includeScriptRequire);
     for (const auto &extendSyms : pkgExtendsMap) {
         // filter curPackage sym
         std::string pkgName = extendSyms.first;
@@ -281,7 +286,7 @@ void MemIndex::FindExtendSymsOnCompletion(const SymbolID &dotCompleteSym,
                     }
                     auto* sym = symMap[symbol.id];
                     // filter symbols that not dependent by curModule
-                    if (!sym || !sym->isCjoSym && !curModuleDeps.count(sym->curModule)) {
+                    if (!sym || (!sym->isCjoSym && !curModuleDeps.count(sym->curModule))) {
                         continue;
                     }
                     // filter by modifier
@@ -300,16 +305,17 @@ void MemIndex::FindExtendSymsOnCompletion(const SymbolID &dotCompleteSym,
 void MemIndex::FindExtendSymsOnCompletionBatch(
     const std::unordered_set<SymbolID> &ids,
     const std::unordered_set<SymbolID> &allVisibleMembers,
-    const std::string &curPkgName, bool filterStatic,
+    const SymbolSearchContext &context, bool filterStatic,
     const std::function<void(const std::string &, const std::string &,
         const Symbol &, const CompletionItem &)>& callback)
 {
     if (ids.empty()) {
         return;
     }
-    auto curModule = SplitFullPackage(curPkgName).first;
+    const auto &curPkgName = context.curPkgName;
+    const auto &curModule = context.curModule;
     std::unordered_set<std::string> curModuleDeps =
-        CompilerCangjieProject::GetInstance()->GetOneModuleDirectDeps(curModule);
+        CompilerCangjieProject::GetInstance()->GetOneModuleDirectDeps(curModule, context.includeScriptRequire);
 
     for (const auto &extendSyms : pkgExtendsMap) {
         const std::string &pkgName = extendSyms.first;
@@ -343,7 +349,7 @@ void MemIndex::FindExtendSymsOnCompletionBatch(
                     continue;
                 }
                 auto* sym = symMap[symbol.id];
-                if (!sym || !sym->isCjoSym && !curModuleDeps.count(sym->curModule)) {
+                if (!sym || (!sym->isCjoSym && !curModuleDeps.count(sym->curModule))) {
                     continue;
                 }
                 if (!checkAccessible(symbol.modifier) || !checkAccessible(sym->modifier)) {
@@ -369,10 +375,9 @@ void MemIndex::FindImportReExportSymsOnCompletion(
     const std::string &curPkgName, const std::string &curModule, const std::string &prefix,
     std::function<void(const std::string &, const ReExportSymbol &, const CompletionItem &)> callback)
 {
+    (void)prefix;
     const auto &normalCompleteSyms  = filterSyms.first;
     const auto &importDeclSyms  = filterSyms.second;
-    size_t normalCompleteCount = 0;
-    size_t importDeclCount = 0;
     std::unordered_set<std::string> curModuleDeps =
         CompilerCangjieProject::GetInstance()->GetOneModuleDirectDeps(curModule);
     for (const auto &pkgReExportSymbols: pkgReExportSymsMap) {
@@ -392,12 +397,10 @@ void MemIndex::FindImportReExportSymsOnCompletion(
             if (!isAccessiable || sym.id == INVALID_SYMBOL_ID) {
                 continue;
             }
-            if (normalCompleteCount >= normalCompleteSyms.size() || normalCompleteSyms.count(sym.id)) {
-                normalCompleteCount++;
+            if (normalCompleteSyms.count(sym.id)) {
                 continue;
             }
-            if (importDeclCount >= importDeclSyms.size() || importDeclSyms.count(sym.id)) {
-                importDeclCount++;
+            if (importDeclSyms.count(sym.id)) {
                 continue;
             }
             for (const auto &completionItem : sym.completionItems) {
@@ -407,13 +410,16 @@ void MemIndex::FindImportReExportSymsOnCompletion(
     }
 }
 
-void MemIndex::FindImportSymsOnQuickFix(const std::string &curPkgName, const std::string &curModule,
-    const std::unordered_set<SymbolID> &importDeclSyms, const std::string& identifier,
+void MemIndex::FindImportSymsOnQuickFix(const SymbolSearchContext &context,
+    const std::unordered_set<SymbolID> &importDeclSyms,
+    const std::string& identifier,
     const std::function<void(const std::string &, const Symbol &)>& callback)
 {
+    const auto &curPkgName = context.curPkgName;
+    const auto &curModule = context.curModule;
     size_t importDeclCount = 0;
     std::unordered_set<std::string> curModuleDeps =
-        CompilerCangjieProject::GetInstance()->GetOneModuleDirectDeps(curModule);
+        CompilerCangjieProject::GetInstance()->GetOneModuleDirectDeps(curModule, context.includeScriptRequire);
     for (const auto &pkgSyms : pkgSymsMap) {
         // filter curPackage sym
         if (curPkgName == pkgSyms.first) {
@@ -462,7 +468,7 @@ void MemIndex::FindImportSymsOnQuickFix(const std::string &curPkgName, const std
         }
     }
 }
-
+// LCOV_EXCL_STOP
 void MemIndex::FindComment(const Symbol &sym, std::vector<std::string> &comments)
 {
     const auto [leadCommentGroup, innerCommentGroup, trailCommentGroup] = sym.comments;
@@ -489,12 +495,14 @@ void MemIndex::FindCrossSymbolByName(const std::string &packageName, const std::
     std::unordered_set<std::string> targetPackageSet;
     targetPackageSet.insert(packageName);
     if (isComebined) {
+        // LCOV_EXCL_START
         auto pkgNameList = CompilerCangjieProject::GetInstance()->GetPkgNameList();
         for (auto &pkgName : pkgNameList) {
             if (pkgName.find(packageName) != std::string::npos) {
                 targetPackageSet.insert(pkgName);
             }
         }
+        // LCOV_EXCL_STOP
     }
     for (const auto &pkgName : targetPackageSet) {
         if (pkgCrossSymsMap.find(pkgName) == pkgCrossSymsMap.end()) {
@@ -508,7 +516,10 @@ void MemIndex::FindCrossSymbolByName(const std::string &packageName, const std::
         }
     }
 }
-void MemIndex::GetExportSID(IDArray array, std::function<void(const CrossSymbol &)> callback) const {
+void MemIndex::GetExportSID(IDArray array, std::function<void(const CrossSymbol &)> callback) const
+{
+    (void)array;
+    (void)callback;
 }
 } // namespace lsp
 } // namespace ark

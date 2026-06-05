@@ -9,8 +9,9 @@
 #ifndef RECORDER_H
 #define RECORDER_H
 
+#include <cstdint>
 #include <string>
-#include <vector>
+#include <sys/types.h>
 
 class Recorder {
 public:

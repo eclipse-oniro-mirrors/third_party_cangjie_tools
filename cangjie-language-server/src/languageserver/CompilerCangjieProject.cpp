@@ -50,6 +50,34 @@ PkgRelation GetPkgRelation(const std::string &srcFullPackageName, const std::str
     auto targetRoot = Utils::SplitQualifiedName(targetFullPackageName).front();
     return srcRoot == targetRoot ? PkgRelation::SAME_MODULE : PkgRelation::NONE;
 }
+
+void AddModuleCandidate(std::unordered_set<std::string> &modules, const std::string &candidate)
+{
+    if (candidate.empty()) {
+        return;
+    }
+    auto moduleName = SplitQualifiedName(candidate).front();
+    if (!moduleName.empty()) {
+        (void)modules.insert(moduleName);
+    }
+}
+
+std::unordered_set<std::string> GetImportedModules(const ImportSpec &importSpec)
+{
+    std::unordered_set<std::string> importedModules;
+    const auto &importContent = importSpec.content;
+    if (!importContent.prefixPaths.empty()) {
+        AddModuleCandidate(importedModules, importContent.prefixPaths.front());
+    }
+    if (importSpec.IsImportMulti()) {
+        for (const auto &item : importContent.items) {
+            AddModuleCandidate(importedModules, item.identifier);
+        }
+        return importedModules;
+    }
+    AddModuleCandidate(importedModules, importContent.identifier.Val());
+    return importedModules;
+}
 } // namespace
 
 namespace ark {
@@ -59,6 +87,7 @@ const unsigned int MAX_THREAD_COUNT = HARDWARE_CONCURRENCY_COUNT > EXTRA_THREAD_
                                       HARDWARE_CONCURRENCY_COUNT - EXTRA_THREAD_COUNT : 1;
 const unsigned int PROPER_THREAD_COUNT = MAX_THREAD_COUNT == 1 ? MAX_THREAD_COUNT : (MAX_THREAD_COUNT >> 1);
 const int LSP_ERROR_CODE = 503;
+const int SCRIPT_DEPENDENCY_IMPORT_ERROR_CODE = 504;
 CompilerCangjieProject *CompilerCangjieProject::instance = nullptr;
 bool CompilerCangjieProject::useDB = false;
 bool CompilerCangjieProject::incrementalOptimize = true;
@@ -98,7 +127,8 @@ PkgInfo::PkgInfo(const std::string &pkgPath,
                  Callbacks *callback,
                  PkgType packageType)
 {
-    std::string moduleSrcPath  = CompilerCangjieProject::GetInstance()->GetModuleSrcPath(curModulePath);
+    (void)callback;
+    std::string moduleSrcPath  = CompilerCangjieProject::GetInstance()->GetModuleSrcPath(curModulePath, pkgPath);
     packagePath = pkgPath;
     if (!curModulePath.empty()) {
         const auto &tempName = GetRealPkgNameFromPath(
@@ -159,7 +189,7 @@ PkgInfo::PkgInfo(const std::string &pkgPath,
         }
     }
 }
-
+// LCOV_EXCL_START
 void CompilerCangjieProject::ClearCacheForDelete(const std::string &fullPkgName, const std::string &dirPath,
                                                  bool isInModule)
 {
@@ -201,12 +231,13 @@ void CompilerCangjieProject::IncrementForFileDelete(const std::string &fileName)
     // fix linux delete file crash
     std::string absName = FileStore::NormalizePath(fileName);
     std::string dirPath = GetDirPath(absName);
+    std::string notInSrcCacheKey = GetNotInSrcCacheKey(absName);
     std::string fullPkgName = GetFullPkgName(absName);
 
     Ptr<Package> package;
     bool isInModule = GetCangjieFileKind(absName).first != CangjieFileKind::IN_PROJECT_NOT_IN_SOURCE;
     if ((isInModule && pkgInfoMap.find(fullPkgName) == pkgInfoMap.end()) ||
-        (!isInModule && pkgInfoMapNotInSrc.find(dirPath) == pkgInfoMapNotInSrc.end())) {
+        (!isInModule && pkgInfoMapNotInSrc.find(notInSrcCacheKey) == pkgInfoMapNotInSrc.end())) {
         return;
     }
     if (isInModule) {
@@ -218,12 +249,12 @@ void CompilerCangjieProject::IncrementForFileDelete(const std::string &fileName)
         }
         package = pLRUCache->Get(fullPkgName)->GetSourcePackages()[0];
     } else {
-        pkgInfoMapNotInSrc[dirPath]->bufferCache.erase(absName);
+        pkgInfoMapNotInSrc[notInSrcCacheKey]->bufferCache.erase(absName);
         IncrementCompileForFileNotInSrc(absName, "", true);
-        if (!pLRUCache->HasCache(dirPath)) {
+        if (!pLRUCache->HasCache(notInSrcCacheKey)) {
             return;
         }
-        package = pLRUCache->Get(dirPath)->GetSourcePackages()[0];
+        package = pLRUCache->Get(notInSrcCacheKey)->GetSourcePackages()[0];
     }
     if (package == nullptr) {
         return;
@@ -233,7 +264,7 @@ void CompilerCangjieProject::IncrementForFileDelete(const std::string &fileName)
         fileCache.erase(fileName);
     }
     if (package->files.empty()) {
-        ClearCacheForDelete(fullPkgName, dirPath, isInModule);
+        ClearCacheForDelete(fullPkgName, isInModule ? dirPath : notInSrcCacheKey, isInModule);
     }
 }
 
@@ -246,7 +277,7 @@ std::string CompilerCangjieProject::GetFullPkgName(const std::string &filePath) 
     }
     return pathToFullPkgName.at(dirPath);
 }
-
+// LCOV_EXCL_STOP
 std::string CompilerCangjieProject::GetFullPkgByDir(const std::string &dirPath) const
 {
     std::string normalizePath = Normalize(dirPath);
@@ -279,28 +310,13 @@ std::string CompilerCangjieProject::GetFullPkgByDir(const std::string &dirPath) 
     return "";
 }
 
-void CompilerCangjieProject::SetCommonPartCjo(const std::unique_ptr<Cangjie::LSPCompilerInstance> &ci,
-    const std::string &fullPkgName)
+std::string CompilerCangjieProject::GetNotInSrcCacheKey(const std::string &filePath) const
 {
-    if (!ci) {
-        return;
+    std::string normalizedFilePath = Normalize(filePath);
+    if (IsBuildScriptFile(normalizedFilePath)) {
+        return normalizedFilePath;
     }
-    ci->upstreamSourceSetName = GetUpStreamSourceSetName(fullPkgName);
-    if (!ci->upstreamSourceSetName.empty()) {
-        std::string realPkgName = GetRealPackageName(fullPkgName);
-        std::string upstreamSourcePkg = ci->upstreamSourceSetName + "-" + realPkgName;
-        auto cjoData = cjoManager->GetData(upstreamSourcePkg);
-        if (!cjoData) {
-            Trace::Log("can not find upstream source-set cache, failed execuate task", fullPkgName);
-            ci->invocation.globalOptions.commonPartCjo.reset();
-        } else {
-            ci->invocation.globalOptions.commonPartCjo.reset();
-            ci->invocation.globalOptions.commonPartCjo = realPkgName;
-            ci->importManager->SetPackageCjoCache(realPkgName, *cjoData);
-        }
-        return;
-    }
-    ci->invocation.globalOptions.commonPartCjo.reset();
+    return Normalize(GetDirPath(normalizedFilePath));
 }
 
 void CompilerCangjieProject::IncrementCompile(const std::string &filePath, const std::string &contents, bool isDelete)
@@ -309,31 +325,24 @@ void CompilerCangjieProject::IncrementCompile(const std::string &filePath, const
     Trace::Log("Start incremental compilation for package: ", filePath);
     auto fullPkgName = GetFullPkgName(filePath);
     // Remove diagnostics for the current package
-    callback->RemoveDiagOfCurPkg(pkgInfoMap[fullPkgName]->packagePath);
+    ClearDiagnosticsForPkg(*pkgInfoMap[fullPkgName]);
     // Construct a compiler instance for compilation.
     auto &invocation = pkgInfoMap[fullPkgName]->compilerInvocation;
     auto ci = std::make_unique<LSPCompilerInstance>(callback, *invocation, GetDiagnosticEngine(),
         fullPkgName, moduleManager);
     ci->cangjieHome = modulesHome;
     ci->loadSrcFilesFromCache = true;
-    SetCommonPartCjo(ci, fullPkgName);
-    if (!isDelete && !Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
-        if (filePath.find(pkgInfoMap[fullPkgName]->modulePath) != std::string::npos) {
-            std::lock_guard<std::mutex> lock(pkgInfoMap[fullPkgName]->pkgInfoMutex);
-            pkgInfoMap[fullPkgName]->bufferCache[filePath] = contents;
-        }
-    }
 
-    // 1. parse and update dependency
+    HandleUpstreamSourceSet(fullPkgName, ci);
+    UpdateBufferCache(fullPkgName, filePath, contents, isDelete);
+
     if (!UpdateDependencies(fullPkgName, ci)) {
         return;
     }
-    // detect circular dependency
+
     auto cycles = graph->FindCycles();
     if (!cycles.second) {
-        // 2. check whether the upstream package cjo is fresh.
         auto upPackages = graph->FindAllDependencies(fullPkgName);
-        // Submit tasks to Thread Pool Compilation
         auto recompileTasks = cjoManager->CheckStatus(upPackages);
         SubmitTasksToPool(recompileTasks);
     }
@@ -345,6 +354,27 @@ void CompilerCangjieProject::IncrementCompile(const std::string &filePath, const
     Trace::Log("Finish incremental compilation for package: ", fullPkgName);
 }
 
+void CompilerCangjieProject::HandleUpstreamSourceSet(const std::string &fullPkgName,
+                                                     const std::unique_ptr<LSPCompilerInstance> &ci)
+{
+    ci->upstreamSourceSetName = GetUpStreamSourceSetName(fullPkgName);
+    if (!ci->upstreamSourceSetName.empty()) {
+        std::string realPkgName = GetRealPackageName(fullPkgName);
+        std::string upstreamSourcePkg = ci->upstreamSourceSetName + "-" + realPkgName;
+        auto cjoData = cjoManager->GetData(upstreamSourcePkg);
+        if (!cjoData) {
+            Trace::Log("can not find upstream source-set cache, failed execuate task", fullPkgName);
+            ci->invocation.globalOptions.commonPartCjos.clear();
+        } else {
+            ci->invocation.globalOptions.commonPartCjos.clear();
+            ci->invocation.globalOptions.commonPartCjos.push_back(realPkgName);
+            ci->importManager->SetPackageCjoCache(realPkgName, *cjoData);
+        }
+    } else {
+        ci->invocation.globalOptions.commonPartCjos.clear();
+    }
+}
+
 void CompilerCangjieProject::UpdateBufferCache(const std::string &fullPkgName, const std::string &filePath,
                                                const std::string &contents, bool isDelete)
 {
@@ -353,6 +383,21 @@ void CompilerCangjieProject::UpdateBufferCache(const std::string &fullPkgName, c
             std::lock_guard<std::mutex> lock(pkgInfoMap[fullPkgName]->pkgInfoMutex);
             pkgInfoMap[fullPkgName]->bufferCache[filePath] = contents;
         }
+    }
+}
+
+void CompilerCangjieProject::ClearDiagnosticsForPkg(const PkgInfo &pkgInfo)
+{
+    for (const auto &file : pkgInfo.bufferCache) {
+        callback->RemoveDiagOfCurFile(file.first);
+    }
+    if (FileUtil::GetFileExtension(pkgInfo.packagePath) == CANGJIE_FILE_EXTENSION) {
+        return;
+    }
+    auto macroFiles = GetAllFilesUnderCurrentPath(
+        pkgInfo.packagePath, CANGJIE_MACRO_FILE_EXTENSION, false);
+    for (const auto &file : macroFiles) {
+        callback->RemoveDiagOfCurFile(FileStore::NormalizePath(JoinPath(pkgInfo.packagePath, file)));
     }
 }
 
@@ -392,6 +437,7 @@ void CompilerCangjieProject::PostCompileProcess(const std::string &fullPkgName, 
 
     // 5. emit diagnostics after index build (includes unused symbol diagnostics)
     if (!isDelete) {
+        ValidateScriptDependencyImports(ci, filePath);
         EmitDiagsOfFile(filePath);
     }
 }
@@ -513,14 +559,29 @@ void CompilerCangjieProject::SubmitTasksToPool(const std::unordered_set<std::str
                 Trace::Log("finish execute task", package);
                 return;
             }
-            callback->RemoveDiagOfCurPkg(pkgInfoMap[package]->packagePath);
+            ClearDiagnosticsForPkg(*pkgInfoMap[package]);
             auto &invocation = pkgInfoMap[package]->compilerInvocation;
             auto ci = std::make_unique<LSPCompilerInstance>(callback, *invocation, GetDiagnosticEngine(),
                 package, moduleManager);
             ci->cangjieHome = modulesHome;
             ci->loadSrcFilesFromCache = true;
             ci->SetBufferCache(pkgInfoMap[package]->bufferCache);
-            SetCommonPartCjo(ci, package);
+            ci->upstreamSourceSetName = GetUpStreamSourceSetName(package);
+            if (!ci->upstreamSourceSetName.empty()) {
+                std::string realPkgName = GetRealPackageName(package);
+                std::string upstreamSourcePkg = ci->upstreamSourceSetName + "-" + realPkgName;
+                auto cjoData = cjoManager->GetData(upstreamSourcePkg);
+                if (!cjoData) {
+                    Trace::Log("can not find upstream source-set cache, failed execuate task", package);
+                    ci->invocation.globalOptions.commonPartCjos.clear();
+                } else {
+                    ci->invocation.globalOptions.commonPartCjos.clear();
+                    ci->invocation.globalOptions.commonPartCjos.push_back(realPkgName);
+                    ci->importManager->SetPackageCjoCache(realPkgName, *cjoData);
+                }
+            } else {
+                ci->invocation.globalOptions.commonPartCjos.clear();
+            }
             ci->PreCompileProcess();
             bool changed = ci->CompileAfterParse(cjoManager, graph);
             if (changed) {
@@ -540,19 +601,20 @@ void CompilerCangjieProject::SubmitTasksToPool(const std::unordered_set<std::str
     }
     thrdPool->WaitUntilAllTasksComplete();
 }
-
+// LCOV_EXCL_START
 void CompilerCangjieProject::IncrementOnePkgCompile(const std::string &filePath, const std::string &contents)
 {
     std::string fullPkgName = GetFullPkgName(filePath);
+    std::string notInSrcCacheKey = GetNotInSrcCacheKey(filePath);
     if (pkgInfoMap.find(fullPkgName) == pkgInfoMap.end()) {
-        if (pkgInfoMapNotInSrc.find(fullPkgName) == pkgInfoMapNotInSrc.end()) {
+        if (pkgInfoMapNotInSrc.find(notInSrcCacheKey) == pkgInfoMapNotInSrc.end()) {
             return;
         }
         if (!Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
-            std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[fullPkgName]->pkgInfoMutex);
-            pkgInfoMapNotInSrc[fullPkgName]->bufferCache[filePath] = contents;
+            std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[notInSrcCacheKey]->pkgInfoMutex);
+            pkgInfoMapNotInSrc[notInSrcCacheKey]->bufferCache[filePath] = contents;
         }
-        IncrementTempPkgCompileNotInSrc(fullPkgName);
+        IncrementTempPkgCompileNotInSrc(notInSrcCacheKey);
         return;
     }
     if (!Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
@@ -568,7 +630,7 @@ void CompilerCangjieProject::IncrementTempPkgCompile(const std::string &basicStr
     if (pkgInfoMap.find(basicString) == pkgInfoMap.end()) {
         return;
     }
-    callback->RemoveDiagOfCurPkg(pkgInfoMap[fullPkgName]->packagePath);
+    ClearDiagnosticsForPkg(*pkgInfoMap[fullPkgName]);
     auto newCI = std::make_unique<LSPCompilerInstance>(callback, *pkgInfoMap[fullPkgName]->compilerInvocation,
         GetDiagnosticEngine(), fullPkgName, moduleManager);
     if (newCI == nullptr) {
@@ -577,7 +639,22 @@ void CompilerCangjieProject::IncrementTempPkgCompile(const std::string &basicStr
     newCI->cangjieHome = modulesHome;
     // update cache and read code from cache
     newCI->loadSrcFilesFromCache = true;
-    SetCommonPartCjo(newCI, fullPkgName);
+    newCI->upstreamSourceSetName = GetUpStreamSourceSetName(fullPkgName);
+    if (!newCI->upstreamSourceSetName.empty()) {
+        std::string realPkgName = GetRealPackageName(fullPkgName);
+        std::string upstreamSourcePkg = newCI->upstreamSourceSetName + "-" + realPkgName;
+        auto cjoData = cjoManager->GetData(upstreamSourcePkg);
+        if (!cjoData) {
+            Trace::Log("can not find upstream source-set cache, failed execuate task", fullPkgName);
+            newCI->invocation.globalOptions.commonPartCjos.clear();
+        } else {
+            newCI->invocation.globalOptions.commonPartCjos.clear();
+            newCI->invocation.globalOptions.commonPartCjos.push_back(realPkgName);
+            newCI->importManager->SetPackageCjoCache(realPkgName, *cjoData);
+        }
+    } else {
+        newCI->invocation.globalOptions.commonPartCjos.clear();
+    }
     if (!UpdateDependencies(fullPkgName, newCI)) {
         return;
     }
@@ -589,20 +666,31 @@ void CompilerCangjieProject::IncrementTempPkgCompile(const std::string &basicStr
 
 void CompilerCangjieProject::IncrementTempPkgCompileNotInSrc(const std::string &fullPkgName)
 {
-    std::string dirPath = fullPkgName;
-    if (pkgInfoMapNotInSrc.find(dirPath) == pkgInfoMapNotInSrc.end()) {
+    std::string cacheKey = fullPkgName;
+    if (pkgInfoMapNotInSrc.find(cacheKey) == pkgInfoMapNotInSrc.end()) {
         return;
     }
-    callback->RemoveDiagOfCurPkg(pkgInfoMapNotInSrc[fullPkgName]->packagePath);
-    auto newCI = std::make_unique<LSPCompilerInstance>(callback, *pkgInfoMapNotInSrc[dirPath]->compilerInvocation,
+    ClearDiagnosticsForPkg(*pkgInfoMapNotInSrc[cacheKey]);
+    auto newCI = std::make_unique<LSPCompilerInstance>(callback, *pkgInfoMapNotInSrc[cacheKey]->compilerInvocation,
         GetDiagnosticEngine(), "", moduleManager);
     newCI->cangjieHome = modulesHome;
     newCI->loadSrcFilesFromCache = true;
+    newCI->SetActiveFilePath("");
 
-    if (!ParseAndUpdateNotInSrcDep(dirPath, newCI)) {
+    if (!ParseAndUpdateNotInSrcDep(cacheKey, newCI)) {
         return;
     }
     newCI->CompileAfterParse(cjoManager, graph);
+    for (const auto &package : newCI->GetSourcePackages()) {
+        if (!package) {
+            continue;
+        }
+        for (const auto &file : package->files) {
+            if (file) {
+                ValidateScriptDependencyImports(newCI, file->filePath);
+            }
+        }
+    }
     BuildIndex(newCI);
     InitCache(newCI, fullPkgName, false);
     pLRUCache->Set(fullPkgName, newCI);
@@ -611,26 +699,28 @@ void CompilerCangjieProject::IncrementTempPkgCompileNotInSrc(const std::string &
 void CompilerCangjieProject::IncrementCompileForFileNotInSrc(const std::string &filePath, const std::string &contents,
                                                              bool isDelete)
 {
-    std::string dirPath = Normalize(GetDirPath(filePath));
-    if (pkgInfoMapNotInSrc.find(dirPath) == pkgInfoMapNotInSrc.end()) {
+    std::string cacheKey = GetNotInSrcCacheKey(filePath);
+    if (pkgInfoMapNotInSrc.find(cacheKey) == pkgInfoMapNotInSrc.end()) {
         return;
     }
-    callback->RemoveDiagOfCurPkg(pkgInfoMapNotInSrc[dirPath]->packagePath);
-    auto newCI = std::make_unique<LSPCompilerInstance>(callback, *pkgInfoMapNotInSrc[dirPath]->compilerInvocation,
+    ClearDiagnosticsForPkg(*pkgInfoMapNotInSrc[cacheKey]);
+    auto newCI = std::make_unique<LSPCompilerInstance>(callback, *pkgInfoMapNotInSrc[cacheKey]->compilerInvocation,
                                                        GetDiagnosticEngine(), "", moduleManager);
     newCI->cangjieHome = modulesHome;
+    newCI->SetActiveFilePath(filePath);
     // update cache and read code from cache
     newCI->loadSrcFilesFromCache = true;
     if (!isDelete && !Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
-        pkgInfoMapNotInSrc[dirPath]->bufferCache[filePath] = contents;
+        pkgInfoMapNotInSrc[cacheKey]->bufferCache[filePath] = contents;
     }
-    if (!ParseAndUpdateNotInSrcDep(dirPath, newCI)) {
+    if (!ParseAndUpdateNotInSrcDep(cacheKey, newCI)) {
         return;
     }
     newCI->CompileAfterParse(cjoManager, graph);
+    ValidateScriptDependencyImports(newCI, filePath);
     BuildIndex(newCI);
-    InitCache(newCI, dirPath);
-    pLRUCache->Set(dirPath, newCI);
+    InitCache(newCI, cacheKey, false);
+    pLRUCache->Set(cacheKey, newCI);
 }
 
 bool CompilerCangjieProject::ParseAndUpdateNotInSrcDep(const std::string &dirPath,
@@ -641,7 +731,7 @@ bool CompilerCangjieProject::ParseAndUpdateNotInSrcDep(const std::string &dirPat
         newCI->SetBufferCache(pkgInfoMapNotInSrc[dirPath]->bufferCache);
     }
     newCI->PreCompileProcess();
-    newCI->UpdateDepGraph();
+    newCI->UpdateDepGraph(false);
     auto packages = newCI->GetSourcePackages();
     if (packages.empty() || !packages[0]) {
         return false;
@@ -699,34 +789,21 @@ std::vector<std::string> CompilerCangjieProject::GetIncTopologySort(const std::s
     }
     return sortResult;
 }
-
-void CompilerCangjieProject::HandleFileNotInSource(const std::string &absName, const std::string &contents,
-                                                   const std::string &dirPath)
-{
-    if (pkgInfoMapNotInSrc.find(dirPath) == pkgInfoMapNotInSrc.end()) {
-        pkgInfoMapNotInSrc[dirPath] = std::make_unique<PkgInfo>(dirPath, "", "", callback);
-    }
-    if (!Cangjie::FileUtil::HasExtension(absName, CANGJIE_MACRO_FILE_EXTENSION)) {
-        std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[dirPath]->pkgInfoMutex);
-        pkgInfoMapNotInSrc[dirPath]->bufferCache[absName] = contents;
-    }
-    IncrementOnePkgCompile(absName, contents);
-}
-
+// LCOV_EXCL_STOP
 void CompilerCangjieProject::CompilerOneFile(
     const std::string &file, const std::string &contents, Position pos, const std::string &name)
 {
+    (void)pos;
+    (void)name;
     std::string absName = Normalize(file);
     Trace::Log("Start analyzing the file: ", absName);
 
     std::string dirPath = GetDirPath(absName);
-    std::string fullPkgName = GetFullPkgName(absName);
     auto [fileKind, modulePath] = GetCangjieFileKind(absName);
 
     if (fileKind == CangjieFileKind::IN_PROJECT_NOT_IN_SOURCE) {
-        HandleFileNotInSource(absName, contents, dirPath);
+        HandleFileNotInSource(absName, contents);
     } else if (fileKind == CangjieFileKind::IN_NEW_PACKAGE) {
-        // in new package in src
         HandleNewPackage(absName, contents, dirPath, modulePath);
     } else {
         // in old package in src
@@ -735,8 +812,24 @@ void CompilerCangjieProject::CompilerOneFile(
     Trace::Log("Finish analyzing the file: ", absName);
 }
 
+void CompilerCangjieProject::HandleFileNotInSource(const std::string &absName, const std::string &contents)
+{
+    std::string cacheKey = GetNotInSrcCacheKey(absName);
+    if (pkgInfoMapNotInSrc.find(cacheKey) == pkgInfoMapNotInSrc.end()) {
+        pkgInfoMapNotInSrc[cacheKey] = std::make_unique<PkgInfo>(cacheKey, "", "", callback);
+    }
+    if (!Cangjie::FileUtil::HasExtension(absName, CANGJIE_MACRO_FILE_EXTENSION)) {
+        std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[cacheKey]->pkgInfoMutex);
+        pkgInfoMapNotInSrc[cacheKey]->bufferCache[absName] = contents;
+    }
+    IncrementOnePkgCompile(absName, contents);
+    if (CIMapNotInSrc.find(cacheKey) == CIMapNotInSrc.end()) {
+        CIMapNotInSrc[cacheKey] = nullptr;
+    }
+}
+
 void CompilerCangjieProject::HandleNewPackage(const std::string &absName, const std::string &contents,
-    const std::string &dirPath, const std::string &modulePath)
+                                              const std::string &dirPath, const std::string &modulePath)
 {
     auto [fullPkgName, pkgType, isDefaultPkg] = DeterminePkgNameAndType(modulePath, dirPath, absName);
     auto moduleInfo = moduleManager->moduleInfoMap[modulePath];
@@ -764,7 +857,9 @@ CompilerCangjieProject::NewPackageInfo CompilerCangjieProject::DeterminePkgNameA
     } else {
         fullPkgName = moduleName + "." + pkgName;
     }
+
     ProcessInvalidPackage(fullPkgName, sourcePath);
+
     PkgType pkgType = PkgType::NORMAL;
     if (moduleInfo.isCommonSpecificModule) {
         std::string sourceSetName = GetSourceSetNameByPath(absName);
@@ -798,7 +893,7 @@ void CompilerCangjieProject::UpdateRelatedPackageStatus(const std::string &fullP
 }
 
 void CompilerCangjieProject::InitPkgInfoBuffer(const std::string &fullPkgName, const std::string &absName,
-    const std::string &contents, bool isDefaultPkg)
+                                               const std::string &contents, bool isDefaultPkg)
 {
     if (!Cangjie::FileUtil::HasExtension(absName, CANGJIE_MACRO_FILE_EXTENSION)) {
         pkgInfoMap[fullPkgName]->bufferCache[absName] = contents;
@@ -819,10 +914,11 @@ void CompilerCangjieProject::UpdatePkgMaps(const std::string &fullPkgName, const
 void CompilerCangjieProject::ProcessInvalidPackage(const std::string &fullPkgName, const std::string &sourcePath)
 {
     bool invalid = pkgInfoMap.find(fullPkgName) != pkgInfoMap.end() && pkgInfoMap[fullPkgName]->isSourceDir &&
-                    pLRUCache->HasCache(fullPkgName) && pLRUCache->Get(fullPkgName) != nullptr;
+                   pLRUCache->HasCache(fullPkgName) && pLRUCache->Get(fullPkgName) != nullptr;
     if (!invalid) {
         return;
     }
+
     std::string defaultPkgName = DEFAULT_PACKAGE_NAME;
     std::string newFullPkgName = defaultPkgName;
     if (pkgInfoMap[fullPkgName]->pkgType != PkgType::NORMAL &&
@@ -852,9 +948,8 @@ void CompilerCangjieProject::ParseOneFile(
     std::string filePath = Normalize(file);
     Trace::Log("Start analyzing the file: ", filePath);
 
-    std::string dirPath = GetDirPath(filePath);
-    std::string fullPkgName = GetFullPkgName(filePath);
     auto [fileKind, modulePath] = GetCangjieFileKind(filePath);
+    (void)modulePath;
     // for normalComplete
     if (taskName == "Completion") {
         if (fileKind == CangjieFileKind::IN_PROJECT_NOT_IN_SOURCE) {
@@ -876,90 +971,77 @@ void CompilerCangjieProject::IncrementCompileForComplete(
 {
     std::string fullPkgName = GetFullPkgName(filePath);
     if (incrementalOptimize && CIForComplete && CIForComplete->pkgNameForPath == fullPkgName) {
-        if (pkgInfoMap[fullPkgName]->bufferCache.count(filePath) &&
-            !Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
-            {
-                std::lock_guard<std::mutex> lock(pkgInfoMap[fullPkgName]->pkgInfoMutex);
-                pkgInfoMap[fullPkgName]->bufferCache[filePath] = contents;
-            }
-            std::lock_guard lock(CIForComplete->fileStatusLock);
-            if (CIForComplete->fileStatus.find(filePath) != CIForComplete->fileStatus.end()) {
-                CIForComplete->fileStatus[filePath] = CompilerInstance::SrcCodeChangeState::CHANGED;
-            }
-        }
-        CIForComplete->SetBufferCacheForParse(pkgInfoMap[fullPkgName]->bufferCache);
-        SetCommonPartCjo(CIForComplete, fullPkgName);
+        UpdateCIForParse(CIForComplete, fullPkgName, filePath, contents);
         CIForComplete->CompilePassForComplete(cjoManager, graph, pos, name);
         InitParseCacheForComplete(CIForComplete, fullPkgName);
-        return;
+    } else {
+        // delete and add new CI
+        auto newCI = std::make_unique<LSPCompilerInstance>(
+            callback, *pkgInfoMap[fullPkgName]->compilerInvocation, GetDiagnosticEngine(),
+            fullPkgName, moduleManager);
+        if (newCI == nullptr) {
+            return;
+        }
+        newCI->cangjieHome = modulesHome;
+        // update cache and read code from cache
+        newCI->loadSrcFilesFromCache = true;
+
+        UpdateCIForParse(newCI, fullPkgName, filePath, contents);
+        newCI->CompilePassForComplete(cjoManager, graph, pos, name);
+        CIForComplete = std::move(newCI);
+        InitParseCacheForComplete(CIForComplete, fullPkgName);
     }
-    // delete and add new CI
-    auto newCI = std::make_unique<LSPCompilerInstance>(callback, *pkgInfoMap[fullPkgName]->compilerInvocation,
-        GetDiagnosticEngine(), fullPkgName, moduleManager);
-    if (newCI == nullptr) {
-        return;
-    }
-    newCI->cangjieHome = modulesHome;
-    // update cache and read code from cache
-    newCI->loadSrcFilesFromCache = true;
-    if (pkgInfoMap[fullPkgName]->bufferCache.count(filePath) &&
-        !Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
-        std::lock_guard<std::mutex> lock(pkgInfoMap[fullPkgName]->pkgInfoMutex);
-        pkgInfoMap[fullPkgName]->bufferCache[filePath] = contents;
-    }
-    newCI->SetBufferCacheForParse(pkgInfoMap[fullPkgName]->bufferCache);
-    SetCommonPartCjo(newCI, fullPkgName);
-    newCI->CompilePassForComplete(cjoManager, graph, pos, name);
-    CIForComplete = std::move(newCI);
-    InitParseCacheForComplete(CIForComplete, fullPkgName);
 }
 
 void CompilerCangjieProject::IncrementCompileForSignatureHelp(const std::string &filePath, const std::string &contents)
 {
     std::string fullPkgName = GetFullPkgName(filePath);
     if (incrementalOptimize && CIForSignatureHelp && CIForSignatureHelp->pkgNameForPath == fullPkgName) {
-        if (pkgInfoMap[fullPkgName]->bufferCache.count(filePath) &&
-            !Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
-            {
-                std::lock_guard<std::mutex> lock(pkgInfoMap[fullPkgName]->pkgInfoMutex);
-                pkgInfoMap[fullPkgName]->bufferCache[filePath] = contents;
-            }
-            std::lock_guard lock(CIForSignatureHelp->fileStatusLock);
-            if (CIForSignatureHelp->fileStatus.find(filePath) != CIForSignatureHelp->fileStatus.end()) {
-                CIForSignatureHelp->fileStatus[filePath] = CompilerInstance::SrcCodeChangeState::CHANGED;
-            }
-        }
-        CIForSignatureHelp->SetBufferCacheForParse(pkgInfoMap[fullPkgName]->bufferCache);
-        SetCommonPartCjo(CIForSignatureHelp, fullPkgName);
+        UpdateCIForParse(CIForSignatureHelp, fullPkgName, filePath, contents);
         CIForSignatureHelp->PreCompileProcess();
         InitParseCacheForSignatureHelp(CIForSignatureHelp, fullPkgName);
-        return;
+    } else {
+        auto newCI = std::make_unique<LSPCompilerInstance>(
+            callback, *pkgInfoMap[fullPkgName]->compilerInvocation, GetDiagnosticEngine(),
+            fullPkgName, moduleManager);
+        if (newCI == nullptr) {
+            return;
+        }
+        UpdateCIForParse(newCI, fullPkgName, filePath, contents);
+        newCI->PreCompileProcess();
+        CIForSignatureHelp = std::move(newCI);
+        InitParseCacheForSignatureHelp(CIForSignatureHelp, fullPkgName);
     }
-    auto newCI = std::make_unique<LSPCompilerInstance>(
-        callback, *pkgInfoMap[fullPkgName]->compilerInvocation, GetDiagnosticEngine(),
-        fullPkgName, moduleManager);
-    if (newCI == nullptr) {
-        return;
-    }
-    if (pkgInfoMap[fullPkgName]->bufferCache.count(filePath) &&
-        !Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
-        std::lock_guard<std::mutex> lock(pkgInfoMap[fullPkgName]->pkgInfoMutex);
-        pkgInfoMap[fullPkgName]->bufferCache[filePath] = contents;
-    }
-    newCI->SetBufferCacheForParse(pkgInfoMap[fullPkgName]->bufferCache);
-    SetCommonPartCjo(newCI, fullPkgName);
-    newCI->PreCompileProcess();
-    CIForSignatureHelp = std::move(newCI);
-    InitParseCacheForSignatureHelp(CIForSignatureHelp, fullPkgName);
 }
 
+void CompilerCangjieProject::UpdateCIForParse(const std::unique_ptr<LSPCompilerInstance> &ci,
+                                              const std::string &fullPkgName,
+                                              const std::string &filePath,
+                                              const std::string &contents)
+{
+    ci->SetActiveFilePath(filePath);
+    if (pkgInfoMap[fullPkgName]->bufferCache.count(filePath) &&
+        !Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
+        {
+            std::lock_guard<std::mutex> lock(pkgInfoMap[fullPkgName]->pkgInfoMutex);
+            pkgInfoMap[fullPkgName]->bufferCache[filePath] = contents;
+        }
+        std::lock_guard lock(ci->fileStatusLock);
+        if (ci->fileStatus.find(filePath) != ci->fileStatus.end()) {
+            ci->fileStatus[filePath] = CompilerInstance::SrcCodeChangeState::CHANGED;
+        }
+    }
+    ci->SetBufferCacheForParse(pkgInfoMap[fullPkgName]->bufferCache);
+    HandleUpstreamSourceSet(fullPkgName, ci);
+}
+
+// LCOV_EXCL_START
 std::unique_ptr<LSPCompilerInstance> CompilerCangjieProject::GetCIForDotComplete(
     const std::string &filePath, Position pos, std::string &contents)
 {
     std::string fullPkgName = GetFullPkgName(filePath);
-    auto newCI = std::make_unique<LSPCompilerInstance>(
-        callback, *pkgInfoMap[fullPkgName]->compilerInvocation, GetDiagnosticEngine(),
-        fullPkgName, moduleManager);
+    auto newCI = std::make_unique<LSPCompilerInstance>(callback, *pkgInfoMap[fullPkgName]->compilerInvocation,
+        GetDiagnosticEngine(), fullPkgName, moduleManager);
     if (!newCI) {
         return nullptr;
     }
@@ -975,7 +1057,6 @@ std::unique_ptr<LSPCompilerInstance> CompilerCangjieProject::GetCIForDotComplete
         !Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION)) {
         newCI->bufferCache[filePath] = contents;
     }
-    SetCommonPartCjo(newCI, fullPkgName);
     newCI->CompilePassForComplete(cjoManager, graph, pos);
     return newCI;
 }
@@ -988,13 +1069,27 @@ std::unique_ptr<LSPCompilerInstance> CompilerCangjieProject::GetCIForFileRefacto
         return nullptr;
     }
     auto &invocation = pkgInfoMap[fullPkgName]->compilerInvocation;
-    // auto &diag = pkgInfoMap[fullPkgName]->diag;
+    // auto &diag = pkgInfoMap[package]->diag;
     auto ci = std::make_unique<LSPCompilerInstance>(callback, *invocation, GetDiagnosticEngine(),
         fullPkgName, moduleManager);
     ci->cangjieHome = modulesHome;
     ci->loadSrcFilesFromCache = true;
     ci->SetBufferCache(pkgInfoMap[fullPkgName]->bufferCache);
-    SetCommonPartCjo(ci, fullPkgName);
+    ci->upstreamSourceSetName = GetUpStreamSourceSetName(fullPkgName);
+    if (!ci->upstreamSourceSetName.empty()) {
+        std::string realPkgName = GetRealPackageName(fullPkgName);
+        std::string upstreamSourcePkg = ci->upstreamSourceSetName + "-" + realPkgName;
+        auto cjoData = cjoManager->GetData(upstreamSourcePkg);
+        if (!cjoData) {
+            ci->invocation.globalOptions.commonPartCjos.clear();
+        } else {
+            ci->invocation.globalOptions.commonPartCjos.clear();
+            ci->invocation.globalOptions.commonPartCjos.push_back(realPkgName);
+            ci->importManager->SetPackageCjoCache(realPkgName, *cjoData);
+        }
+    } else {
+        ci->invocation.globalOptions.commonPartCjos.clear();
+    }
     ci->PreCompileProcess();
 
     return ci;
@@ -1003,24 +1098,25 @@ std::unique_ptr<LSPCompilerInstance> CompilerCangjieProject::GetCIForFileRefacto
 void CompilerCangjieProject::IncrementCompileForCompleteNotInSrc(
     const std::string &name, const std::string &filePath, const std::string &contents)
 {
-    std::string dirPath = Normalize(GetDirPath(filePath));
-    if (pkgInfoMapNotInSrc.find(dirPath) == pkgInfoMapNotInSrc.end()) {
+    std::string cacheKey = GetNotInSrcCacheKey(filePath);
+    if (pkgInfoMapNotInSrc.find(cacheKey) == pkgInfoMapNotInSrc.end()) {
         return;
     }
 
     auto newCI = std::make_unique<LSPCompilerInstance>(
-        callback, *pkgInfoMapNotInSrc[dirPath]->compilerInvocation,
+        callback, *pkgInfoMapNotInSrc[cacheKey]->compilerInvocation,
         GetDiagnosticEngine(), "", moduleManager);
     if (newCI == nullptr) {
         return;
     }
     newCI->cangjieHome = modulesHome;
+    newCI->SetActiveFilePath(filePath);
     // update cache and read code from cache
     newCI->loadSrcFilesFromCache = true;
-    if (pkgInfoMapNotInSrc[dirPath]->bufferCache.count(filePath)) {
-        pkgInfoMapNotInSrc[dirPath]->bufferCache[filePath] = contents;
+    if (pkgInfoMapNotInSrc[cacheKey]->bufferCache.count(filePath)) {
+        pkgInfoMapNotInSrc[cacheKey]->bufferCache[filePath] = contents;
     }
-    newCI->SetBufferCacheForParse(pkgInfoMapNotInSrc[dirPath]->bufferCache);
+    newCI->SetBufferCacheForParse(pkgInfoMapNotInSrc[cacheKey]->bufferCache);
 
     newCI->CompilePassForComplete(cjoManager, graph, INVALID_POSITION, name);
     CIForComplete = std::move(newCI);
@@ -1030,24 +1126,25 @@ void CompilerCangjieProject::IncrementCompileForCompleteNotInSrc(
 void CompilerCangjieProject::IncrementCompileForSignatureHelpNotInSrc(const std::string &filePath,
     const std::string &contents)
 {
-    std::string dirPath = Normalize(GetDirPath(filePath));
-    if (pkgInfoMapNotInSrc.find(dirPath) == pkgInfoMapNotInSrc.end()) {
+    std::string cacheKey = GetNotInSrcCacheKey(filePath);
+    if (pkgInfoMapNotInSrc.find(cacheKey) == pkgInfoMapNotInSrc.end()) {
         return;
     }
 
     auto newCI = std::make_unique<LSPCompilerInstance>(
-        callback, *pkgInfoMapNotInSrc[dirPath]->compilerInvocation,
+        callback, *pkgInfoMapNotInSrc[cacheKey]->compilerInvocation,
         GetDiagnosticEngine(), "", moduleManager);
     if (newCI == nullptr) {
         return;
     }
     newCI->cangjieHome = modulesHome;
+    newCI->SetActiveFilePath(filePath);
     // update cache and read code from cache
     newCI->loadSrcFilesFromCache = true;
-    if (pkgInfoMapNotInSrc[dirPath]->bufferCache.count(filePath)) {
-        pkgInfoMapNotInSrc[dirPath]->bufferCache[filePath] = contents;
+    if (pkgInfoMapNotInSrc[cacheKey]->bufferCache.count(filePath)) {
+        pkgInfoMapNotInSrc[cacheKey]->bufferCache[filePath] = contents;
     }
-    newCI->SetBufferCache(pkgInfoMap[dirPath]->bufferCache);
+    newCI->SetBufferCache(pkgInfoMapNotInSrc[cacheKey]->bufferCache);
 
     newCI->PreCompileProcess();
     CIForSignatureHelp = std::move(newCI);
@@ -1074,21 +1171,21 @@ void CompilerCangjieProject::InitParseCacheForComplete(const std::unique_ptr<LSP
                 std::lock_guard<std::mutex> lock(pkgInfoMap[pkgForPath]->pkgInfoMutex);
                 contents = pkgInfoMap[pkgForPath]->bufferCache[file->filePath];
             } else {
-                std::string dirPath = Normalize(GetDirPath(file->filePath));
-                if (pkgInfoMapNotInSrc.find(dirPath) == pkgInfoMapNotInSrc.end()) {
+                std::string cacheKey = GetNotInSrcCacheKey(file->filePath);
+                if (pkgInfoMapNotInSrc.find(cacheKey) == pkgInfoMapNotInSrc.end()) {
                     continue;
                 }
-                std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[dirPath]->pkgInfoMutex);
-                contents = pkgInfoMapNotInSrc[dirPath]->bufferCache[file->filePath];
+                std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[cacheKey]->pkgInfoMutex);
+                contents = pkgInfoMapNotInSrc[cacheKey]->bufferCache[file->filePath];
             }
             std::pair<std::string, std::string> paths = { file->filePath, contents };
             auto arkAST = std::make_unique<ArkAST>(paths, file.get(), lspCI->diag,
                                                    this->packageInstanceCacheForComplete.get(),
                                                    &lspCI->GetSourceManager());
             std::string absName = FileStore::NormalizePath(file->filePath);
-            int fileId = lspCI->GetSourceManager().GetFileID(absName);
-            if (fileId >= 0) {
-                arkAST->fileID = static_cast<unsigned int>(fileId);
+            auto fileId = lspCI->GetSourceManager().TryGetFileID(absName);
+            if (fileId) {
+                arkAST->fileID = fileId.value_or(0);
             }
             this->fileCacheForComplete[absName] = std::move(arkAST);
         }
@@ -1115,12 +1212,12 @@ void CompilerCangjieProject::InitParseCacheForSignatureHelp(const std::unique_pt
                 std::lock_guard<std::mutex> lock(pkgInfoMap[pkgForPath]->pkgInfoMutex);
                 contents = pkgInfoMap[pkgForPath]->bufferCache[file->filePath];
             } else {
-                std::string dirPath = Normalize(GetDirPath(file->filePath));
-                if (pkgInfoMapNotInSrc.find(dirPath) == pkgInfoMapNotInSrc.end()) {
+                std::string cacheKey = GetNotInSrcCacheKey(file->filePath);
+                if (pkgInfoMapNotInSrc.find(cacheKey) == pkgInfoMapNotInSrc.end()) {
                     continue;
                 }
-                std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[dirPath]->pkgInfoMutex);
-                contents = pkgInfoMapNotInSrc[dirPath]->bufferCache[file->filePath];
+                std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[cacheKey]->pkgInfoMutex);
+                contents = pkgInfoMapNotInSrc[cacheKey]->bufferCache[file->filePath];
             }
             std::pair<std::string, std::string> paths = { file->filePath, contents };
             auto arkAST = std::make_unique<ArkAST>(paths, file.get(), lspCI->diag,
@@ -1138,6 +1235,15 @@ void CompilerCangjieProject::InitParseCacheForSignatureHelp(const std::unique_pt
 
 std::pair<CangjieFileKind, std::string> CompilerCangjieProject::GetCangjieFileKind(const std::string &filePath, bool isPkg) const
 {
+    if (isSingleFileMode && !singleFilePath.empty() && !isPkg) {
+        std::string normalizeInput = Normalize(filePath);
+        std::string normalizeSingleDir = GetDirPath(Normalize(singleFilePath));
+        std::string inputDir = GetDirPath(normalizeInput);
+        if (normalizeInput == Normalize(singleFilePath) || inputDir == normalizeSingleDir) {
+            return {CangjieFileKind::IN_PROJECT_NOT_IN_SOURCE, normalizeSingleDir};
+        }
+    }
+
     std::string normalizeFilePath = Normalize(filePath);
     std::string dirPath = isPkg ? normalizeFilePath : GetDirPath(normalizeFilePath);
     if (pathToFullPkgName.find(dirPath) != pathToFullPkgName.end()) {
@@ -1188,9 +1294,10 @@ bool CompilerCangjieProject::InitCache(const std::unique_ptr<LSPCompilerInstance
         }
 
         // if pkg->files[0]->filePath is a dir file we need dirPath is pkgForPath
-        std::string dirPath = Normalize(GetDirPath(pkg->files[0]->filePath));
+        std::string cacheKey = isInModule ? Normalize(GetDirPath(pkg->files[0]->filePath))
+                                          : GetNotInSrcCacheKey(pkg->files[0]->filePath);
         if (GetFileExtension(pkg->files[0]->filePath) != "cj") {
-            dirPath = Normalize(pkg->files[0]->filePath);
+            cacheKey = isInModule ? Normalize(pkg->files[0]->filePath) : pkgForPath;
         }
 
         for (auto &file : pkg->files) {
@@ -1211,21 +1318,21 @@ bool CompilerCangjieProject::InitCache(const std::unique_ptr<LSPCompilerInstance
                     contents = pkgInfoMap[pkgForPath]->bufferCache[filePath];
                 }
             } else {
-                if (pkgInfoMapNotInSrc.find(dirPath) == pkgInfoMapNotInSrc.end()) {
+                if (pkgInfoMapNotInSrc.find(cacheKey) == pkgInfoMapNotInSrc.end()) {
                     continue;
                 }
                 {
-                    std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[pkgForPath]->pkgInfoMutex);
-                    contents = pkgInfoMapNotInSrc[dirPath]->bufferCache[filePath];
+                    std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[cacheKey]->pkgInfoMutex);
+                    contents = pkgInfoMapNotInSrc[cacheKey]->bufferCache[filePath];
                 }
             }
             std::pair<std::string, std::string> paths = {filePath, contents};
             auto arkAST = std::make_unique<ArkAST>(paths, file.get(), lspCI->diag, pkgInstance.get(),
                                                    &lspCI->GetSourceManager());
             std::string absName = FileStore::NormalizePath(filePath);
-            int fileId = lspCI->GetSourceManager().GetFileID(absName);
-            if (fileId >= 0) {
-                arkAST->fileID = static_cast<unsigned int>(fileId);
+            auto fileId = lspCI->GetSourceManager().TryGetFileID(absName);
+            if (fileId) {
+                arkAST->fileID = fileId.value_or(0);
             }
             {
                 std::unique_lock<std::recursive_mutex> lock(fileCacheMtx);
@@ -1234,14 +1341,14 @@ bool CompilerCangjieProject::InitCache(const std::unique_ptr<LSPCompilerInstance
         }
         {
             std::unique_lock lock(fileCacheMtx);
-            this->packageInstanceCache[dirPath] = std::move(pkgInstance);
+            this->packageInstanceCache[cacheKey] = std::move(pkgInstance);
         }
     }
     return true;
 }
 
 bool CompilerCangjieProject::InitPackage(const std::string &packagePath, const std::string &fullPackageName,
-    const ModuleInfo &moduleInfo, PkgType pkgType)
+                                         const ModuleInfo &moduleInfo, PkgType pkgType)
 {
     pkgInfoMap[fullPackageName] = std::make_unique<PkgInfo>(packagePath, moduleInfo.modulePath,
                                                             moduleInfo.moduleName, callback, pkgType);
@@ -1272,7 +1379,7 @@ bool CompilerCangjieProject::InitPackage(const std::string &packagePath, const s
 }
 
 void CompilerCangjieProject::InitSubPackages(const std::string &sourcePath, const std::string &rootPackageName,
-    const ModuleInfo &moduleInfo, PkgType pkgType)
+                                             const ModuleInfo &moduleInfo, PkgType pkgType)
 {
     for (auto &packagePath: GetAllDirsUnderCurrentPath(sourcePath)) {
         packagePath = Normalize(packagePath);
@@ -1343,11 +1450,14 @@ void CompilerCangjieProject::InitNotInModule()
 
     for (const auto& nosrc : notInSrcDirs) {
         auto allFiles = GetAllFilesUnderCurrentPath(nosrc, CANGJIE_FILE_EXTENSION, false);
-        pkgInfoMapNotInSrc[nosrc] = std::make_unique<PkgInfo>(nosrc, "", "", callback);
         for (const auto &file : allFiles) {
             std::string filePath = NormalizePath(JoinPath(nosrc, file));
             LowFileName(filePath);
-            pkgInfoMapNotInSrc[nosrc]->bufferCache.emplace(filePath, GetFileContents(filePath));
+            std::string cacheKey = GetNotInSrcCacheKey(filePath);
+            if (pkgInfoMapNotInSrc.find(cacheKey) == pkgInfoMapNotInSrc.end()) {
+                pkgInfoMapNotInSrc[cacheKey] = std::make_unique<PkgInfo>(cacheKey, "", "", callback);
+            }
+            pkgInfoMapNotInSrc[cacheKey]->bufferCache.emplace(filePath, GetFileContents(filePath));
         }
     }
 
@@ -1376,7 +1486,7 @@ void CompilerCangjieProject::UpdateDownstreamPackages()
                 LSPCompilerInstance::dependentPackageMap[dep.first].importPackages.count(item)) {
                 willDeleteKey.push_back(item);
                 continue;
-            }
+                }
             LSPCompilerInstance::dependentPackageMap[item].downstreamPkgs.insert(dep.first);
         }
         for (auto &item : willDeleteKey) {
@@ -1477,7 +1587,7 @@ void CompilerCangjieProject::InitPkgInfoAndParse()
     InitPkgInfoAndParseNotInModule();
     UpdateDownstreamPackages();
 }
-
+// LCOV_EXCL_START
 void CompilerCangjieProject::EraseOtherCache(const std::string &fullPkgName)
 {
     if (fullPkgName.empty() || pkgInfoMap.find(fullPkgName) == pkgInfoMap.end() ||
@@ -1521,39 +1631,7 @@ void CompilerCangjieProject::EraseOtherCache(const std::string &fullPkgName)
     (void) malloc_zone_pressure_relief(malloc_default_zone(), 0);
 #endif
 }
-
-bool CompilerCangjieProject::SetCommonPartCjoForFullCompile(std::unique_ptr<Cangjie::LSPCompilerInstance> &ci,
-    const std::string &fullPkgName)
-{
-    if (!ci) {
-        return false;
-    }
-    if (ci->upstreamSourceSetName.empty()) {
-        return true;
-    }
-    const auto upstreamSourceSetName = std::move(ci->upstreamSourceSetName);
-    const auto bufferCache = std::move(ci->bufferCache);
-    std::string realPackageName = GetRealPackageName(fullPkgName);
-    std::string upstreamSourcePkg = upstreamSourceSetName + "-" + realPackageName;
-    auto cjoData = cjoManager->GetData(upstreamSourcePkg);
-    if (!cjoData) {
-        return false;
-    }
-    callback->RemoveDiagOfCurPkg(ci->invocation.globalOptions.packagePaths.front());
-    ci = std::make_unique<LSPCompilerInstance>(
-        callback, ci->invocation, GetDiagnosticEngine(), fullPkgName, moduleManager);
-    ci->cangjieHome = modulesHome;
-    ci->loadSrcFilesFromCache = true;
-    ci->upstreamSourceSetName = upstreamSourceSetName;
-    ci->bufferCache = bufferCache;
-    ci->invocation.globalOptions.commonPartCjo.reset();
-    ci->invocation.globalOptions.commonPartCjo = realPackageName;
-    ci->importManager->SetPackageCjoCache(realPackageName, *cjoData);
-    CIMap[fullPkgName] = std::move(ci);
-    CIMap[fullPkgName]->PreCompileProcess();
-    return true;
-}
-
+// LCOV_EXCL_STOP
 void CompilerCangjieProject::FullCompilation()
 {
     if (MessageHeaderEndOfLine::GetIsDeveco() && lsp::CjdIndexer::GetInstance() != nullptr) {
@@ -1616,7 +1694,7 @@ void CompilerCangjieProject::FullCompilation()
         for (auto &iter: allDependencies) {
             dependencies.emplace(GenTaskId(iter));
         }
-        auto task = [this, fullPkg, taskId, token, &workDoneCnt, &sendReport]() {
+        auto task = [this, fullPkg, taskId, token, &sendReport]() {
             Trace::Log("start execute task ", fullPkg);
             if (CIMap.find(fullPkg) == CIMap.end()) {
                 sendReport();
@@ -1634,11 +1712,30 @@ void CompilerCangjieProject::FullCompilation()
             }
             auto &ci = CIMap[fullPkg];
             // all package do parse in funll compilation, so need reparse to input common cjo path
-            if (!SetCommonPartCjoForFullCompile(ci, fullPkg)) {
-                Trace::Log("can not find upstream source-set cache, failed execuate task", fullPkg);
-                sendReport();
-                thrdPool->TaskCompleted(taskId);
-                return;
+            if (!ci->upstreamSourceSetName.empty()) {
+                const auto upstreamSourceSetName = std::move(ci->upstreamSourceSetName);
+                const auto bufferCache = std::move(ci->bufferCache);
+                std::string realPackageName = GetRealPackageName(fullPkg);
+                std::string upstreamSourcePkg = upstreamSourceSetName + "-" + realPackageName;
+                auto cjoData = cjoManager->GetData(upstreamSourcePkg);
+                if (!cjoData) {
+                    Trace::Log("can not find upstream source-set cache, failed execuate task", fullPkg);
+                    sendReport();
+                    thrdPool->TaskCompleted(taskId);
+                    return;
+                }
+                ClearDiagnosticsForPkg(*pkgInfoMap[fullPkg]);
+                ci = std::make_unique<LSPCompilerInstance>(
+                    callback, ci->invocation, GetDiagnosticEngine(), fullPkg, moduleManager);
+                ci->cangjieHome = modulesHome;
+                ci->loadSrcFilesFromCache = true;
+                ci->upstreamSourceSetName = upstreamSourceSetName;
+                ci->bufferCache = bufferCache;
+                ci->invocation.globalOptions.commonPartCjos.clear();
+                ci->invocation.globalOptions.commonPartCjos.push_back(realPackageName);
+                ci->importManager->SetPackageCjoCache(realPackageName, *cjoData);
+                CIMap[fullPkg] = std::move(ci);
+                CIMap[fullPkg]->PreCompileProcess();
             }
             bool changed = CIMap[fullPkg]->CompileAfterParse(cjoManager, graph);
             if (changed) {
@@ -1661,7 +1758,7 @@ void CompilerCangjieProject::FullCompilation()
     callback->SendWorkDoneProgressEnd(token, end);
     Trace::Log("All tasks are completed in full compilation");
 }
-
+// LCOV_EXCL_START
 bool CompilerCangjieProject::LoadASTCache(const std::string &package)
 {
     if (!cacheManager->IsStale(package, Digest(GetPathFromPkg(package)))) {
@@ -1681,7 +1778,7 @@ bool CompilerCangjieProject::LoadASTCache(const std::string &package)
 
     return false;
 }
-
+// LCOV_EXCL_STOP
 bool CompilerCangjieProject::Compiler(const std::string &moduleUri,
                                       const nlohmann::json &initializationOptions,
                                       const Environment &environment)
@@ -1696,6 +1793,19 @@ bool CompilerCangjieProject::Compiler(const std::string &moduleUri,
     }
 
     workspace = FileStore::NormalizePath(URI::Resolve(moduleUri));
+
+    // Detect single-file mode from initializationOptions
+    if (initializationOptions.contains(SINGLE_FILE_PATH_OPTION)) {
+        std::string sfPath = initializationOptions.value(SINGLE_FILE_PATH_OPTION, "");
+        if (!sfPath.empty()) {
+            isSingleFileMode = true;
+#ifdef _WIN32
+            sfPath = NormalizeStringToGBK(sfPath);
+#endif
+            singleFilePath = FileStore::NormalizePath(sfPath);
+        }
+    }
+
     std::string modulesHomeOption;
     if (initializationOptions.contains(MODULES_HOME_OPTION)) {
         modulesHomeOption = initializationOptions.value(MODULES_HOME_OPTION, "");
@@ -1889,6 +1999,7 @@ std::vector<std::string> CompilerCangjieProject::GetCommonSpecificModuleSrcPaths
 void CompilerCangjieProject::UpdateBuffCache(const std::string &file, bool isContentChange)
 {
     auto fullPkgName = GetFullPkgName(file);
+    auto notInSrcCacheKey = GetNotInSrcCacheKey(file);
     if (pkgInfoMap.find(fullPkgName) != pkgInfoMap.end() &&
         !Cangjie::FileUtil::HasExtension(file, CANGJIE_MACRO_FILE_EXTENSION)) {
         {
@@ -1896,11 +2007,11 @@ void CompilerCangjieProject::UpdateBuffCache(const std::string &file, bool isCon
             pkgInfoMap[fullPkgName]->bufferCache[file] = callback->GetContentsByFile(file);
         }
     }
-    if (pkgInfoMapNotInSrc.find(fullPkgName) != pkgInfoMapNotInSrc.end() &&
+    if (pkgInfoMapNotInSrc.find(notInSrcCacheKey) != pkgInfoMapNotInSrc.end() &&
         !Cangjie::FileUtil::HasExtension(file, CANGJIE_MACRO_FILE_EXTENSION)) {
         {
-            std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[fullPkgName]->pkgInfoMutex);
-            pkgInfoMapNotInSrc[fullPkgName]->bufferCache[file] = callback->GetContentsByFile(file);
+            std::lock_guard<std::mutex> lock(pkgInfoMapNotInSrc[notInSrcCacheKey]->pkgInfoMutex);
+            pkgInfoMapNotInSrc[notInSrcCacheKey]->bufferCache[file] = callback->GetContentsByFile(file);
         }
     }
     if (isContentChange) {
@@ -1913,7 +2024,7 @@ void CompilerCangjieProject::UpdateBuffCache(const std::string &file, bool isCon
     UpdateFileStatusInCI(fullPkgName, file, CompilerInstance::SrcCodeChangeState::CHANGED);
 }
 
-
+// LCOV_EXCL_START
 std::vector<std::vector<std::string>> CompilerCangjieProject::ResolveDependence()
 {
     std::vector<std::vector<std::string>> res;
@@ -1935,7 +2046,7 @@ std::vector<std::vector<std::string>> CompilerCangjieProject::ResolveDependence(
     }
     return res;
 }
-
+// LCOV_EXCL_STOP
 void CompilerCangjieProject::ReportCircularDeps(const std::vector<std::vector<std::string>> &cycles)
 {
     for (const auto &it : cycles) {
@@ -1953,7 +2064,7 @@ void CompilerCangjieProject::ReportCircularDeps(const std::vector<std::vector<st
             if (files.empty()) {
                 continue;
             }
-            callback->RemoveDiagOfCurPkg(pkgInfoMap[pkg]->packagePath);
+            ClearDiagnosticsForPkg(*pkgInfoMap[pkg]);
             for (const auto &file: files) {
                 const auto &filePath = FileStore::NormalizePath(JoinPath(dirPath, file));
                 DiagnosticToken dt;
@@ -1987,7 +2098,7 @@ void CompilerCangjieProject::ReportCombinedCycles()
         if (files.empty()) {
             continue;
         }
-        callback->RemoveDiagOfCurPkg(pkgInfoMap[pkg]->packagePath);
+        ClearDiagnosticsForPkg(*pkgInfoMap[pkg]);
         std::ostringstream diagMessage;
         diagMessage << "packages " << combinedCirclePkgName
                     << " are in circular dependencies (because of combined module '"
@@ -2011,7 +2122,7 @@ void CompilerCangjieProject::EmitDiagsOfFile(const std::string &filePath)
     std::vector<DiagnosticToken> diagnostics = callback->GetDiagsOfCurFile(filePath);
     callback->ReadyForDiagnostics(filePath, callback->GetVersionByFile(filePath), diagnostics);
 }
-
+// LCOV_EXCL_START
 void CompilerCangjieProject::TarjanForSCC(SCCParam &sccParam, std::stack<std::string> &st, size_t &index,
                                           const std::string &pkgName, std::vector<std::vector<std::string>> &cycles)
 {
@@ -2047,7 +2158,7 @@ void CompilerCangjieProject::TarjanForSCC(SCCParam &sccParam, std::stack<std::st
         }
     }
 }
-
+// LCOV_EXCL_STOP
 void CompilerCangjieProject::GetRealPath(std::string &path)
 {
     if (!IsRelativePathByImported(path)) {
@@ -2138,15 +2249,123 @@ bool CompilerCangjieProject::CheckPackageModifier(const File &needCheckedFile, c
     return true;
 }
 
-int CompilerCangjieProject::GetFileID(const std::string &fileName)
+void CompilerCangjieProject::ValidateScriptDependencyImports(
+    const std::unique_ptr<LSPCompilerInstance> &ci,
+    const std::string &filePath)
+{
+    if (!ci || filePath.empty()) {
+        return;
+    }
+
+    ClearScriptDependencyImportDiags(filePath);
+    if (IsBuildScriptFile(filePath)) {
+        return;
+    }
+
+    auto packages = ci->GetSourcePackages();
+    if (packages.empty() || !packages[0]) {
+        return;
+    }
+
+    for (const auto &package : packages) {
+        if (!package) {
+            continue;
+        }
+        if (ValidateScriptDependencyImportsInPackage(*package, filePath)) {
+            return;
+        }
+    }
+}
+
+void CompilerCangjieProject::ClearScriptDependencyImportDiags(const std::string &filePath)
+{
+    for (const auto &diag : callback->GetDiagsOfCurFile(filePath)) {
+        if (diag.code == SCRIPT_DEPENDENCY_IMPORT_ERROR_CODE) {
+            callback->RemoveDiagnostic(filePath, diag);
+        }
+    }
+}
+
+bool CompilerCangjieProject::ValidateScriptDependencyImportsInPackage(
+    const Package &package,
+    const std::string &filePath)
+{
+    for (const auto &file : package.files) {
+        if (!file || file->filePath != filePath || !file->curPackage) {
+            continue;
+        }
+        ValidateScriptDependencyImportsInFile(*file, filePath);
+        return true;
+    }
+    return false;
+}
+
+void CompilerCangjieProject::ValidateScriptDependencyImportsInFile(const File &file, const std::string &filePath)
+{
+    if (!file.curPackage) {
+        return;
+    }
+    const auto curModule = GetModuleNameByFile(filePath, file.curPackage->fullPackageName);
+    if (curModule.empty()) {
+        return;
+    }
+
+    const auto normalDeps = GetOneModuleDeps(curModule, false);
+    const auto buildDeps = GetOneModuleDeps(curModule, true);
+    if (buildDeps.empty()) {
+        return;
+    }
+
+    for (const auto &importSpec : file.imports) {
+        if (importSpec && !importSpec->end.IsZero()) {
+            ValidateScriptDependencyImportSpec(*importSpec, filePath, curModule, normalDeps, buildDeps);
+        }
+    }
+}
+
+void CompilerCangjieProject::ValidateScriptDependencyImportSpec(const ImportSpec &importSpec,
+    const std::string &filePath, const std::string &curModule,
+    const std::unordered_set<std::string> &normalDeps,
+    const std::unordered_set<std::string> &buildDeps)
+{
+    for (const auto &importedModule : GetImportedModules(importSpec)) {
+        if (importedModule.empty() || importedModule == curModule) {
+            continue;
+        }
+        if (!buildDeps.count(importedModule) || normalDeps.count(importedModule)) {
+            continue;
+        }
+        ReportScriptDependencyImport(filePath, importSpec, importedModule);
+        break;
+    }
+}
+
+void CompilerCangjieProject::ReportScriptDependencyImport(const std::string &filePath,
+    const ImportSpec &importSpec, const std::string &importedModule)
+{
+    DiagnosticToken dt;
+    dt.category = SCRIPT_DEPENDENCY_IMPORT_ERROR_CODE;
+    dt.code = SCRIPT_DEPENDENCY_IMPORT_ERROR_CODE;
+    dt.message = "module '" + importedModule
+        + "' is declared in script-dependencies and can only be imported in build.cj";
+    dt.range = {
+        {importSpec.begin.fileID, importSpec.begin.line - 1, importSpec.begin.column - 1},
+        {importSpec.end.fileID, importSpec.end.line - 1, importSpec.end.column - 1}
+    };
+    dt.severity = 1;
+    dt.source = "Cangjie";
+    callback->UpdateDiagnostic(filePath, dt);
+}
+
+std::optional<unsigned int> CompilerCangjieProject::GetFileID(const std::string &fileName)
 {
     std::string fullPkgName = GetFullPkgName(fileName);
+    std::string notInSrcCacheKey = GetNotInSrcCacheKey(fileName);
     if (pLRUCache->HasCache(fullPkgName)) {
-        return pLRUCache->Get(fullPkgName)->GetSourceManager().GetFileID(fileName);
+        return pLRUCache->Get(fullPkgName)->GetSourceManager().TryGetFileID(fileName);
     }
-    std::string dirPath = GetDirPath(fileName);
-    if (pLRUCache->HasCache(dirPath)) {
-        return pLRUCache->Get(dirPath)->GetSourceManager().GetFileID(fileName);
+    if (pLRUCache->HasCache(notInSrcCacheKey)) {
+        return pLRUCache->Get(notInSrcCacheKey)->GetSourceManager().TryGetFileID(fileName);
     }
     return 0;
 }
@@ -2168,11 +2387,11 @@ Callbacks* CompilerCangjieProject::GetCallback()
 bool CompilerCangjieProject::FileHasSemaCache(const std::string &fileName)
 {
     std::string fullPkgName = GetFullPkgName(fileName);
+    std::string notInSrcCacheKey = GetNotInSrcCacheKey(fileName);
     if (pLRUCache->HasCache(fullPkgName)) {
         return true;
     }
-    std::string dirPath = GetDirPath(fileName);
-    if (pLRUCache->HasCache(dirPath)) {
+    if (pLRUCache->HasCache(notInSrcCacheKey)) {
         return true;
     }
     return false;
@@ -2181,15 +2400,15 @@ bool CompilerCangjieProject::FileHasSemaCache(const std::string &fileName)
 bool CompilerCangjieProject::CheckNeedCompiler(const std::string &fileName)
 {
     std::string fullPkgName = GetFullPkgName(fileName);
+    std::string notInSrcCacheKey = GetNotInSrcCacheKey(fileName);
     if (!cjoManager->CheckStatus({fullPkgName}).empty()) {
         return true;
     }
     if (pkgInfoMap.find(fullPkgName) != pkgInfoMap.end()) {
         return pkgInfoMap[fullPkgName]->needReCompile;
     }
-    std::string dirPath = GetDirPath(fileName);
-    if (pkgInfoMapNotInSrc.find(dirPath) != pkgInfoMapNotInSrc.end()) {
-        return pkgInfoMapNotInSrc[dirPath]->needReCompile;
+    if (pkgInfoMapNotInSrc.find(notInSrcCacheKey) != pkgInfoMapNotInSrc.end()) {
+        return pkgInfoMapNotInSrc[notInSrcCacheKey]->needReCompile;
     }
     return false;
 }
@@ -2202,15 +2421,15 @@ bool CompilerCangjieProject::PkgHasSemaCache(const std::string &pkgName)
 std::string CompilerCangjieProject::GetPathBySource(const std::string& fileName, unsigned int id)
 {
     std::string fullPkgName = GetFullPkgName(fileName);
+    std::string notInSrcCacheKey = GetNotInSrcCacheKey(fileName);
     std::string path;
     if (pLRUCache->HasCache(fullPkgName)) {
         path = pLRUCache->Get(fullPkgName)->GetSourceManager().GetSource(id).path;
         GetRealPath(path);
         return path;
     }
-    std::string dirPath = GetDirPath(fileName);
-    if (pLRUCache->HasCache(dirPath)) {
-        path = pLRUCache->Get(dirPath)->GetSourceManager().GetSource(id).path;
+    if (pLRUCache->HasCache(notInSrcCacheKey)) {
+        path = pLRUCache->Get(notInSrcCacheKey)->GetSourceManager().GetSource(id).path;
         GetRealPath(path);
         return path;
     }
@@ -2231,9 +2450,9 @@ std::string CompilerCangjieProject::GetPathBySource(const Node &node, unsigned i
         return "";
     }
     path = fileNode == nullptr ? node.curFile->filePath : fileNode->filePath;
-    std::string dirPath = GetDirPath(path);
-    if (pLRUCache->HasCache(dirPath)) {
-        path = pLRUCache->Get(dirPath)->GetSourceManager().GetSource(id).path;
+    std::string notInSrcCacheKey = GetNotInSrcCacheKey(path);
+    if (pLRUCache->HasCache(notInSrcCacheKey)) {
+        path = pLRUCache->Get(notInSrcCacheKey)->GetSourceManager().GetSource(id).path;
         GetRealPath(path);
         return path;
     }
@@ -2296,7 +2515,7 @@ void CompilerCangjieProject::StoreAllPackagesCache()
         StorePackageCache(fullPkgName);
     }
 }
-
+// LCOV_EXCL_START
 void CompilerCangjieProject::StorePackageCache(const std::string& pkgName)
 {
     if (!useDB) {
@@ -2317,9 +2536,10 @@ void CompilerCangjieProject::StorePackageCache(const std::string& pkgName)
     cacheManager->Store(
         pkgName, Digest(GetPathFromPkg(pkgName)), *cjoManager->GetData(pkgName));
 }
-
+// LCOV_EXCL_STOP
 void CompilerCangjieProject::BuildIndex(const std::unique_ptr<LSPCompilerInstance> &ci, bool isFullCompilation)
 {
+    (void)isFullCompilation;
     auto packages = ci->GetSourcePackages();
     if (!packages[0] || !ci->typeManager) {
         return;
@@ -2372,9 +2592,9 @@ void CompilerCangjieProject::BuildIndex(const std::unique_ptr<LSPCompilerInstanc
             auto digest = Digest(absName);
             fileInfo.emplace_back(digest);
             fileMap.insert(std::make_pair(id, fileInfo));
-            int fileId = ci->GetSourceManager().GetFileID(absName);
-            if (fileId >= 0) {
-                arkAST->fileID = static_cast<unsigned int>(fileId);
+            auto fileId = ci->GetSourceManager().TryGetFileID(absName);
+            if (fileId) {
+                arkAST->fileID = fileId.value_or(0);
             }
             {
                 std::unique_lock<std::recursive_mutex> lock(fileCacheMtx);
@@ -2432,7 +2652,6 @@ void CompilerCangjieProject::UpdateOnDisk(const std::string &path)
         return;
     }
     std::string pkgName = found->second;
-    DataStatus status = cjoManager->GetStatus(pkgName);
     cacheManager->Store(pkgName, Digest(GetPathFromPkg(pkgName)), LSPCompilerInstance::astDataMap[pkgName].first);
 }
 
@@ -2570,7 +2789,7 @@ void CompilerCangjieProject::BuildIndexFromCjo()
         Trace::Log("UpdateAll End");
     }
 }
-
+// LCOV_EXCL_START
 void CompilerCangjieProject::BuildIndexFromCache(const std::string &package) {
         std::string sourceCodePath = GetPathFromPkg(package);
         if (sourceCodePath.empty()) {
@@ -2591,25 +2810,59 @@ void CompilerCangjieProject::BuildIndexFromCache(const std::string &package) {
             (void) memIndex->pkgReExportSymsMap.insert_or_assign(package, indexCache->get()->reExportSymbols);
         }
 }
-
-std::unordered_set<std::string> CompilerCangjieProject::GetOneModuleDeps(const std::string &curModule)
+// LCOV_EXCL_STOP
+std::unordered_set<std::string> CompilerCangjieProject::GetOneModuleDeps(
+    const std::string &curModule,
+    bool includeScriptRequire)
 {
     std::unordered_set<std::string> res;
-    auto found = moduleManager->requireAllPackages.find(curModule);
-    if (found != moduleManager->requireAllPackages.end()) {
+    auto &requireMap = includeScriptRequire
+        ? moduleManager->requireAllPackagesInBuild : moduleManager->requireAllPackages;
+    auto found = requireMap.find(curModule);
+    if (found != requireMap.end()) {
         return found->second;
     }
     return res;
 }
 
-std::unordered_set<std::string> CompilerCangjieProject::GetOneModuleDirectDeps(const std::string &curModule)
+std::unordered_set<std::string> CompilerCangjieProject::GetOneModuleDirectDeps(
+    const std::string &curModule,
+    bool includeScriptRequire)
 {
     std::unordered_set<std::string> res;
-    auto found = moduleManager->requirePackages.find(curModule);
-    if (found != moduleManager->requirePackages.end()) {
-        return found->second;
+    if (!includeScriptRequire) {
+        auto found = moduleManager->requirePackages.find(curModule);
+        if (found != moduleManager->requirePackages.end()) {
+            return found->second;
+        }
+        return res;
+    }
+    if (!curModule.empty()) {
+        (void)res.insert(curModule);
+    }
+    auto scriptFound = moduleManager->scriptRequirePackages.find(curModule);
+    if (scriptFound != moduleManager->scriptRequirePackages.end()) {
+        res.insert(scriptFound->second.begin(), scriptFound->second.end());
     }
     return res;
+}
+
+std::string CompilerCangjieProject::GetModuleNameByFile(const std::string &filePath, const std::string &pkgName)
+{
+    if (moduleManager && moduleManager->IsBuildScriptFile(filePath)) {
+        return moduleManager->GetProjectModuleName();
+    }
+    std::string fullPkgName = pkgName.empty() ? GetFullPkgName(filePath) : pkgName;
+    fullPkgName = GetRealPackageName(fullPkgName);
+    if (fullPkgName.empty()) {
+        return "";
+    }
+    return SplitFullPackage(fullPkgName).first;
+}
+
+bool CompilerCangjieProject::IsBuildScriptFile(const std::string &filePath) const
+{
+    return moduleManager && moduleManager->IsBuildScriptFile(filePath);
 }
 
 bool CompilerCangjieProject::GetModuleCombined(const std::string &curModule)
@@ -2750,7 +3003,7 @@ std::string CompilerCangjieProject::GetSourceSetNameByPath(const std::string &pa
         return "";
     }
     size_t index = 0;
-    for (const auto &commonSpecificPath : commonSpecificPaths) {
+    for(const auto &commonSpecificPath : commonSpecificPaths) {
         if (IsUnderPath(commonSpecificPath, realPath, true)) {
             break;
         }
@@ -2801,8 +3054,7 @@ std::string CompilerCangjieProject::GetFinalDownStreamFullPkgName(const std::str
     return pkgName;
 }
 
-std::string CompilerCangjieProject::GetCurSourceSetName(const std::string& fullPackageName)
-{
+std::string CompilerCangjieProject::GetCurSourceSetName(const std::string& fullPackageName) {
     size_t dashPos = fullPackageName.find('-');
     if (dashPos == std::string::npos) {
         return "";
@@ -2810,8 +3062,7 @@ std::string CompilerCangjieProject::GetCurSourceSetName(const std::string& fullP
     return fullPackageName.substr(0, dashPos);
 }
 
-std::string CompilerCangjieProject::GetRealPackageName(const std::string& fullPackageName)
-{
+std::string CompilerCangjieProject::GetRealPackageName(const std::string& fullPackageName) {
     size_t dashPos = fullPackageName.find('-');
     if (dashPos == std::string::npos) {
         return fullPackageName;

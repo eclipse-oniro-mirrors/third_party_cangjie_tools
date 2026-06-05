@@ -126,15 +126,15 @@ func runScriptExe(scriptConfig: ScriptConfig, commandArg: String): Bool {
     if (RUN_SCRIPT_CMD_MAP.contains(scriptConfig.moduleName)) {
         (cmd, exePath, env) = RUN_SCRIPT_CMD_MAP[scriptConfig.moduleName]
         if (scriptConfig.isVerbose) {
-            println(cmd)
+            println("${cmd} ${commandArg}")
         }
     } else {
         exePath = scriptConfig.scriptExe
         let envBuilder = getEnvBuilder(scriptConfig.scriptLdPath)
         let originalEnv = getVariables()
         if (scriptConfig.isVerbose) {
-            cmd = "Run build script: ${getCmdStr(envBuilder.asCliStrings(originalEnv), exePath, ArrayList<String>([commandArg]))}"
- 	        println(cmd)
+            cmd = "Run build script: ${getCmdStr(envBuilder.asCliStrings(originalEnv), exePath, ArrayList<String>())}"
+            println("${cmd} ${commandArg}")
         }
         env = envBuilder.finish(HashMap<String, String>())
         for ((name,value) in env) {
@@ -318,16 +318,13 @@ func getScriptDepLink(modulePath: String, buildConfig: BuildConfig): Option<Arra
     }
 
     let target = if (buildConfig.isCrossCompile) { targetConfigName } else { crossCompileTarget }
-    let requireTasks = requires.iterator().map { it => TaskIdentifier(it, target, "") } |> collectHashSet
-    let taskId = TaskIdentifier("build-script", target, "")
     let compileTask: CompileTask = CompileTask(
-        id: taskId,
+        id: TaskId.BuildScriptCompile,
         fullName: "build-script",
         targetDir: buildConfig.globalConfig.targetDir,
         isCrossCompile: buildConfig.isCrossCompile,
         target: target,
         outputType: Exe,
-        requireTasks: requireTasks,
         isDebug: buildConfig.isDebug,
         isCov: buildConfig.isCov,
         mockSupported: buildConfig.mockSupported,

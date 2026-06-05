@@ -28,10 +28,10 @@ public enum AutoGenType0Inexport_class_2 {
     }
     public static func fromJSValue(context: JSContext, input: JSValue): AutoGenType0Inexport_class_2 {
         
-        if(input.isString()) {
+        if (input.isString()) {
             return STRING(String.fromJSValue(context, input))
         } 
-        if(input.isNumber()) {
+        if (input.isNumber()) {
             return NUMBER(Float64.fromJSValue(context, input))
         }  
         if (input.isBoolean()) {
@@ -51,7 +51,6 @@ public enum AutoGenType0Inexport_class_2 {
     }*/
 
 public class AppSettings {
-    
     protected AppSettings(var arkts_object: JSObject) { }
     
     
@@ -68,11 +67,11 @@ public class AppSettings {
         jsObjApiCall < AutoGenType0Inexport_class_2 >( arkts_object, "getSetting", { ctx =>[key.toJSValue(ctx)] }) { ctx, info => AutoGenType0Inexport_class_2.fromJSValue(ctx, info) }
     }
     
-    func toJSValue(context: JSContext): JSValue {
+    func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): AppSettings {
+    static func fromJSValue(_: JSContext, input: JSValue): AppSettings {
         AppSettings(input.asObject())
     }
 }

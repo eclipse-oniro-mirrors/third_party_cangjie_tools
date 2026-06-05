@@ -28,9 +28,9 @@ public class GlobalConfig {
     public var typeDeclFile: String = ""
     public var gconfigArray: ArrayList<GlobalConfig> = ArrayList<GlobalConfig>()
     public var arkTSMoudleName: String = ""
-    public var requiredUnionMembers: ArrayList<(String, TsType, ArrayList<String>)> = ArrayList<(String, TsType, ArrayList<String>)>()
-    public var requiredAnonymousInterfaces: ArrayList<ObjectType> = ArrayList<ObjectType>()
-    public var count: AtomicInt64 = AtomicInt64(0)
+    public var requiredUnionMembers = ArrayList<(String, TsType, ArrayList<String>)>()
+    public var requiredAnonymousInterfaces = ArrayList<ObjectType>()
+    public var count = AtomicInt64(0)
     public var fileName: String = ""
     private var cacheUnions: TreeMap<String, TsType> = TreeMap<String, TsType>()
     private var cacheAnonymousInterfaces: TreeMap<String, TsType> = TreeMap<String, TsType>()
@@ -267,20 +267,32 @@ public class GlobalConfig {
                         m.returnTypeNode = v
                 } 
             }
+
+             // Scan global types
+             for (i in 0..cns.types.size) {
+                let ty = cns.types[i].tsType
+                match (ty) {
+                    case TsUnion(_) =>
+                        scanTypeForUnions(ty, HashSet<String>(), isTopLevelTSUnion: true)
+                    case _ =>
+                        if (let Some(v) <- scanTypeForUnions(ty, HashSet<String>())) {
+                            cns.types[i].tsType = v
+                        }
+                }
+             }
         }
     }
     
     // Recursively scan a type for union types and record their member counts
-    private func scanTypeForUnions(ty: TsType, genericParameters: HashSet<String>): Option<TsType> {
+    // isTopLevelTSUnion indicates whether it is the outermost TsUnion type, such as type. The outermost TsUnion is not translated into TsRef(AutogenType***)
+    private func scanTypeForUnions(ty: TsType, genericParameters: HashSet<String>, isTopLevelTSUnion!: Bool = false): Option<TsType> {
         match (ty) {
-            case TsUnion(elems) =>
-                let elements = elems.map {item => 
-                    if (let Some(v) <- scanTypeForUnions(item, genericParameters)) {
-                        v
-                    } else {
-                        item
+            case TsUnion(elements) =>
+                for (i in 0..elements.size) { 
+                    if (let Some(v) <- scanTypeForUnions(elements[i], genericParameters)) {
+                        elements[i] = v
                     }
-                } 
+                }
                 let nonNullTypes = ArrayList<TsType>()
                 for (e in elements) {
                     match (e) {
@@ -301,7 +313,9 @@ public class GlobalConfig {
                         return Some(cacheUnions[tempName])
                     } else {
                         let paramName = "AutoGenType${count.load()}In${fileName}"
-                        requiredUnionMembers.add((paramName, ty, result))
+                        if (!isTopLevelTSUnion) {
+                            requiredUnionMembers.add((paramName, ty, result))
+                        }
                         count.fetchAdd(1)
                         let temp = result |> map {item => 
                             let result = TypeParameter()
@@ -312,7 +326,7 @@ public class GlobalConfig {
                         return Some(TsTypeRef(paramName + getTypeParametersToken(temp).toString()))
                     }
                 }
-               return TsUnion(elements) 
+               return TsUnion(elements)
             case TsArray(elemTy) => 
                 let elementType = if (let Some(v) <- scanTypeForUnions(elemTy, genericParameters)) {
                     v

@@ -8,5 +8,6 @@
 
 add_library(Data OBJECT
     Hprof.cpp
+    HprofParser.cpp
 )
 set_target_properties(Data PROPERTIES POSITION_INDEPENDENT_CODE ON)

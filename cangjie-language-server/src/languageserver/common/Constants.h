@@ -28,6 +28,7 @@ namespace CONSTANTS {
     const std::string SINGLE_CONDITION_COMPILE_OPTION = "singleConditionCompileOption";
     const std::string CONDITION_COMPILE_PATHS = "conditionCompilePaths";
     const std::string MODULES_HOME_OPTION = "modulesHomeOption";
+    const std::string SINGLE_FILE_PATH_OPTION = "singleFilePath";
     const std::string STD_LIB_PATH_OPTION = "stdLibPathOption";
     const std::string STD_CJD_PATH_OPTION = "stdCjdPathOption";
     const std::string OHOS_CJD_PATH_OPTION = "ohosCjdPathOption";
@@ -39,6 +40,7 @@ namespace CONSTANTS {
     const std::string MODULE_JSON_NAME = "name";
     const std::string REQUIRES = "requires";
     const std::string MODULE_JSON_PATH = "path";
+    const std::string IS_SCRIPT_DEPENDENCE = "isScriptDependence";
     const std::string PACKAGES_REQUIRES = "package_requires";
     const std::string PACKAGE_OPTION = "package_option";
     const std::string PATH_OPTION = "path_option";
@@ -51,6 +53,7 @@ namespace CONSTANTS {
     const std::string TYPE = "type";
     const std::string PATH = "path";
     const std::string COMBINED = "combined";
+    const std::string BUILD_SCRIPT_FILE_NAME = "build.cj";
     const std::string IMPORT = "import";
     const std::string AS = "as";
     const std::string WHITE_SPACE = " ";

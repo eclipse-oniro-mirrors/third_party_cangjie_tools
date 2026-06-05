@@ -36,8 +36,8 @@ bool IsOverrideable(const Ptr<ClassLikeDecl> owner, const Ptr<Decl> member)
 {
     // make sure member is member of owner before call this function
     if (auto funcDecl = DynamicCast<FuncDecl>(member)) {
-        if ((funcDecl->TestAttr(Attribute::OPEN) ||
-            (funcDecl->TestAttr(Attribute::ABSTRACT) && owner->TestAttr(Attribute::ABSTRACT)) &&
+        if (funcDecl->TestAttr(Attribute::OPEN) ||
+            ((funcDecl->TestAttr(Attribute::ABSTRACT) && owner->TestAttr(Attribute::ABSTRACT)) &&
             !funcDecl->TestAttr(Attribute::CONSTRUCTOR))) {
                 return true;
             }
@@ -70,6 +70,9 @@ void FindOverrideMethodsImpl::AddFuncItemsToResult(const Ptr<Decl>& decl, const 
             }
         }
         info.deprecated = method->HasAnno(AnnotationKind::DEPRECATED);
+        auto cleanDetail = funcDetail.ToString();
+        auto funcTextPos = cleanDetail.find(" func ");
+        info.signatureWithRet = cleanDetail.substr(funcTextPos+ strlen(" func "));
         FilterModifiers(decl, funcDetail.modifiers);
         info.insertText = funcDetail.ToString() + " {\n" + superCallText + "}";
         item.overrideMethodInfos.emplace_back(info);
@@ -113,7 +116,9 @@ void FindOverrideMethodsImpl::AddPropItemsToResult(const Ptr<Decl> decl, const P
         }
         OverrideMethodInfo info;
         info.isProp = true;
+        auto propTy = propDetail.type->ToString();
         info.deprecated = prop->HasAnno(AnnotationKind::DEPRECATED);
+        info.signatureWithRet = identifier + ": " + propTy;
         info.insertText = propDetail.ToString() + " {\n" + TAB + getter;
         if (!setter.empty()) {
             info.insertText += NEWLINE + TAB + setter;
@@ -151,14 +156,14 @@ void ExtractReplace(const Ptr<InheritableDecl>& decl, std::unordered_map<Ptr<Inh
         }
         for (const auto& inheritedType: inheritedTypes) {
             Ptr<ClassLikeDecl> inheritedDecl = nullptr;
-            if (auto clsTy = DynamicCast<ClassTy*>(inheritedType->ty)) {
+            if (auto clsTy = DynamicCast<ClassTy*>(inheritedType->GetTy())) {
                 inheritedDecl = clsTy->declPtr;
-            } else if (auto ifTy = DynamicCast<InterfaceTy*>(inheritedType->ty)) {
+            } else if (auto ifTy = DynamicCast<InterfaceTy*>(inheritedType->GetTy())) {
                 inheritedDecl = ifTy->declPtr;
             }
-            if (inheritedDecl && inheritedType->ty) {
-                auto originalDetail = ResolveType(inheritedDecl->ty);
-                auto newDetail = ResolveType(inheritedType->ty);
+            if (inheritedDecl && inheritedType->GetTy()) {
+                auto originalDetail = ResolveType(inheritedDecl->GetTy());
+                auto newDetail = ResolveType(inheritedType->GetTy());
                 ApplyReplace(newDetail, replace);
                 std::unordered_map<std::string, std::string> myReplace;
                 originalDetail->Diff(newDetail, myReplace);

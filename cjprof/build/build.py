@@ -70,6 +70,18 @@ def download_runtime():
     for line in output.stdout:
         print(line.decode("ascii", "ignore").rstrip())
 
+def download_json():
+    cmd = ["git", "clone", "-b", "OpenHarmony-v6.0-Release", "--depth=1", "https://gitcode.com/openharmony/third_party_json.git", "third_party_json"]
+    output = subprocess.Popen(cmd, cwd=THIRDPARTY_DIR, stdout=PIPE)
+    for line in output.stdout:
+        print(line.decode("ascii", "ignore").rstrip())
+
+def download_httplib():
+    cmd = ["git", "clone", "-b", "master", "--depth=1", "https://gitcode.com/GitHub_Trending/cp/cpp-httplib.git", "cpp-httplib"]
+    output = subprocess.Popen(cmd, cwd=THIRDPARTY_DIR, stdout=PIPE)
+    for line in output.stdout:
+        print(line.decode("ascii", "ignore").rstrip())
+
 def prepare_build():
     if not os.path.exists(THIRDPARTY_DIR):
         os.makedirs(THIRDPARTY_DIR)
@@ -77,6 +89,10 @@ def prepare_build():
         download_runtime()
     if not os.path.exists(os.path.join(THIRDPARTY_DIR, "boundscheck")):
         download_boundscheck()
+    if not os.path.exists(os.path.join(THIRDPARTY_DIR, "third_party_json")):
+        download_json()
+    if not os.path.exists(os.path.join(THIRDPARTY_DIR, "cpp-httplib")):
+        download_httplib()
 
 def setup_compiler():
     if not IS_WINDOWS:
@@ -84,8 +100,10 @@ def setup_compiler():
         clang_pp_path = shutil.which("clang++")
         if not clang_path:
             LOG.error("clang is required to build cangjie compiler")
+            sys.exit(1)
         if not clang_pp_path:
             LOG.error("clang++ is required to build cangjie compiler")
+            sys.exit(1)
 
         os.environ["CC"] = clang_path
         os.environ["CXX"] = clang_pp_path
@@ -94,8 +112,10 @@ def setup_compiler():
         cxx_compiler = shutil.which("g++")
         if not c_compiler:
             LOG.error("gcc is required to build cangjie compiler")
+            sys.exit(1)
         if not cxx_compiler:
             LOG.error("g++ is required to build cangjie compiler")
+            sys.exit(1)
         os.environ["CC"] = c_compiler
         os.environ["CXX"] = cxx_compiler
 
@@ -199,7 +219,10 @@ def build(args):
             ["make", "-j" + str(args.jobs)], cwd=CMAKE_BUILD_DIR, stdout=PIPE
         )
         log_output(output)
-        run_jni_script(["build", "-t", str(args.build_type), "--target", str(args.target)])
+        if not args.skip_jni:
+            run_jni_script(["build", "-t", str(args.build_type), "--target", str(args.target)])
+        else:
+            LOG.info("skipping JNI build (--skip-jni)\n")
         LOG.info("end build\n")
         return
 
@@ -234,7 +257,10 @@ def build(args):
         else:
             output = subprocess.Popen(["ninja", "-j" + str(args.jobs)], cwd=CMAKE_BUILD_DIR, stdout=PIPE)
         log_output(output)
-    run_jni_script(["build", "-t", str(args.build_type)])
+    if not args.skip_jni:
+        run_jni_script(["build", "-t", str(args.build_type)])
+    else:
+        LOG.info("skipping JNI build (--skip-jni)\n")
     LOG.info("end build\n")
 
 
@@ -250,7 +276,10 @@ def clean(args):
             shutil.rmtree(abs_file_path, ignore_errors=True)
         if os.path.isfile(abs_file_path):
             os.remove(abs_file_path)
-    run_jni_script(["clean"])
+    if not args.skip_jni:
+        run_jni_script(["clean"])
+    else:
+        LOG.info("skipping JNI clean (--skip-jni)\n")
     LOG.info("end clean\n")
 
 
@@ -324,6 +353,10 @@ def main():
         default=THREADS_NUM,
         help="number of parallel jobs to run")
     parser_build.add_argument(
+        "--skip-jni",
+        action="store_true",
+        help="skip JNI/Java bridge build")
+    parser_build.add_argument(
         "cmake_args",
         nargs=argparse.REMAINDER,
         help="other arguments directly passed to CMake, " "please pass it after a '--'",
@@ -337,6 +370,10 @@ def main():
     parser_install.set_defaults(func=install)
 
     parser_clean = subparsers.add_parser("clean", help="clean build")
+    parser_clean.add_argument(
+        "--skip-jni",
+        action="store_true",
+        help="skip JNI/Java bridge clean")
     parser_clean.set_defaults(func=clean)
 
     args = parser.parse_args()

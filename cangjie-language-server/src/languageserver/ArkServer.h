@@ -37,6 +37,9 @@ enum class CompleteMode {
     PARSE_COMPLETE,
     NONE_COMPLETE
 };
+
+std::string BuildHoverMarkdown(const Hover &hover);
+
 class ArkServer {
 public:
     explicit ArkServer(Callbacks *callbacks = nullptr);
@@ -143,6 +146,10 @@ public:
         std::map<std::string, std::string> extraOptions, const Callback<Tweak::Effect> &cb);
 
 private:
+    std::optional<unsigned int> GetFileId(const std::string &file) const;
+    void ProcessCompletion(const InputsAndAST &input, const Cangjie::Position &pos,
+                           const Callback<ValueOrError> &reply) const;
+
     Callbacks *callback = nullptr;
     std::unique_ptr<ark::ArkScheduler> arkScheduler;
     std::unique_ptr<ark::ArkScheduler> arkSchedulerOfComplete;

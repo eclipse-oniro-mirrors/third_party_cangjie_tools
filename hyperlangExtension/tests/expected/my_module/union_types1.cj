@@ -27,7 +27,7 @@ public enum AutoGenType0InunionTypes1 {
         if (input.isBoolean()) {
             return BOOLEAN(Bool.fromJSValue(context, input))
         } 
-        if(input.isString()) {
+        if (input.isString()) {
             return STRING(String.fromJSValue(context, input))
         }
         throw Exception("unsupport type!")
@@ -46,10 +46,10 @@ public enum AutoGenType1InunionTypes1 {
     }
     public static func fromJSValue(context: JSContext, input: JSValue): AutoGenType1InunionTypes1 {
         
-        if(input.isString()) {
+        if (input.isString()) {
             return STRING(String.fromJSValue(context, input))
         } 
-        if(input.isNumber()) {
+        if (input.isNumber()) {
             return NUMBER(Float64.fromJSValue(context, input))
         } 
         throw Exception("unsupport type!")
@@ -69,10 +69,10 @@ public enum a1 {
     }
     public static func fromJSValue(context: JSContext, input: JSValue): a1 {
         
-        if(input.isString()) {
+        if (input.isString()) {
             return STRING(String.fromJSValue(context, input))
         } 
-        if(input.isNumber()) {
+        if (input.isNumber()) {
             return NUMBER(Float64.fromJSValue(context, input))
         } 
         throw Exception("unsupport type!")
@@ -89,7 +89,6 @@ public enum a1 {
     }*/
 
 public class A {
-    
     protected A(var arkts_object: JSObject) { }
     
     
@@ -141,11 +140,11 @@ public class A {
         jsObjApiCall < Float64 >( arkts_object, "test2", { ctx =>[a.toJSValue(ctx)] })
     }
     
-    func toJSValue(context: JSContext): JSValue {
+    func toJSValue(_: JSContext): JSValue {
         arkts_object.toJSValue()
     }
     
-    static func fromJSValue(context: JSContext, input: JSValue): A {
+    static func fromJSValue(_: JSContext, input: JSValue): A {
         A(input.asObject())
     }
 }
