@@ -16,6 +16,51 @@ using namespace AST;
 using namespace lsp;
 
 // ---------------------------------------------------------------------------
+// Constants for macro-generated symbol patterns
+// ---------------------------------------------------------------------------
+namespace {
+    // Macro names
+    constexpr const char* COMPONENT_MACRO = "Component";
+    constexpr const char* ENTRY_MACRO = "Entry";
+    
+    // Generated variable prefixes
+    constexpr const char* STATE_VAR_DECL_PREFIX = "stateVarDecl_";
+    constexpr const char* A_P_PREFIX = "A_P_";
+    
+    // Macro-generated function name patterns
+    constexpr const char* GET_PREFIX = "get_";
+    constexpr const char* SET_PREFIX = "set_";
+    constexpr const char* UNDERSCORE_PREFIX = "__";
+    constexpr const char* ABOUT_TO_PREFIX = "aboutTo";
+    constexpr const char* PURGE_PREFIX = "purge";
+    constexpr const char* UPDATE_WITH_VALUE_PARAMS = "updateWithValueParams";
+    constexpr const char* INIT_FUNC = "init";
+    constexpr const char* ABOUT_TO_APPEAR = "aboutToAppear";
+    constexpr const char* ABOUT_TO_DISAPPEAR = "aboutToDisappear";
+}
+
+// ---------------------------------------------------------------------------
+// Helper: Check if a function name matches macro-generated patterns
+// ---------------------------------------------------------------------------
+static bool IsMacroGeneratedFuncName(const std::string& funcName)
+{
+    static const std::unordered_set<std::string> exactMatches = {
+        INIT_FUNC,
+        ABOUT_TO_APPEAR,
+        ABOUT_TO_DISAPPEAR,
+        UPDATE_WITH_VALUE_PARAMS
+    };
+    
+    return exactMatches.count(funcName) > 0 ||
+           funcName.find(GET_PREFIX) == 0 ||
+           funcName.find(SET_PREFIX) == 0 ||
+           funcName.find(UNDERSCORE_PREFIX) == 0 ||
+           funcName.find(ABOUT_TO_PREFIX) == 0 ||
+           funcName.find(PURGE_PREFIX) == 0 ||
+           funcName.find('.') != std::string::npos;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: Check if a symbol has any REFERENCE-kind ref
 // ---------------------------------------------------------------------------
 bool UnusedSymbolDiag::HasReference(
@@ -220,21 +265,22 @@ bool UnusedSymbolDiag::ShouldExclude(
         }
     }
 
-    if (excludedMacroDecls.count(symbol.id) > 0) {
+    if ((symbol.kind == ASTKind::CLASS_DECL || symbol.kind == ASTKind::STRUCT_DECL) &&
+        excludedMacroDecls.count(symbol.id) > 0) {
         return true;
     }
 
-    // For member variables (VAR_DECL) inside @Component/@Entry classes,
-    // do NOT exclude them - we now have proper reference tracking for macro-expanded code.
-    // Only exclude the class/struct itself and other member types (func, prop, etc.)
-    SymbolID containerId = GetContainerID(symbol.id, relations);
-    if (containerId != INVALID_SYMBOL_ID && excludedMacroDecls.count(containerId) > 0) {
-        // Allow VAR_DECL to be checked for unused status
-        if (symbol.kind == ASTKind::VAR_DECL) {
-            // VAR_DECL NOT excluded - will check references
-        } else {
-            return true;
-        }
+    // Skip @Component/@Entry generated internal symbols
+    auto symName = symbol.name;
+    
+    // Skip variables with specific prefixes
+    if (symName.find(STATE_VAR_DECL_PREFIX) == 0 || symName.find(A_P_PREFIX) == 0) {
+        return true;
+    }
+    
+    // Skip macro-generated functions
+    if (symbol.kind == ASTKind::FUNC_DECL && IsMacroGeneratedFuncName(symName)) {
+        return true;
     }
 
     return false;
@@ -316,7 +362,20 @@ std::vector<DiagnosticToken> UnusedSymbolDiag::Analyze(
 
     for (const auto& sym : symbols) {
         // 1. Only process symbols defined in the target file
-        if (sym.location.fileUri != filePath) {
+        // For macro-expanded code, also allow symbols from .macrocall files
+        // that correspond to the target source file
+        bool isTargetFile = (sym.location.fileUri == filePath);
+        if (!isTargetFile) {
+            // Check if this is a .macrocall file corresponding to the target file
+            if (EndsWith(sym.location.fileUri, ".macrocall")) {
+                // Extract source file path from .macrocall path
+                // e.g., "foo.cj.macrocall" -> "foo.cj"
+                std::string macroCallFile = sym.location.fileUri;
+                std::string sourceFile = macroCallFile.substr(0, macroCallFile.length() - 10); // Remove ".macrocall"
+                isTargetFile = (sourceFile == filePath);
+            }
+        }
+        if (!isTargetFile) {
             continue;
         }
 
@@ -395,17 +454,47 @@ static bool ShouldSkipFuncParam(const FuncParam* funcParam)
 }
 
 // ---------------------------------------------------------------------------
+// Helper: Check if a node is in @Component/@Entry macro-expanded code
+// ---------------------------------------------------------------------------
+static bool IsInComponentMacro(const Node* node)
+{
+    if (!node || !node->curMacroCall || node->isInMacroCall) {
+        return false;
+    }
+    
+    // Check if the macro is @Component or @Entry
+    auto macroCall = node->curMacroCall.get();
+    if (!macroCall) {
+        return false;
+    }
+    
+    auto invocation = macroCall->GetConstInvocation();
+    if (!invocation || !invocation->target) {
+        return false;
+    }
+    
+    auto macroName = invocation->target->identifier;
+    return macroName == COMPONENT_MACRO || macroName == ENTRY_MACRO;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: Check and report unused local variable.
 // ---------------------------------------------------------------------------
 static void CheckUnusedVarDecl(VarDecl* varDecl, Package& package,
     const std::string& filePath, std::vector<DiagnosticToken>& diagnostics)
 {
-    bool isGlobalOrMember = IsGlobalOrMember(*varDecl);
-    // For macro-expanded declarations (e.g., member variables in @Component/@Entry classes),
-    // also check if they have curMacroCall set and have valid outerDecl
-    if (!isGlobalOrMember && varDecl->curMacroCall && !varDecl->identifier.Empty() && varDecl->outerDecl) {
-        isGlobalOrMember = true;
+    // Skip variables in @Component/@Entry macro-expanded code
+    if (IsInComponentMacro(varDecl)) {
+        return;
     }
+    
+    // Skip @Component/@Entry generated internal variables
+    std::string varName(varDecl->identifier);
+    if (varName.find(STATE_VAR_DECL_PREFIX) == 0) {
+        return;
+    }
+    
+    bool isGlobalOrMember = IsGlobalOrMember(*varDecl);
     if (!isGlobalOrMember) {
         auto usages = FindDeclUsage(*varDecl, package);
         if (usages.empty()) {
@@ -442,13 +531,42 @@ static bool IsComponentGeneratedParam(const FuncParam* funcParam)
 }
 
 // ---------------------------------------------------------------------------
+// Helper: Check if a FuncParam belongs to a macro-generated method.
+// Macro-generated methods: get_*, set_*, __*, aboutTo*, purge*, init, updateWithValueParams
+// Also includes functions with '.' in name (e.g., bb.1, cc.2) generated by @Component/@Entry
+// ---------------------------------------------------------------------------
+static bool IsInMacroGeneratedFunc(const FuncParam* funcParam)
+{
+    if (!funcParam || !funcParam->outerDecl) {
+        return false;
+    }
+    auto outerFunc = DynamicCast<const FuncDecl*>(funcParam->outerDecl.get());
+    if (!outerFunc) {
+        return false;
+    }
+    
+    return IsMacroGeneratedFuncName(outerFunc->identifier);
+}
+
+// ---------------------------------------------------------------------------
 // Helper: Check and report unused function parameter.
 // ---------------------------------------------------------------------------
 static void CheckUnusedFuncParam(FuncParam* funcParam, Package& package,
     const std::string& filePath, std::vector<DiagnosticToken>& diagnostics)
 {
+    bool isComponentGen = IsComponentGeneratedParam(funcParam);
+    bool isInCompMacro = IsInComponentMacro(funcParam);
+    bool isInMacroGenFunc = IsInMacroGeneratedFunc(funcParam);
+    
     // Skip @Component/@Entry auto-generated parameters
-    if (IsComponentGeneratedParam(funcParam)) {
+    if (isComponentGen) {
+        return;
+    }
+    
+    // Skip parameters in @Component/@Entry macro-expanded code,
+    // BUT only if they are in macro-generated methods.
+    // User-defined methods (like name(dd:String)) should still be checked.
+    if (isInCompMacro && isInMacroGenFunc) {
         return;
     }
     
@@ -499,6 +617,48 @@ static void CheckUnusedEnumVariantCommon(Decl& decl, Package& package,
 // ---------------------------------------------------------------------------
 // Walker visitor for local symbol analysis
 // ---------------------------------------------------------------------------
+static void HandleMacroCallFuncParam(FuncParam* funcParam, Package& package,
+    const std::string& filePath, std::vector<DiagnosticToken>& diagnostics)
+{
+    if (!funcParam || funcParam->isMemberParam) {
+        return;
+    }
+    if (!IsInMacroGeneratedFunc(funcParam) && !ShouldSkipFuncParam(funcParam)) {
+        CheckUnusedFuncParam(funcParam, package, filePath, diagnostics);
+    }
+}
+
+static void HandleVarDecl(Ptr<Node> node, Package& package,
+    const std::string& filePath, std::vector<DiagnosticToken>& diagnostics)
+{
+    auto varDecl = DynamicCast<VarDecl*>(node);
+    if (varDecl && !DynamicCast<FuncParam*>(node)) {
+        CheckUnusedVarDecl(varDecl, package, filePath, diagnostics);
+    }
+}
+
+static void HandleFuncParam(FuncParam* funcParam, Package& package,
+    const std::string& filePath, std::vector<DiagnosticToken>& diagnostics)
+{
+    if (funcParam && !ShouldSkipFuncParam(funcParam)) {
+        CheckUnusedFuncParam(funcParam, package, filePath, diagnostics);
+    }
+}
+
+static void HandleEnumDecl(Ptr<Node> node, Package& package,
+    const std::string& filePath, std::vector<DiagnosticToken>& diagnostics)
+{
+    auto enumDecl = DynamicCast<EnumDecl*>(node);
+    if (!enumDecl) {
+        return;
+    }
+    for (auto& ctor : enumDecl->constructors) {
+        if (ctor && !ctor->isInMacroCall) {
+            CheckUnusedEnumVariantCommon(*ctor, package, filePath, diagnostics);
+        }
+    }
+}
+
 static VisitAction CollectUnusedLocalDiags(
     Ptr<Node> node,
     Package& package,
@@ -510,30 +670,16 @@ static VisitAction CollectUnusedLocalDiags(
         return VisitAction::WALK_CHILDREN;
     }
 
+    auto funcParam = DynamicCast<FuncParam*>(node);
+
     if (decl->isInMacroCall) {
+        HandleMacroCallFuncParam(funcParam, package, filePath, diagnostics);
         return VisitAction::WALK_CHILDREN;
     }
 
-    if (auto varDecl = DynamicCast<VarDecl*>(node)) {
-        if (!DynamicCast<FuncParam*>(node)) {
-            CheckUnusedVarDecl(varDecl, package, filePath, diagnostics);
-        }
-    }
-
-    if (auto funcParam = DynamicCast<FuncParam*>(node)) {
-        if (ShouldSkipFuncParam(funcParam)) {
-            return VisitAction::WALK_CHILDREN;
-        }
-        CheckUnusedFuncParam(funcParam, package, filePath, diagnostics);
-    }
-
-    if (auto enumDecl = DynamicCast<EnumDecl*>(node)) {
-        for (auto& ctor : enumDecl->constructors) {
-            if (ctor && !ctor->isInMacroCall) {
-                CheckUnusedEnumVariantCommon(*ctor, package, filePath, diagnostics);
-            }
-        }
-    }
+    HandleVarDecl(node, package, filePath, diagnostics);
+    HandleFuncParam(funcParam, package, filePath, diagnostics);
+    HandleEnumDecl(node, package, filePath, diagnostics);
 
     return VisitAction::WALK_CHILDREN;
 }
