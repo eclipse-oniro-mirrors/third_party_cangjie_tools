@@ -24,11 +24,6 @@ class InlineVariableSelectionRule : public TweakRule {
     bool Check(const Tweak::Selection &sel, std::map<std::string, std::string> &extraOptions) const override
     {
         auto root = sel.selectionTree.root();
-        if (!root || root->selected != SelectionTree::Selection::Complete) {
-            extraOptions.insert(std::make_pair("ErrorCode",
-                std::to_string(static_cast<int>(TweakRule::TweakError::ERROR_AST))));
-            return false;
-        }
 
         auto toBeInline = root->node;
         if (root->node->astKind == ASTKind::FUNC_ARG) {
@@ -45,7 +40,7 @@ class InlineVariableSelectionRule : public TweakRule {
         auto refExpr = DynamicCast<RefExpr*>(toBeInline.get());
         if (!refExpr || refExpr->TestAttr(Attribute::LEFT_VALUE)) {
             extraOptions.insert(std::make_pair("ErrorCode",
-                std::to_string(static_cast<int>(TweakRule::TweakError::ERROR_AST))));
+                std::to_string(static_cast<int>(InlineVariable::InlineVariableError::LEFT_IN_DEC))));
             return false;
         }
 

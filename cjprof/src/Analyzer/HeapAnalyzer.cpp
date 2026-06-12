@@ -20,6 +20,12 @@
 
 static std::vector<std::pair<std::string, uint64_t>> g_phaseBreakdown;
 
+static std::string GetStringSafe(const std::map<Hprof::ID, std::string>& strings, Hprof::ID id)
+{
+    auto it = strings.find(id);
+    return it != strings.end() ? it->second : "";
+}
+
 static void AddPhase(const std::string& name, uint64_t ms)
 {
     g_phaseBreakdown.emplace_back(name, ms);
@@ -123,7 +129,11 @@ void HeapAnalyzer::ShowThread()
     for (auto thread : m_threads) {
         printf("%s\n", thread.name.c_str());
         for (auto frame : thread.frames) {
-            printf("  at %s (%s:%d)\n", frame.name.c_str(), frame.fileName.c_str(), frame.line);
+            if (frame.fileName.empty()) {
+                printf("  at %s\n", frame.name.c_str());
+            } else {
+                printf("  at %s (%s:%d)\n", frame.name.c_str(), frame.fileName.c_str(), frame.line);
+            }
             for (auto local : frame.locals) {
                 std::stringstream ss;
                 ss << local->name << " @ 0x" << std::hex << local->id;
@@ -213,6 +223,20 @@ void HeapAnalyzer::ShowReference(const std::string &objNameList, int maxDepth, b
 
     if (!str.empty()) {
         objNames.emplace(str);
+    }
+
+    if (!objNames.empty()) {
+        std::unordered_set<std::string> matchedNames;
+        for (auto obj : m_objects) {
+            if (objNames.count(obj->name) != 0) {
+                matchedNames.insert(obj->name);
+            }
+        }
+        for (const auto& name : objNames) {
+            if (matchedNames.find(name) == matchedNames.end()) {
+                printf("No objects found matching: %s\n", name.c_str());
+            }
+        }
     }
 
     const auto& locals = m_hprof.GetLocalsRoots();
@@ -417,7 +441,7 @@ void HeapAnalyzer::AnalyzeInstance()
         auto obj = GetObject(inst.first);
         auto cls = classes.at(inst.second.cls);
         obj->id = inst.first;
-        obj->name = ReplaceTypeName(strings.at(cls.name));
+        obj->name = ReplaceTypeName(GetStringSafe(strings, cls.name));
         obj->size = Align(cls.size);
         auto it = categories.find(inst.first);
         if (it != categories.end()) {
@@ -465,7 +489,7 @@ void HeapAnalyzer::AnalyzeArray()
         }
 
         auto cls = classes.at(arr.second.cls);
-        obj->name = ReplaceTypeName(strings.at(cls.name));
+        obj->name = ReplaceTypeName(GetStringSafe(strings, cls.name));
         obj->size += cls.size != 0 ?
             Align(uint64_t(cls.size) * (componentNums.find(obj->id) != componentNums.end() ?
                 componentNums.at(obj->id)
@@ -491,14 +515,18 @@ void HeapAnalyzer::AnalyzeThread()
     for (auto stackTrace : m_hprof.GetStackTraces()) {
         for (auto frame : stackTrace.second.frames) {
             stackTraces[stackTrace.first].push_back(
-                { strings.at(frames[frame].name), strings.at(frames[frame].fileName), int(frames[frame].line) }
+                { GetStringSafe(strings, frames[frame].name),
+                  GetStringSafe(strings, frames[frame].fileName),
+                  int(frames[frame].line)
+                }
             );
         }
     }
 
     std::map<Hprof::u4, Thread> threads;
     for (auto thread : m_hprof.GetThreads()) {
-        threads[thread.second.idx] = { strings.at(thread.second.name), stackTraces[thread.second.stackTraceIdx] };
+        threads[thread.second.idx] =
+            { GetStringSafe(strings, thread.second.name), stackTraces[thread.second.stackTraceIdx] };
     }
 
     for (auto local : m_hprof.GetLocalsRoots()) {
