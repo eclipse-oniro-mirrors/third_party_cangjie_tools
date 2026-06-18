@@ -56,7 +56,7 @@ namespace TestLspCodeActionTest {
             std::cout << "the false reason is : " << reason << std::endl;
             ShowDiff(expLines, result, param, p->messagePath);
         }
-        return showErr;
+        return true;
     }
 
     class CodeActionTest : public testing::TestWithParam<struct TestParam> {

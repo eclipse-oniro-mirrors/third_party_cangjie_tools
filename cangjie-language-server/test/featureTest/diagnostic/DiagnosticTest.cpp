@@ -46,7 +46,7 @@ namespace TestLspDiagnostic {
         /* Check the test case result. */
         nlohmann::json expLines = ReadExpectedResult(param.baseFile);
         ChangeMessageUrlForBaseFile(testFile, expLines, rootUri, isMultiModule);
-        nlohmann::json result = ReadFileByMethod(p->pathOut, "publishDiagnostics");
+        nlohmann::json result = ReadFileByMethodLast(p->pathOut, "publishDiagnostics");
 
         /* if case is diff show info */
         std::string reason = "none";

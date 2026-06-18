@@ -9,7 +9,7 @@
 package UnimplementQuickFix
 
 interface ExtInterface {
-    func doExt(): Unit
+    mut func doExt(): Unit
 }
 
 class BaseClass {}

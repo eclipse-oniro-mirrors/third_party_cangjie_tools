@@ -263,6 +263,7 @@
 {"completion":{"testFile":"LSP_Completion_PrimaryTy_Extend_005.test","id":"9"}}
 {"completion":{"testFile":"LSP_Completion_PrimaryTy_Extend_006.test","id":"9"}}
 {"completion":{"testFile":"LSP_Completion_PrimaryTy_Extend_007.test","id":"9"}}
+{"completion":{"testFile":"LSP_Completion_RuneLiteral_001.test","id":"9"}}
 {"completion":{"testFile":"LSP_Completion_ReExport_001.test","id":"6"}}
 {"completion":{"testFile":"LSP_Completion_ReExport_Alias_001.test","id":"9"}}
 
@@ -1243,3 +1244,8 @@
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_003.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_004.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_005.test","method":"workspace/applyEdit"}}
+
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_006.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_007.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_008.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_009.test","method":"workspace/applyEdit"}}

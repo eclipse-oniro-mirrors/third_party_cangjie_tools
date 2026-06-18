@@ -419,6 +419,10 @@ public:
         }
     }
 
+    void AnalyzeUnusedSymbolsForFile(const std::string &filePath,
+        const Cangjie::AST::File &astFile,
+        const Cangjie::AST::Package &package);
+
     lsp::MemIndex *GetMemIndex() const
     {
         return memIndex.get();
@@ -674,9 +678,6 @@ private:
 
     void BuildIndex(const std::unique_ptr<LSPCompilerInstance> &ci, bool isFullCompilation = false);
 
-    void AnalyzeUnusedSymbols(const lsp::SymbolCollector &sc, const Cangjie::AST::Package &package,
-                              const std::string &pkgPath);
-
     bool LoadASTCache(const std::string &package);
 
     void StorePackageCache(const std::string& pkgName);
@@ -717,6 +718,7 @@ private:
     std::unique_ptr<SortModel> model = std::make_unique<SortModel>();
 
     std::unique_ptr<lsp::BackgroundIndexDB> backgroundIndexDb;
+    std::unordered_set<std::string> unusedSymbolsAnalyzedFileSet{};
     std::unordered_map<std::string, std::string> pathToFullPkgName;  // key: package path
     std::unordered_map<std::string, std::unordered_set<std::string>> realPkgToFullPkgName;
     std::mutex cimapMtx;
