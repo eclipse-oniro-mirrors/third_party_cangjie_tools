@@ -107,6 +107,8 @@ namespace test::common {
 
     nlohmann::json ReadFileByMethod(const std::string& file, const std::string& method);
 
+    nlohmann::json ReadFileByMethodLast(const std::string& file, const std::string& method);
+
     nlohmann::json ReadExpectedResult(std::string &baseFile);
 
     std::vector<ark::DocumentHighlight> ReadExpectedVector(std::string &baseFile);

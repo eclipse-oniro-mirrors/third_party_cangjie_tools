@@ -104,7 +104,7 @@ HoverMarkdownBlocks CollectHoverMarkdownBlocks(const ark::Hover &hover)
             blocks.sourceInfo.push_back(block);
         } else if (StartsWith(block, "apiKey:") || StartsWith(block, "// In ")) {
             blocks.declarations.push_back(block);
-        } else if (!hasPrimaryDeclaration || StartsWith(block, "@")) {
+        } else if (!hasPrimaryDeclaration || StartsWith(block, "@!")) {
             blocks.declarations.push_back(block);
             hasPrimaryDeclaration = true;
         } else {
@@ -1171,6 +1171,15 @@ static std::vector<std::unique_ptr<Tweak::Selection>> CreateTweakSelection(const
     const std::string &file, Range range, std::map<std::string, std::string> extraOptions)
 {
     std::vector<std::unique_ptr<Tweak::Selection>> result;
+    if (range.start == range.end && inputAST.ast && !inputAST.ast->tokens.empty()) {
+        int tokenIndex = inputAST.ast->GetCurTokenByStartColumn(range.start, 0,
+            static_cast<int>(inputAST.ast->tokens.size()) - 1);
+        if (tokenIndex >= 0 && static_cast<size_t>(tokenIndex) < inputAST.ast->tokens.size()) {
+            auto token = inputAST.ast->tokens[static_cast<size_t>(tokenIndex)];
+            range.start = token.Begin();
+            range.end = token.End();
+        }
+    }
 
     SelectionTree::CreateEach(*inputAST.ast, file, range.start,
         range.end, [&](SelectionTree selectionTree) {
