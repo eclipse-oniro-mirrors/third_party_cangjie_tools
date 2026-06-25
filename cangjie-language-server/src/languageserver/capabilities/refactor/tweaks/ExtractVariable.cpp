@@ -27,6 +27,7 @@ std::string GetIndentBeforePosition(const Position &pos)
 }
 
 // LCOV_EXCL_START
+// NOLINTNEXTLINE(G.NAM.02-CPP)
 class ExtractVariableRule : public TweakRule {
     bool Check(const Tweak::Selection &sel, std::map<std::string, std::string> &extraOptions) const override
     {
@@ -424,7 +425,7 @@ void ExtractVariable::MatchModifier(Cangjie::AST::Node &node, std::string &modif
 {
     std::string targetModifier;
     Meta::match(node)(
-        [&](Cangjie::AST::AssignExpr &assignExpr) {
+        [&targetModifier, &modifier](Cangjie::AST::AssignExpr &assignExpr) {
             if (!assignExpr.leftValue || !assignExpr.leftValue->GetTarget()) {
                 return;
             }
@@ -438,7 +439,7 @@ void ExtractVariable::MatchModifier(Cangjie::AST::Node &node, std::string &modif
             modifier = targetModifier;
             return;
         },
-        [&](Cangjie::AST::VarDecl &varDecl) {
+        [&targetModifier, &modifier](Cangjie::AST::VarDecl &varDecl) {
             if (varDecl.TestAttr(Attribute::STATIC)) {
                 targetModifier = "static ";
             }
@@ -448,7 +449,7 @@ void ExtractVariable::MatchModifier(Cangjie::AST::Node &node, std::string &modif
             modifier = targetModifier;
             return;
         },
-        [&]() {
+        []() {
             return;
         });
 }

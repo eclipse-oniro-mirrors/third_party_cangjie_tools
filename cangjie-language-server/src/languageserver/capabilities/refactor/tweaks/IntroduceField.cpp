@@ -26,6 +26,8 @@ constexpr const char *CONST_INITIALIZER_MESSAGE =
     "Cannot introduce field from a const initializer because it must remain a compile-time constant expression.";
 constexpr const char *LET_PATTERN_DESTRUCTOR_MESSAGE =
     "Cannot introduce field from a let pattern condition because it is not a standalone expression.";
+constexpr const char *IMMUTABLE_STRUCT_MEMBER_FIELD_ASSIGNMENT_MESSAGE =
+    "Cannot introduce field from an immutable struct function because it needs to modify an instance field.";
 
 struct LocalVarTarget {
     Ptr<Cangjie::AST::VarDecl> decl = nullptr;
@@ -416,6 +418,8 @@ static std::string GetExplicitTypeName(const Tweak::Selection &sel)
     return it == sel.extraOptions.end() ? "" : it->second;
 }
 
+namespace {
+// NOLINTNEXTLINE(G.NAM.02-CPP)
 class IntroduceFieldRule : public TweakRule {
     bool Check(const Tweak::Selection &sel, std::map<std::string, std::string> &extraOptions) const override
     {
@@ -431,9 +435,9 @@ class IntroduceFieldRule : public TweakRule {
             return false;
         }
         auto memberInitializerTarget = GetMemberInitializerTarget(sel, range);
-        if (sel.selectionTree.SelectedScope() == SelectionTree::Scope::GLOBAL_VAR ||
-            (sel.selectionTree.SelectedScope() == SelectionTree::Scope::MEMBER_VAR && !memberInitializerTarget) ||
-            IsExistingFieldDeclarationSelection(sel, range)) {
+        if ((sel.selectionTree.SelectedScope() & SelectionTree::Scope::GLOBAL_VAR) != SelectionTree::Scope::UNKNOWN ||
+            ((sel.selectionTree.SelectedScope() & SelectionTree::Scope::MEMBER_VAR) != SelectionTree::Scope::UNKNOWN &&
+            !memberInitializerTarget) || IsExistingFieldDeclarationSelection(sel, range)) {
             extraOptions.insert(std::make_pair("ErrorCode",
                 std::to_string(static_cast<int>(IntroduceField::IntroduceFieldError::INVALID_SCOPE))));
             return false;
@@ -469,9 +473,16 @@ class IntroduceFieldRule : public TweakRule {
                 std::to_string(static_cast<int>(IntroduceField::IntroduceFieldError::INVALID_TYPE))));
             return false;
         }
+        if (!memberInitializerTarget &&
+            IntroduceField::IsImmutableStructMemberFieldAssignment(sel, range, typeName, *funcDecl)) {
+            extraOptions.insert(std::make_pair("ErrorCode", std::to_string(static_cast<int>(
+                IntroduceField::IntroduceFieldError::INVALID_IMMUTABLE_STRUCT_MEMBER_FIELD_ASSIGNMENT))));
+            return false;
+        }
         return true;
     }
 };
+}
 
 bool IntroduceField::Prepare(const Selection &sel)
 {
@@ -519,6 +530,9 @@ std::optional<Tweak::Effect> IntroduceField::Apply(const Selection &sel)
     auto funcDecl = GetTargetFunc(sel);
     if (!funcDecl || !IsSupportedTargetFunc(*funcDecl)) {
         return std::nullopt;
+    }
+    if (IsImmutableStructMemberFieldAssignment(sel, range, typeName, *funcDecl)) {
+        return Tweak::Effect::ShowMessage(IMMUTABLE_STRUCT_MEMBER_FIELD_ASSIGNMENT_MESSAGE);
     }
     bool useSelectedExprAsInitializer = CanUseAsFieldInitializer(sel, range, *funcDecl) ||
         GetDefaultInitializer(sel, range, typeName).empty();
@@ -590,6 +604,16 @@ bool IntroduceField::IsMemberFieldTarget(Cangjie::AST::FuncDecl &funcDecl)
 bool IntroduceField::IsStaticFieldTarget(Cangjie::AST::FuncDecl &funcDecl)
 {
     return IsMemberFieldTarget(funcDecl) && funcDecl.TestAttr(Attribute::STATIC);
+}
+
+bool IntroduceField::IsImmutableStructMemberFieldAssignment(
+    const Selection &sel, Range &range, const std::string &typeName, Cangjie::AST::FuncDecl &funcDecl)
+{
+    if (!funcDecl.outerDecl || funcDecl.outerDecl->astKind != ASTKind::STRUCT_DECL ||
+        funcDecl.TestAttr(Attribute::MUT) || IsStaticFieldTarget(funcDecl)) {
+        return false;
+    }
+    return !CanUseAsFieldInitializer(sel, range, funcDecl) && !GetDefaultInitializer(sel, range, typeName).empty();
 }
 
 static Position GetDeclarationInsertStart(const Cangjie::AST::Decl &decl)

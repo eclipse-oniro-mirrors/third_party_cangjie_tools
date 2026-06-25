@@ -19,6 +19,7 @@ using namespace Cangjie::FileUtil;
 namespace ark {
 const int NUMBER_FOR_LINE_COMMENT = 2; // length of "//"
 const int NUMBER_FOR_DOC_COMMENT = 3;  // length of "/**"
+const int CRLF_LENGTH = 2; // length of "\r\n"
 const std::string PKG_NAME_OHOS_LABELS = "ohos.labels";
 const std::string HIDE_ANNO_NAME = "Hide";
 const std::unordered_map<ASTKind, SymbolKind> AST_KIND_TO_SYMBOL_KIND = {
@@ -707,8 +708,8 @@ void ConvertCarriageToSpace(std::string &str)
 void GetConditionCompile(const nlohmann::json &initializationOptions,
                          std::unordered_map<std::string, std::string> &conditions)
 {
-    if (initializationOptions.contains(CONSTANTS::CONDITION_COMPILE_OPTION)) {
-        auto conditionCompiles = initializationOptions[CONSTANTS::CONDITION_COMPILE_OPTION];
+    if (initializationOptions.contains(CONSTANTS::CONDITION_COMPILE_OPTION())) {
+        auto conditionCompiles = initializationOptions[CONSTANTS::CONDITION_COMPILE_OPTION()];
         auto conditionItems = conditionCompiles.items();
         for (auto &item : conditionItems) {
             auto &key = item.key();
@@ -722,10 +723,10 @@ void GetModuleConditionCompile(
     const std::unordered_map<std::string, std::string> &globalConditions,
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>> &conditions)
 {
-    if (!initializationOptions.contains(CONSTANTS::MODULE_CONDITION_COMPILE_OPTION)) {
+    if (!initializationOptions.contains(CONSTANTS::MODULE_CONDITION_COMPILE_OPTION())) {
         return;
     }
-    auto customModuleConditions = initializationOptions[CONSTANTS::MODULE_CONDITION_COMPILE_OPTION];
+    auto customModuleConditions = initializationOptions[CONSTANTS::MODULE_CONDITION_COMPILE_OPTION()];
     const auto moduleConditionItems = customModuleConditions.items();
     for (auto &item : moduleConditionItems) {
         auto &moduleName = item.key();
@@ -745,10 +746,10 @@ void GetSingleConditionCompile(
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& modulesConditions,
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>> &conditions)
 {
-    if (!initializationOptions.contains(CONSTANTS::SINGLE_CONDITION_COMPILE_OPTION)) {
+    if (!initializationOptions.contains(CONSTANTS::SINGLE_CONDITION_COMPILE_OPTION())) {
         return;
     }
-    auto customSingleConditionCompiles = initializationOptions[CONSTANTS::SINGLE_CONDITION_COMPILE_OPTION];
+    auto customSingleConditionCompiles = initializationOptions[CONSTANTS::SINGLE_CONDITION_COMPILE_OPTION()];
     auto packageNameItems = customSingleConditionCompiles.items();
     for (auto &item : packageNameItems) {
         auto &packageName = item.key();
@@ -776,8 +777,8 @@ void GetSingleConditionCompile(
 
 void GetConditionCompilePaths(const nlohmann::json &initializationOptions, std::vector<std::string> &conditionPaths)
 {
-    if (initializationOptions.contains(CONSTANTS::CONDITION_COMPILE_PATHS)) {
-        auto conditionCompilePaths = initializationOptions[CONSTANTS::CONDITION_COMPILE_PATHS];
+    if (initializationOptions.contains(CONSTANTS::CONDITION_COMPILE_PATHS())) {
+        auto conditionCompilePaths = initializationOptions[CONSTANTS::CONDITION_COMPILE_PATHS()];
         for (int i = 0; i < static_cast<int>(conditionCompilePaths.size()); ++i) {
             conditionPaths.push_back(conditionCompilePaths[i].get<std::string>());
         }
@@ -824,7 +825,7 @@ std::pair<std::string, std::string> SplitFullPackage(const std::string &fullPack
 {
     std::string moduleName;
     std::string packageName;
-    auto found = fullPackageName.find_first_of(CONSTANTS::DOT);
+    auto found = fullPackageName.find_first_of(CONSTANTS::DOT());
     if (found != std::string::npos) {
         moduleName = fullPackageName.substr(0, found);
         auto temp = fullPackageName.substr(found);
@@ -1382,7 +1383,8 @@ bool DeleteCharForPosition(std::string& text, int row, int column)
         return false;
     };
     int r = 1, c = 1;
-    for (size_t i = 0; i < text.length(); i++) {
+    size_t i = 0;
+    while (i < text.length()) {
         if (r == row && c == column) {
             text.erase(i, 1);
             return true;
@@ -1391,11 +1393,13 @@ bool DeleteCharForPosition(std::string& text, int row, int column)
             r++;
             c = 1;
             if (text[i] == '\r' && i + 1 < text.length() && text[i + 1] == '\n') {
-                i++;
+                i += CRLF_LENGTH;
+                continue;
             }
         } else {
             c++;
         }
+        i++;
     }
     return false;
 }
@@ -1645,5 +1649,23 @@ Ptr<Decl> GetRealTarget(Ptr<Decl> decl)
         return last ? last->type->GetTarget() : last;
     }
     return decl;
+}
+
+bool CheckIsDirectory(const std::string &dirPath, bool isDelete)
+{
+    if (dirPath.empty()) {
+        return false;
+    }
+
+    struct stat buffer = {};
+    std::string realPath = PathWindowsToLinux(dirPath);
+    std::string file = realPath;
+    if (isDelete) {
+        auto res = realPath.find_last_of('/');
+        if (res != std::string::npos) {
+            file = realPath.substr(0, res);
+        }
+    }
+    return (stat(file.c_str(), &buffer) == 0 && S_ISDIR(buffer.st_mode));
 }
 } // namespace ark

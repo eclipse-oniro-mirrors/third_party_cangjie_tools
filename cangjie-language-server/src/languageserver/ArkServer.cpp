@@ -9,6 +9,7 @@
 #include "ArkServer.h"
 #include <cangjie/Utils/ConstantsUtils.h>
 #include <cangjie/Utils/FileUtil.h>
+#include <cctype>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -65,8 +66,24 @@ std::string TrimHoverBlock(const std::string &text)
 std::string EscapeMarkdownText(const std::string &text)
 {
     std::string escaped;
-    escaped.reserve(text.size());
-    for (char ch : text) {
+    escaped.reserve(text.size() + 1);
+    size_t orderedListDot = std::string::npos;
+    const size_t firstNonSpace = text.find_first_not_of(" \t");
+    if (firstNonSpace != std::string::npos) {
+        size_t numberEnd = firstNonSpace;
+        while (numberEnd < text.size() && std::isdigit(static_cast<unsigned char>(text[numberEnd]))) {
+            ++numberEnd;
+        }
+        if (numberEnd > firstNonSpace && numberEnd + 1 < text.size() && text[numberEnd] == '.' &&
+            (text[numberEnd + 1] == ' ' || text[numberEnd + 1] == '\t')) {
+            orderedListDot = numberEnd;
+        }
+    }
+    for (size_t i = 0; i < text.size(); ++i) {
+        char ch = text[i];
+        if (i == orderedListDot) {
+            escaped.push_back('\\');
+        }
         if (ch == '\\' || ch == '`' || ch == '*' || ch == '_' || ch == '[' || ch == ']' ||
             ch == '<' || ch == '>' || ch == '#') {
             escaped.push_back('\\');
@@ -1092,7 +1109,7 @@ void ArkServer::FindDocumentSymbol(const DocumentSymbolParams &params, const Cal
         auto filePath = FileStore::NormalizePath(URI::Resolve(params.textDocument.uri.file));
         // To avoid queue task in runWithAST crashing
         if (inputAST.ast == nullptr || !CompilerCangjieProject::GetInstance()->FileHasSemaCache(filePath)
-            || Cangjie::FileUtil::HasExtension(filePath, CONSTANTS::CANGJIE_MACRO_FILE_EXTENSION)) {
+            || Cangjie::FileUtil::HasExtension(filePath, CONSTANTS::CANGJIE_MACRO_FILE_EXTENSION())) {
             ValueOrError value(ValueOrErrorCheck::VALUE, nullptr);
             reply(value);
             return;
@@ -1133,7 +1150,7 @@ void ArkServer::FindOverrideMethods(const std::string &file,
         nlohmann::json jsonValue;
         for (auto item: result.overrideMethods) {
             nlohmann::json overrideItem;
-            overrideItem["importItem"] = item.package + CONSTANTS::DOT + item.identifier;
+            overrideItem["importItem"] = item.package + CONSTANTS::DOT() + item.identifier;
             overrideItem["fullPackageName"] = item.package;
             overrideItem["identifier"] = item.identifier;
             overrideItem["kind"] = item.kind;

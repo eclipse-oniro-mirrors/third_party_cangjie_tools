@@ -639,6 +639,7 @@
 {"hover":{"testFile":"LSP_Hover_Comment_Line_001.test","id":"9"}}
 {"hover":{"testFile":"LSP_Hover_Comment_Line_002.test","id":"9","useDB":true}}
 {"hover":{"testFile":"LSP_Hover_Comment_Block_001.test","id":"9"}}
+{"hover":{"testFile":"LSP_Hover_Comment_Block_Ordered_List_001.test","id":"9"}}
 {"hover":{"testFile":"LSP_Hover_2021111115435_001.test","id":"9"}}
 {"hover":{"testFile":"LSP_Hover_2021111115435_002.test","id":"9"}}
 {"hover":{"testFile":"LSP_Hover_2022022212539.test","id":"9"}}
@@ -1212,7 +1213,9 @@
 {"codeAction":{"testFile":"ExtractInterface_Constraint_012.test","id":"10"}}
 {"codeAction":{"testFile":"IntroduceField_Constraint_001.test","id":"10"}}
 {"codeAction":{"testFile":"IntroduceField_Constraint_002.test","id":"10"}}
+{"codeAction":{"testFile":"IntroduceField_Constraint_003.test","id":"10"}}
 {"codeAction":{"testFile":"IntroduceParameter_Constraint_001.test","id":"10"}}
+{"codeAction":{"testFile":"IntroduceParameter_Constraint_002.test","id":"10"}}
 
 {"applyEdit":{"testFile":"ExtractMethod_Apply_003.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"ExtractVariable_Apply_001.test","method":"workspace/applyEdit"}}
@@ -1230,6 +1233,12 @@
 {"applyEdit":{"testFile":"ExtractInterface_Apply_010.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"ExtractInterface_Apply_011.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"ExtractInterface_Apply_012.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"ExtractInterface_Apply_013.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"ExtractInterface_Apply_014.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"ExtractInterface_Apply_015.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"ExtractInterface_Apply_016.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"ExtractInterface_Apply_017.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"ExtractInterface_Apply_019.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceField_Apply_001.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceField_Apply_002.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceField_Apply_003.test","method":"workspace/applyEdit"}}
@@ -1249,3 +1258,8 @@
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_007.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_008.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_009.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_010.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_011.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_012.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_013.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_014.test","method":"workspace/applyEdit"}}

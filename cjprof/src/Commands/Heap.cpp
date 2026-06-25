@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <fstream>
+#include <climits>
 #include "Analyzer/HeapAnalyzer.h"
 #include "Commands/Heap.h"
 
@@ -71,7 +72,7 @@ static void ParseDepth(const char *arg, int &depth)
 {
     char *endPtr = nullptr;
     long pid_long = strtol(arg, &endPtr, 10);
-    if (endPtr == arg || *endPtr != '\0' || errno == ERANGE || pid_long <= 0) {
+    if (endPtr == arg || *endPtr != '\0' || errno == ERANGE || pid_long <= 0 || pid_long > INT_MAX) {
         printf("warning: Invalid depth value, use the default value (%d).\n", depth);
         return;
     }
@@ -148,7 +149,7 @@ bool Heap::ParseArgs(int argc, char **argv)
                 m_cfg.dump = true;
                 char *endPtr = nullptr;
                 long pid_long = strtol(optarg, &endPtr, 10);
-                if (endPtr == optarg || *endPtr != '\0' || errno == ERANGE || pid_long <= 0) {
+                if (endPtr == optarg || *endPtr != '\0' || errno == ERANGE || pid_long <= 0 || pid_long > INT_MAX) {
                     fprintf(stderr, "error: Invalid pid '%s'.\n", optarg);
                     break;
                 }
@@ -259,7 +260,7 @@ bool Heap::DumpHeap()
         fprintf(stderr, "error: Invalid path of %s.\n", softLinkPath.c_str());
         return false;
     }
-    while (stat(data.c_str(), &sb) != 0) {
+    while (stat(data.c_str(), &sb) != 0 && errno == ENOENT) {
         sleep(1);
     }
 
@@ -282,10 +283,9 @@ bool Heap::DumpHeap()
     }
     ifs.seekg(0, ifs.beg);
 
-    auto buf = new char[size];
-    ifs.read(buf, size);
-    ofs.write(buf, size);
-    delete [] buf;
+    std::vector<char> buf(size);
+    ifs.read(buf.data(), size);
+    ofs.write(buf.data(), size);
 
     ifs.close();
     ofs.close();

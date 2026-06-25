@@ -58,7 +58,7 @@ void FindReferencesImpl::CompileDownStreamPackage(const std::vector<Ptr<Cangjie:
 }
 // LCOV_EXCL_START
 std::unordered_set<std::string> FindReferencesImpl::GetSelectedUesScopeNames(Ptr<Decl> decl,
-    const ArkAST &ast, Range &range)
+    const ArkAST &ast, const Range &range)
 {
     std::unordered_set<std::string> scopeNames;
     if (!decl || !ast.file || !ast.file->curPackage) {

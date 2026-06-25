@@ -16,6 +16,7 @@
 #include "cangjie/Frontend/CompilerInstance.h"
 #include "capabilities/semanticHighlight/SemanticTokensAdaptor.h"
 #include "capabilities/shutdown/Shutdown.h"
+#include "common/Utils.h"
 #include "ArkLanguageServer.h"
 
 namespace ark {
@@ -813,10 +814,16 @@ void ArkLanguageServer::WrapClientWatchedFiles(std::vector<FileWatchedEvent> &ch
         std::vector<std::string> fileVec;
         if (event.type == FileChangeType::DELETED && CheckIsDirectory(file, true) &&
             CheckFileInCangjieProject(filePath)) {
-            fileVec = CompilerCangjieProject::GetInstance()->GetFilesInPkg(file); // multi folder
+            auto res =
+                CompilerCangjieProject::GetInstance()->GetAllFilesUnderPathRecursive(file, true); // multi folder
+            std::for_each(res.begin(), res.end(), [&file, &fileVec] (auto& fp) {
+                if (fp.rfind(file, 0) == 0) {
+                    fileVec.push_back(fp.substr(file.length() + 1));
+                }
+            });
         } else if (event.type == FileChangeType::CREATED && CheckIsDirectory(file) &&
                 CheckFileInCangjieProject(filePath)) {
-            fileVec = GetAllFilesUnderCurrentPath(file, CANGJIE_FILE_EXTENSION, false);
+            fileVec = GetAllFilesUnderCurrentPath(file, CANGJIE_FILE_EXTENSION(), false);
         }
         for (const auto& item : fileVec) {
             TextDocumentIdentifier textDocument;
@@ -827,24 +834,6 @@ void ArkLanguageServer::WrapClientWatchedFiles(std::vector<FileWatchedEvent> &ch
             }
         }
     }
-}
-
-bool ArkLanguageServer::CheckIsDirectory(const std::string &dirPath, bool isDelete) const
-{
-    if (dirPath.empty()) {
-        return false;
-    }
-
-    struct stat buffer = {};
-    std::string realPath = PathWindowsToLinux(dirPath);
-    std::string file = realPath;
-    if (isDelete) {
-        auto res = realPath.find_last_of('/');
-        if (res != std::string::npos) {
-            file = realPath.substr(0, res);
-        }
-    }
-    return (stat(file.c_str(), &buffer) == 0 && S_ISDIR(buffer.st_mode));
 }
 
 void ArkLanguageServer::OnDidChangeWatchedFiles(const DidChangeWatchedFilesParam &params)
@@ -866,7 +855,8 @@ void ArkLanguageServer::OnDidChangeWatchedFiles(const DidChangeWatchedFilesParam
 // LCOV_EXCL_STOP
 bool ArkLanguageServer::CheckFileInCangjieProject(const std::string &filePath, bool ignoreMacro) const
 {
-    if (filePath.empty() || (ignoreMacro && Cangjie::FileUtil::HasExtension(filePath, CANGJIE_MACRO_FILE_EXTENSION))) {
+    if (filePath.empty() || (ignoreMacro && Cangjie::FileUtil::HasExtension(filePath,
+        CANGJIE_MACRO_FILE_EXTENSION()))) {
         return false;
     }
     return CompilerCangjieProject::GetInstance()->GetCangjieFileKind(filePath).first != CangjieFileKind::MISSING;
@@ -1003,7 +993,7 @@ void ArkLanguageServer::OnFileRefactor(const FileRefactorReqParams &params, nloh
     logger.LogMessage(MessageType::MSG_LOG, "ArkLanguageServer::OnFileRefactor in");
 
     std::string file = FileStore::NormalizePath(URI::Resolve(params.file.uri.file));
-    if (FileUtil::GetFileExtension(file) != CONSTANTS::CANGJIE_FILE_EXTENSION) {
+    if (FileUtil::GetFileExtension(file) != CONSTANTS::CANGJIE_FILE_EXTENSION()) {
         ReplyError(id);
         return;
     }
@@ -1246,13 +1236,13 @@ std::vector<DiagnosticToken> ArkLanguageServer::GetDiagsOfCurFile(std::string fi
 void ArkLanguageServer::RemoveDiagOfCurPkg(const std::string& dirName)
 {
     std::lock_guard<std::mutex> lock(fixItsMutex);
-    std::vector<std::string> files = GetAllFilesUnderCurrentPath(dirName, CANGJIE_FILE_EXTENSION, false);
+    std::vector<std::string> files = GetAllFilesUnderCurrentPath(dirName, CANGJIE_FILE_EXTENSION(), false);
     for (auto &iter : files) {
         LowFileName(iter);
         std::string path = JoinPath(dirName, iter);
         (void)fixItsMap.erase(path);
     }
-    files = GetAllFilesUnderCurrentPath(dirName, CANGJIE_MACRO_FILE_EXTENSION, false);
+    files = GetAllFilesUnderCurrentPath(dirName, CANGJIE_MACRO_FILE_EXTENSION(), false);
     for (auto &iter : files) {
         std::string path = JoinPath(dirName, iter);
         (void) fixItsMap.erase(path);
@@ -2197,50 +2187,130 @@ static bool MatchFuncParamAtPos(const FuncParam* funcParam, const Range& diagRan
     return ProcessFuncParamDeleteRange(funcParam, info.deleteRange, info.symbolKindDesc, currentFuncBody, outerDecl);
 }
 
-static UnusedSymbolInfo FindUnusedSymbol(const ArkAST* arkAst, const Range& diagRange)
+// Structure to hold matched declaration info for unused symbol quickfix
+struct MatchedDecl {
+    const Decl* decl;
+    Ptr<const MacroExpandDecl> parentMacro;
+    bool isUserDecl;   // true if not inside a macro call context
+    bool nameMatches;  // true if name matches the hint
+};
+
+// Select the best matched declaration using priority: name match > user-declared > first match
+static UnusedSymbolInfo SelectBestMatchedDecl(const std::vector<MatchedDecl>& matchedDecls,
+    const Range& diagRange, const ArkAST* arkAst)
 {
     UnusedSymbolInfo info;
     info.deleteRange = diagRange;
+
+    if (matchedDecls.empty()) {
+        return info;
+    }
+
+    // First priority: exact name match (from diagnostic message)
+    for (const auto& match : matchedDecls) {
+        if (match.nameMatches) {
+            info.symbolName = std::string(match.decl->identifier);
+            info.symbolKindDesc = GetSymbolKindDescription(match.decl->astKind, match.decl);
+            ComputeDeclDeleteRange(match.decl, match.parentMacro, info.deleteRange, diagRange, arkAst);
+            info.found = true;
+            return info;
+        }
+    }
+
+    // Second priority: user-declared symbol (not inside macro call)
+    for (const auto& match : matchedDecls) {
+        if (match.isUserDecl) {
+            info.symbolName = std::string(match.decl->identifier);
+            info.symbolKindDesc = GetSymbolKindDescription(match.decl->astKind, match.decl);
+            ComputeDeclDeleteRange(match.decl, match.parentMacro, info.deleteRange, diagRange, arkAst);
+            info.found = true;
+            return info;
+        }
+    }
+
+    // Fallback: use the first match (macro-generated)
+    const auto& firstMatch = matchedDecls[0];
+    info.symbolName = std::string(firstMatch.decl->identifier);
+    info.symbolKindDesc = GetSymbolKindDescription(firstMatch.decl->astKind, firstMatch.decl);
+    ComputeDeclDeleteRange(firstMatch.decl, firstMatch.parentMacro, info.deleteRange, diagRange, arkAst);
+    info.found = true;
+
+    return info;
+}
+
+// Context for collecting matching declarations during AST walk
+struct UnusedSymbolWalkContext {
     const FuncBody* currentFuncBody = nullptr;
     Ptr<const MacroExpandDecl> parentMacroExpandDecl = nullptr;
+    std::vector<MatchedDecl> matchedDecls;
+    UnusedSymbolInfo info;
+    bool foundFuncParam = false;
+};
+
+// Process a single node during AST walk for unused symbol search
+static VisitAction ProcessNodeForUnusedSymbol(Ptr<const Node> node, const Range& diagRange,
+    const std::string& symbolNameHint, UnusedSymbolWalkContext& ctx)
+{
+    if (auto funcBody = DynamicCast<const FuncBody*>(node)) {
+        ctx.currentFuncBody = funcBody;
+    }
+
+    if (auto macroExpand = DynamicCast<const MacroExpandDecl*>(node)) {
+        ctx.parentMacroExpandDecl = macroExpand;
+    }
+
+    if (auto funcParam = DynamicCast<const FuncParam*>(node)) {
+        if (MatchFuncParamAtPos(funcParam, diagRange, ctx.currentFuncBody, ctx.info)) {
+            ctx.info.found = true;
+            ctx.foundFuncParam = true;
+            return VisitAction::STOP_NOW;
+        }
+        return VisitAction::WALK_CHILDREN;
+    }
+
+    auto decl = DynamicCast<const Decl*>(node);
+    if (!decl) {
+        return VisitAction::WALK_CHILDREN;
+    }
+
+    auto identifierPos = decl->GetIdentifierPos();
+    bool isUserDecl = !decl->isInMacroCall;
+    bool nameMatches = !symbolNameHint.empty() && decl->identifier == symbolNameHint;
+
+    auto comparePos = identifierPos;
+    if (!isUserDecl && decl->curMacroCall) {
+        auto mappedPos = decl->curMacroCall->GetMacroCallPos(identifierPos);
+        if (!mappedPos.IsZero()) {
+            comparePos = mappedPos;
+        }
+    }
+
+    if (comparePos.line != diagRange.start.line ||
+        comparePos.column != diagRange.start.column) {
+        return VisitAction::WALK_CHILDREN;
+    }
+
+    ctx.matchedDecls.push_back({decl, ctx.parentMacroExpandDecl, isUserDecl, nameMatches});
+    return VisitAction::WALK_CHILDREN;
+}
+
+static UnusedSymbolInfo FindUnusedSymbol(const ArkAST* arkAst, const Range& diagRange,
+    const std::string& symbolNameHint = "")
+{
+    UnusedSymbolWalkContext ctx;
+    ctx.info.deleteRange = diagRange;
 
     std::function<VisitAction(Ptr<const Node>)> finder = [&](Ptr<const Node> node) -> VisitAction {
-        if (auto funcBody = DynamicCast<const FuncBody*>(node)) {
-            currentFuncBody = funcBody;
-        }
-
-        if (auto macroExpand = DynamicCast<const MacroExpandDecl*>(node)) {
-            parentMacroExpandDecl = macroExpand;
-        }
-
-        if (auto funcParam = DynamicCast<const FuncParam*>(node)) {
-            if (MatchFuncParamAtPos(funcParam, diagRange, currentFuncBody, info)) {
-                info.found = true;
-                return VisitAction::STOP_NOW;
-            }
-            return VisitAction::WALK_CHILDREN;
-        }
-
-        auto decl = DynamicCast<const Decl*>(node);
-        if (!decl) {
-            return VisitAction::WALK_CHILDREN;
-        }
-
-        auto identifierPos = decl->GetIdentifierPos();
-        if (identifierPos.line != diagRange.start.line ||
-            identifierPos.column != diagRange.start.column) {
-            return VisitAction::WALK_CHILDREN;
-        }
-
-        info.symbolName = std::string(decl->identifier);
-        info.symbolKindDesc = GetSymbolKindDescription(decl->astKind, decl);
-        ComputeDeclDeleteRange(decl, parentMacroExpandDecl, info.deleteRange, diagRange, arkAst);
-        info.found = true;
-        return VisitAction::STOP_NOW;
+        return ProcessNodeForUnusedSymbol(node, diagRange, symbolNameHint, ctx);
     };
 
     ConstWalker(arkAst->file, finder).Walk();
-    return info;
+
+    if (ctx.foundFuncParam) {
+        return ctx.info;
+    }
+
+    return SelectBestMatchedDecl(ctx.matchedDecls, diagRange, arkAst);
 }
 
 void ArkLanguageServer::RemoveUnusedSymbolQuickFix(DiagnosticToken &diagnostic, ArkAST *arkAst, const std::string &uri)
@@ -2253,7 +2323,18 @@ void ArkLanguageServer::RemoveUnusedSymbolQuickFix(DiagnosticToken &diagnostic, 
     diagnostic.range.end.fileID = arkAst->fileID;
 
     Range diagRange = TransformFromIDE2Char(diagnostic.range);
-    auto info = FindUnusedSymbol(arkAst, diagRange);
+
+    // Extract symbol name from diagnostic message to avoid position mapping issues
+    std::string symbolNameFromDiag;
+    size_t pos1 = diagnostic.message.find("'");
+    if (pos1 != std::string::npos) {
+        size_t pos2 = diagnostic.message.find("'", pos1 + 1);
+        if (pos2 != std::string::npos) {
+            symbolNameFromDiag = diagnostic.message.substr(pos1 + 1, pos2 - pos1 - 1);
+        }
+    }
+
+    auto info = FindUnusedSymbol(arkAst, diagRange, symbolNameFromDiag);
     if (!info.found) {
         return;
     }
