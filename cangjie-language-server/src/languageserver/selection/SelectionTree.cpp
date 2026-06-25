@@ -197,19 +197,21 @@ void SelectionTree::printSelection(const SelectionTreeNode* node, int level) con
 
 void SelectionTree::MatchSelectedScope(Ptr<Node> node, Position start, Position end)
 {
-    if (scope != Scope::UNKNOWN) {
+    if ((scope & Scope::GLOBAL_VAR) != Scope::UNKNOWN ||
+        (scope & Scope::MEMBER_VAR) != Scope::UNKNOWN ||
+        (scope & Scope::FUNC_BODY) != Scope::UNKNOWN) {
         return;
     }
 
     switch (node->astKind) {
         case ASTKind::VAR_DECL: {
             if (node->TestAttr(Attribute::GLOBAL)) {
-                scope = Scope::GLOBAL_VAR;
+                scope |= Scope::GLOBAL_VAR;
                 targetDecl = node;
                 return;
             }
             if (node->TestAnyAttr(Attribute::IN_CLASSLIKE, Attribute::IN_STRUCT, Attribute::IN_ENUM)) {
-                scope = Scope::MEMBER_VAR;
+                scope |= Scope::MEMBER_VAR;
                 targetDecl = node;
                 return;
             }
@@ -223,7 +225,7 @@ void SelectionTree::MatchSelectedScope(Ptr<Node> node, Position start, Position 
             if (start < funcDecl->funcBody->body->begin || end > funcDecl->funcBody->body->end) {
                 return;
             }
-            scope = Scope::FUNC_BODY;
+            scope |= Scope::FUNC_BODY;
             targetDecl = node;
             return;
         }
@@ -235,7 +237,7 @@ void SelectionTree::MatchSelectedScope(Ptr<Node> node, Position start, Position 
             if (start < node->begin || end > node->end) {
                 return;
             }
-            scope = Scope::TYPE_DECL;
+            scope |= Scope::TYPE_DECL;
             targetDecl = node;
             return;
         }
@@ -250,39 +252,39 @@ void SelectionTree::FindTopDecl(Cangjie::AST::Node &node)
         return;
     }
     Meta::match(node)(
-        [&](Cangjie::AST::InterfaceDecl &interfaceDecl) {
+        [this](Cangjie::AST::InterfaceDecl &interfaceDecl) {
             topDecl = &interfaceDecl;
             return;
         },
-        [&](Cangjie::AST::ClassDecl &classDecl) {
+        [this](Cangjie::AST::ClassDecl &classDecl) {
             topDecl = &classDecl;
             return;
         },
-        [&](Cangjie::AST::StructDecl &structDecl) {
+        [this](Cangjie::AST::StructDecl &structDecl) {
             topDecl = &structDecl;
             return;
         },
-        [&](Cangjie::AST::EnumDecl &enumDecl) {
+        [this](Cangjie::AST::EnumDecl &enumDecl) {
             topDecl = &enumDecl;
             return;
         },
-        [&](Cangjie::AST::ExtendDecl &extendDecl) {
+        [this](Cangjie::AST::ExtendDecl &extendDecl) {
             topDecl = &extendDecl;
             return;
         },
-        [&](Cangjie::AST::FuncDecl &funcDecl) {
+        [this](Cangjie::AST::FuncDecl &funcDecl) {
             if (funcDecl.TestAttr(Attribute::GLOBAL)) {
                 topDecl = &funcDecl;
             }
             return;
         },
-        [&](Cangjie::AST::VarDecl &varDecl) {
+        [this](Cangjie::AST::VarDecl &varDecl) {
             if (varDecl.TestAttr(Attribute::GLOBAL)) {
                 topDecl = &varDecl;
             }
             return;
         },
-        [&]() {
+        []() {
             return;
         });
 }

@@ -11,7 +11,7 @@ cmake_minimum_required(VERSION 3.10)
 project("cjprof")
 
 set(CMAKE_CXX_STANDARD 17)
-set(CJPROF_VERSION_STR "1.2.0-beta.01")
+set(CJPROF_VERSION_STR "1.2.0-beta.02")
 set(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2 -O2")
 set(STRIP_FLAG "-s")
 
@@ -22,7 +22,7 @@ if (STRIP_LIB_PREFIX)
 endif()
 
 if (NOT APPLE AND NOT WIN32)
-  set(LINK_FLAGS "-pie -rdynamic -Wl,-z,relro,-z,now,-z,noexecstack -Wl,-Bsymbolic -Wl,--no-undefined")
+  set(LINK_FLAGS "-rdynamic -Wl,-z,relro,-z,now,-z,noexecstack -Wl,-Bsymbolic -Wl,--no-undefined")
 endif ()
 
 if (WIN32)
@@ -31,7 +31,7 @@ if (WIN32)
 endif ()
 
 if (APPLE)
-  set(LINK_FLAGS "-pie -rdynamic")
+  set(LINK_FLAGS "-rdynamic")
 endif ()
 
 if(CMAKE_BUILD_TYPE MATCHES Release)
@@ -63,12 +63,15 @@ else()
   message(WARNING "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif()
 
-include_directories(third_party/boundscheck/include)
 include_directories(third_party/cpp-httplib)
 include_directories(third_party/third_party_json/include)
-include_directories(third_party/runtime/runtime/src)
-add_subdirectory(third_party/runtime/runtime/src/Demangler EXCLUDE_FROM_ALL)
-set_target_properties(cangjie-demangle PROPERTIES EXCLUDE_FROM_ALL FALSE)
+
+if (NOT APPLE AND NOT WIN32)
+  include_directories(third_party/boundscheck/include)
+  include_directories(third_party/runtime/runtime/src)
+  add_subdirectory(third_party/runtime/runtime/src/Demangler EXCLUDE_FROM_ALL)
+  set_target_properties(cangjie-demangle PROPERTIES EXCLUDE_FROM_ALL FALSE)
+endif()
 
 include_directories(include)
 add_subdirectory(src)

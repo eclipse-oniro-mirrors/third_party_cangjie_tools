@@ -92,9 +92,14 @@ public:
         }
     }
 
-    IndexDatabase& GetIndexDatabase() const
+    const IndexDatabase& GetIndexDatabase() const
     {
         return db;
+    }
+
+    void EraseThreadCache()
+    {
+        db.GetDatabaseCache().EraseThreadCache();
     }
 
     void GetFuncByName(const FuncSigRequest &req,
