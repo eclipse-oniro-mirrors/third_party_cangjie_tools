@@ -84,3 +84,47 @@ struct Temperature {
         a+1
     }
 }
+
+class MathTool {
+    static func add(base: Int64): Int64 {
+        var bit: Int32 = 0b0001
+        bit <<= 1
+        bit >>= 1
+        bit |= 0b1000
+        bit &= 0b1111
+        bit ^= 0b1111
+        return base
+    }
+}
+
+private func nestedFunctionFieldSample() {
+    func companame() {
+        let a = 3
+    }
+}
+
+public func testStringType(): Unit {
+    let s1: String = "Hello Cangjie"
+    let s2 = "World"
+
+    // Interpolation string
+    let name = "Alice"
+    let age = 30
+    let greeting = "Hello, ${name}! You are ${age} years old."
+
+    // Multiline raw string
+    let raw = #"""
+        Line 1
+        Line 2
+        Line 3
+        """#
+
+    // Convert string to Rune array
+    let runes = "nihao".toRuneArray()
+}
+
+type CompareFunction = (Int64, Int64) -> Int64
+
+func lambdaFieldSample(compare: CompareFunction) {
+    let num: CompareFunction = {a: Int64, b: Int64 => a - b}
+}

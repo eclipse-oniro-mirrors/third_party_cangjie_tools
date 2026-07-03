@@ -182,6 +182,8 @@ private:
 
     void CreateNamedArgRef(const CallExpr& ce);
 
+    void CreateResolvedFunctionRef(const CallExpr& ce);
+
     void CreateImportRef(const File &fileNode);
 
     void CollectReExportSymbol(const File &file);

@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <sstream>
 #include <unordered_set>
@@ -202,20 +203,6 @@ static bool HasExprBoundary(const SelectionTree::SelectionTreeNode &treeNode, co
     return hasBoundary;
 }
 
-static const std::unordered_set<Cangjie::TokenKind> INTRODUCE_PARAMETER_COMPOUND_ASSIGN_OPERATORS = {
-    TokenKind::EXP_ASSIGN, TokenKind::MUL_ASSIGN, TokenKind::DIV_ASSIGN, TokenKind::ADD_ASSIGN,
-    TokenKind::SUB_ASSIGN, TokenKind::MOD_ASSIGN, TokenKind::LSHIFT_ASSIGN, TokenKind::RSHIFT_ASSIGN,
-    TokenKind::AND_ASSIGN, TokenKind::BITXOR_ASSIGN, TokenKind::BITAND_ASSIGN, TokenKind::BITOR_ASSIGN,
-    TokenKind::OR_ASSIGN
-};
-
-static bool IsSupportedCompoundAssignExpr(const Cangjie::AST::Node &node)
-{
-    auto assignExpr = DynamicCast<Cangjie::AST::AssignExpr *>(&node);
-    return assignExpr && assignExpr->isCompound &&
-        INTRODUCE_PARAMETER_COMPOUND_ASSIGN_OPERATORS.count(assignExpr->op) > 0;
-}
-
 static std::string GetCompoundAssignFallbackTypeName(const Cangjie::AST::Expr &expr)
 {
     auto assignExpr = DynamicCast<const Cangjie::AST::AssignExpr *>(&expr);
@@ -231,7 +218,7 @@ static bool HasValidIntroduceParameterExprType(const Cangjie::AST::Expr &expr)
     if (expr.GetTy() && GetString(*expr.GetTy()) != "UnknownType") {
         return true;
     }
-    return IsSupportedCompoundAssignExpr(expr) && !GetCompoundAssignFallbackTypeName(expr).empty();
+    return TweakUtils::IsSupportedCompoundAssignExpr(expr) && !GetCompoundAssignFallbackTypeName(expr).empty();
 }
 
 static Ptr<Cangjie::AST::Expr> GetContainingIntroduceParameterExpr(
@@ -251,7 +238,7 @@ static Ptr<Cangjie::AST::Expr> GetContainingIntroduceParameterExpr(
             return SelectionTree::WalkAction::WALK_CHILDREN;
         }
         bool isSupportedExpr = treeNode->node->astKind == ASTKind::BINARY_EXPR ||
-            IsSupportedCompoundAssignExpr(*treeNode->node);
+            TweakUtils::IsSupportedCompoundAssignExpr(*treeNode->node);
         if (isSupportedExpr && treeNode->node->end == selectedRange.end &&
             HasExprBoundary(*treeNode, selectedRange.start, true) &&
             HasExprBoundary(*treeNode, selectedRange.end, false)) {
@@ -292,7 +279,7 @@ static std::string GetIntroduceParameterExprTypeName(const SelectionTree &select
     const Range &selectedRange)
 {
     auto expr = GetIntroduceParameterExpr(selectionTree, selectedRange);
-    if (expr && IsSupportedCompoundAssignExpr(*expr)) {
+    if (expr && TweakUtils::IsSupportedCompoundAssignExpr(*expr)) {
         return GetCompoundAssignFallbackTypeName(*expr);
     }
     auto exactTypeName = TweakUtils::GetSelectedExprTypeName(selectionTree, selectedRange);
@@ -517,33 +504,8 @@ static bool IsFuncParamUsedOutsideRange(Cangjie::AST::FuncDecl &funcDecl, Cangji
     return isUsed;
 }
 // LCOV_EXCL_BR_STOP
-// LCOV_EXCL_START
-static bool GetParamRemovalRange(Cangjie::AST::FuncParamList &paramList, Cangjie::AST::FuncParam &param, Range &range)
-{
-    for (std::size_t index = 0; index < paramList.params.size(); ++index) {
-        if (!paramList.params[index] || paramList.params[index].get() != &param) {
-            continue;
-        }
-        if (paramList.params.size() == 1) {
-            range.start = param.begin;
-            range.end = param.end;
-            return true;
-        }
-        if (index + 1 < paramList.params.size() && paramList.params[index + 1]) {
-            range.start = param.begin;
-            range.end = paramList.params[index + 1]->begin;
-            return true;
-        }
-        if (index > 0 && paramList.params[index - 1]) {
-            range.start = paramList.params[index - 1]->end;
-            range.end = param.end;
-            return true;
-        }
-        return false;
-    }
-    return false;
-}
 
+// LCOV_EXCL_START
 static std::vector<std::size_t> CollectRemovableParamIndices(
     const Tweak::Selection &sel, Cangjie::AST::FuncDecl &funcDecl, Cangjie::AST::FuncParamList &paramList, Range &range)
 {
@@ -600,26 +562,91 @@ static std::vector<TextEdit> BuildPartialParameterRemovalEdits(
     std::size_t replacedIndex)
 {
     std::vector<TextEdit> edits;
-    for (auto it = removedParamIndices.rbegin(); it != removedParamIndices.rend(); ++it) {
-        if (*it == replacedIndex || *it >= paramList.params.size() || !paramList.params[*it]) {
+    std::vector<std::size_t> indices;
+    for (auto index : removedParamIndices) {
+        if (index == replacedIndex || index >= paramList.params.size() || !paramList.params[index]) {
             continue;
         }
+        indices.push_back(index);
+    }
+    if (indices.empty()) {
+        return edits;
+    }
+
+    std::sort(indices.begin(), indices.end(), std::greater<std::size_t>());
+    for (std::size_t i = 0; i < indices.size();) {
+        std::size_t segmentEnd = indices[i];
+        std::size_t segmentStart = segmentEnd;
+        while (i + 1 < indices.size() && indices[i + 1] + 1 == segmentStart) {
+            ++i;
+            segmentStart = indices[i];
+        }
+
         Range removeRange;
-        if (!GetParamRemovalRange(paramList, *paramList.params[*it], removeRange)) {
+        if (segmentEnd + 1 < paramList.params.size() && paramList.params[segmentEnd + 1]) {
+            removeRange = {paramList.params[segmentStart]->begin, paramList.params[segmentEnd + 1]->begin};
+        } else if (segmentStart > 0 && paramList.params[segmentStart - 1]) {
+            removeRange = {paramList.params[segmentStart - 1]->end, paramList.params[segmentEnd]->end};
+        } else if (paramList.params[segmentStart]) {
+            removeRange = {paramList.params[segmentStart]->begin, paramList.params[segmentEnd]->end};
+        } else {
+            ++i;
             continue;
         }
         TextEdit textEdit;
         textEdit.range = TransformFromChar2IDE(removeRange);
         edits.push_back(textEdit);
+        ++i;
     }
     return edits;
 }
 // LCOV_EXCL_STOP
+static std::optional<Position> ResolveParamListRightParen(
+    const Tweak::Selection *sel, Cangjie::AST::FuncDecl *funcDecl, Cangjie::AST::FuncParamList &paramList)
+{
+    if (!sel || !sel->arkAst || !sel->arkAst->sourceManager || paramList.params.empty() || !paramList.params.front()) {
+        return std::nullopt;
+    }
+    auto searchEnd = paramList.rightParenPos;
+    if (searchEnd.IsZero() || searchEnd <= paramList.params.front()->begin) {
+        searchEnd = paramList.params.back() ? paramList.params.back()->end : searchEnd;
+    }
+    if (funcDecl && funcDecl->funcBody && funcDecl->funcBody->body &&
+        funcDecl->funcBody->body->begin > paramList.params.front()->begin) {
+        searchEnd = funcDecl->funcBody->body->begin;
+    }
+    if (searchEnd.IsZero() || searchEnd <= paramList.params.front()->begin) {
+        return std::nullopt;
+    }
+
+    auto searchStart = paramList.params.front()->begin;
+    std::string text = sel->arkAst->sourceManager->GetContentBetween(searchStart, searchEnd);
+    int depth = 0;
+    for (size_t offset = 0; offset < text.size(); ++offset) {
+        if (text[offset] == '(') {
+            ++depth;
+            continue;
+        }
+        if (text[offset] != ')') {
+            continue;
+        }
+        if (depth == 0) {
+            return TweakUtils::PositionAtOffset(searchStart, text, offset);
+        }
+        --depth;
+    }
+    return std::nullopt;
+}
+
 static std::vector<TextEdit> BuildAllParameterReplacementEdit(
-    Cangjie::AST::FuncParamList &paramList, const std::string &newParamText)
+    Cangjie::AST::FuncParamList &paramList,
+    const std::string &newParamText,
+    const Tweak::Selection *sel = nullptr,
+    Cangjie::AST::FuncDecl *funcDecl = nullptr)
 {
     TextEdit textEdit;
-    Range replaceRange = {paramList.params.front()->begin, paramList.params.back()->end};
+    auto rightParen = ResolveParamListRightParen(sel, funcDecl, paramList);
+    Range replaceRange = {paramList.params.front()->begin, rightParen.value_or(paramList.params.back()->end)};
     textEdit.range = TransformFromChar2IDE(replaceRange);
     textEdit.newText = newParamText;
     return {textEdit};
@@ -643,7 +670,7 @@ static std::vector<TextEdit> RemoveReplacedParameters(const ParamRemovalContext 
     std::string newParamText = BuildNewParamText(context.funcDecl, context.paramName, context.typeName);
     if (context.removedParamIndices.size() == paramList->params.size()) {
         context.insertedParameter = true;
-        return BuildAllParameterReplacementEdit(*paramList, newParamText);
+        return BuildAllParameterReplacementEdit(*paramList, newParamText, &context.sel, &context.funcDecl);
     }
 
     std::size_t replacedIndex = context.removedParamIndices.front();
@@ -753,7 +780,7 @@ TextEdit IntroduceParameter::ReplaceExprWithParam(const Selection &sel, Range &r
 {
     TextEdit textEdit;
     auto selectedExpr = GetIntroduceParameterExpr(sel.selectionTree, range);
-    bool isCompoundAssign = selectedExpr && IsSupportedCompoundAssignExpr(*selectedExpr);
+    bool isCompoundAssign = selectedExpr && TweakUtils::IsSupportedCompoundAssignExpr(*selectedExpr);
     textEdit.newText = isCompoundAssign ? "" : paramName;
     if (isCompoundAssign) {
         Range deleteLineRange = range;
@@ -767,11 +794,11 @@ TextEdit IntroduceParameter::ReplaceExprWithParam(const Selection &sel, Range &r
     std::string charContent = sel.arkAst->sourceManager->GetContentBetween(
         {range.start.fileID, range.start.line, 1}, range.start);
     range.start.column = CountUnicodeCharacters(charContent) + 1;
-    
+
     std::string endCharContent = sel.arkAst->sourceManager->GetContentBetween(
         {range.end.fileID, range.end.line, 1}, range.end);
     range.end.column = CountUnicodeCharacters(endCharContent) + 1;
-    
+
     textEdit.range = TransformFromChar2IDE(range);
     return textEdit;
 }
@@ -1185,7 +1212,7 @@ static std::string BuildCallSiteArgumentText(const CallSiteContext &context, Can
         return context.argumentText;
     }
     auto selectedExpr = GetIntroduceParameterExpr(context.sel.selectionTree, context.range);
-    if (selectedExpr && IsSupportedCompoundAssignExpr(*selectedExpr)) {
+    if (selectedExpr && TweakUtils::IsSupportedCompoundAssignExpr(*selectedExpr)) {
         return BuildCompoundAssignArgumentText(context, callExpr);
     }
 
@@ -1198,40 +1225,6 @@ static std::string BuildCallSiteArgumentText(const CallSiteContext &context, Can
         argumentText = ReplaceParameterNamesWithCallArguments(context, callExpr, *paramList);
     }
     return ReplaceThisReceiverAtCallSite(context, callExpr, argumentText);
-}
-
-static std::string GetCompoundAssignOperatorText(Cangjie::TokenKind tokenKind)
-{
-    switch (tokenKind) {
-        case TokenKind::EXP_ASSIGN:
-            return "**";
-        case TokenKind::MUL_ASSIGN:
-            return "*";
-        case TokenKind::DIV_ASSIGN:
-            return "/";
-        case TokenKind::ADD_ASSIGN:
-            return "+";
-        case TokenKind::SUB_ASSIGN:
-            return "-";
-        case TokenKind::MOD_ASSIGN:
-            return "%";
-        case TokenKind::LSHIFT_ASSIGN:
-            return "<<";
-        case TokenKind::RSHIFT_ASSIGN:
-            return ">>";
-        case TokenKind::AND_ASSIGN:
-            return "&&";
-        case TokenKind::BITXOR_ASSIGN:
-            return "^";
-        case TokenKind::BITAND_ASSIGN:
-            return "&";
-        case TokenKind::BITOR_ASSIGN:
-            return "|";
-        case TokenKind::OR_ASSIGN:
-            return "||";
-        default:
-            return "";
-    }
 }
 
 static std::string BuildCompoundAssignArgumentText(const CallSiteContext &context, Cangjie::AST::CallExpr &callExpr)
@@ -1249,7 +1242,7 @@ static std::string BuildCompoundAssignArgumentText(const CallSiteContext &contex
     std::string leftText = ApplyCallSiteArgumentReplacements(context, std::move(replacements));
     std::string rightText = context.sel.arkAst->sourceManager->GetContentBetween(
         assignExpr->rightExpr->begin, assignExpr->rightExpr->end);
-    auto opText = GetCompoundAssignOperatorText(assignExpr->op);
+    auto opText = TweakUtils::GetCompoundAssignOperatorText(assignExpr->op);
     if (leftText.empty() || rightText.empty() || opText.empty()) {
         return context.argumentText;
     }
@@ -1407,7 +1400,7 @@ static std::string ReplaceThisReceiverAtCallSite(
     }
 
     std::string receiverText;
-    
+
     if (callExpr.baseFunc && callExpr.baseFunc->astKind == ASTKind::MEMBER_ACCESS) {
         auto memberAccess = DynamicCast<Cangjie::AST::MemberAccess *>(callExpr.baseFunc.get());
         if (memberAccess && memberAccess->baseExpr) {

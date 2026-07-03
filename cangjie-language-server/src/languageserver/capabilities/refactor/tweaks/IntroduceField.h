@@ -23,7 +23,8 @@ public:
         INVALID_TYPE,
         INVALID_CONST_INITIALIZER,
         INVALID_LET_PATTERN_DESTRUCTOR,
-        INVALID_IMMUTABLE_STRUCT_MEMBER_FIELD_ASSIGNMENT
+        INVALID_IMMUTABLE_STRUCT_MEMBER_FIELD_ASSIGNMENT,
+        INVALID_COMPOUND_ASSIGNMENT
     };
 
     const std::string Id() const override
@@ -56,6 +57,8 @@ public:
     static bool IsMemberFieldTarget(Cangjie::AST::FuncDecl &funcDecl);
 
     static bool IsStaticFieldTarget(Cangjie::AST::FuncDecl &funcDecl);
+
+    static bool IsStringInterpolationLiteral(Ptr<Cangjie::AST::Expr> expr);
 
     static bool IsImmutableStructMemberFieldAssignment(
         const Selection &sel, Range &range, const std::string &typeName, Cangjie::AST::FuncDecl &funcDecl);
