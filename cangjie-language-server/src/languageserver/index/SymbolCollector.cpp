@@ -1652,7 +1652,7 @@ void SymbolCollector::CreateReExportSymbolFromSingleImport(const File &file,
         return;
     }
     auto importContent = importSpec->content;
-    std::string importedPkgName = Utils::JoinStrings(importContent.prefixPaths, ".");
+    std::string importedPkgName = importContent.GetImportedPackageNameWithIsDecl();
     auto importedPkg = importMgr.GetPackageDecl(importedPkgName);
     if (!importedPkg) {
         return;
@@ -1701,7 +1701,7 @@ void SymbolCollector::CreateReExportSymbolFromAliasImport(const File &file,
         return;
     }
     auto importContent = importSpec->content;
-    std::string importedPkgName = Utils::JoinStrings(importContent.prefixPaths, ".");
+    std::string importedPkgName = importContent.GetImportedPackageNameWithIsDecl();
     auto importedPkg = importMgr.GetPackageDecl(importedPkgName);
     if (!importedPkg) {
         return;
@@ -1747,7 +1747,7 @@ void SymbolCollector::CreateReExportSymbolFromAllImport(const File &file,
         return;
     }
     auto importContent = importSpec->content;
-    std::string importedPkgName = Utils::JoinStrings(importContent.prefixPaths, ".");
+    std::string importedPkgName = importContent.GetImportedPackageNameWithIsDecl();
     auto importedPkg = importMgr.GetPackageDecl(importedPkgName);
     if (!importedPkg) {
         return;
@@ -1914,6 +1914,32 @@ void SymbolCollector::CreateNamedArgRef(const CallExpr &ce)
         SymbolLocation loc{arg->name.Begin(), arg->name.Begin() + CountUnicodeCharacters(arg->name), filePath};
         Ref refInfo{.location = loc, .kind = RefKind::REFERENCE, .container = GetContextID()};
         (void)symbolRefMap[found->second].emplace_back(refInfo);
+    }
+}
+
+void SymbolCollector::CreateResolvedFunctionRef(const CallExpr& ce)
+{
+    auto funcDecl = DynamicCast<FuncDecl*>(ce.resolvedFunction.get());
+    if (!funcDecl || !funcDecl->outerDecl || !ce.curFile) {
+        return;
+    }
+    // Only create reference for constructor's outer class to fix unused class diagnostic
+    if ((funcDecl->TestAttr(Attribute::CONSTRUCTOR) || funcDecl->TestAttr(Attribute::PRIMARY_CONSTRUCTOR)) &&
+        IsGlobalOrMemberOrItsParam(*funcDecl->outerDecl)) {
+        auto begin = ce.GetBegin();
+        auto uri = ce.curFile->filePath;
+        if (begin.fileID != ce.begin.fileID && !ce.curFile->macroCallFilePath.empty()) {
+            uri = ce.curFile->macroCallFilePath;
+        }
+        if (uri.empty()) {
+            return;
+        }
+        auto classId = GetDeclSymbolID(*funcDecl->outerDecl);
+        if (classId != INVALID_SYMBOL_ID) {
+            SymbolLocation loc{begin, begin + CountUnicodeCharacters(funcDecl->outerDecl->identifier), uri};
+            Ref refInfo{.location = loc, .kind = RefKind::REFERENCE, .container = GetContextID()};
+            (void)symbolRefMap[classId].emplace_back(refInfo);
+        }
     }
 }
 
@@ -2173,6 +2199,9 @@ void SymbolCollector::CollectNode(Ptr<Node> node, const std::string& filePath, A
         CreateRef(*ref, filePath);
     } else if (auto ce = DynamicCast<CallExpr *>(node); ce && !ce->desugarExpr) {
         CreateNamedArgRef(*ce);
+        if (ce->resolvedFunction && ce->curFile) {
+            CreateResolvedFunctionRef(*ce);
+        }
     } else if (auto type = DynamicCast<Type *>(node)) {
         CreateTypeRef(*type, filePath);
     }

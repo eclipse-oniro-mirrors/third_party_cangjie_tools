@@ -266,6 +266,8 @@
 {"completion":{"testFile":"LSP_Completion_RuneLiteral_001.test","id":"9"}}
 {"completion":{"testFile":"LSP_Completion_ReExport_001.test","id":"6"}}
 {"completion":{"testFile":"LSP_Completion_ReExport_Alias_001.test","id":"9"}}
+{"completion":{"testFile":"LSP_Completion_OrgAutoComplete_001.test","id":"6"}}
+{"completion":{"testFile":"LSP_Completion_MultiImport_001.test","id":"9"}}
 
 {"diagnostic":{"testFile":"LSP_Diagnostic_Tuple_001.test"}}
 {"diagnostic":{"testFile":"LSP_Diagnostic_Operator_001.test"}}
@@ -451,6 +453,7 @@
 {"documentHighlight":{"testFile":"LSP_DocumentHighlight_MultiLineArg.test","id":"7"}}
 {"documentHighlight":{"testFile":"LSP_DocumentHighlight_Func_Overload_001.test","id":"7"}}
 {"documentHighlight":{"testFile":"LSP_DocumentHighlight_Func_Overload_002.test","id":"7"}}
+{"documentHighlight":{"testFile":"LSP_DocumentHighlight_ExtendDocHighLight_001.test","id":"7"}}
 
 {"goToDefinition":{"testFile":"LSP_GoToDefinition_String_001.test","id":"7"}}
 {"goToDefinition":{"testFile":"LSP_GoToDefinition_Interface_001.test","id":"110"}}
@@ -872,7 +875,6 @@
 {"rename":{"testFile":"LSP_Rename_Config_Src.test","id":"7"}}
 {"rename":{"testFile":"LSP_Rename_InterplationString_001.test","id":"9"}}
 {"rename":{"testFile":"LSP_Rename_InterplationString_002.test","id":"9"}}
-{"rename":{"testFile":"LSP_Rename_2025072323710.test","id":"7","useDB":true}}
 {"rename":{"testFile":"LSP_Rename_Common_Specific.test","id":"9"}}
 
 {"semanticHighlight":{"testFile":"LSP_SemanticHighlight_String_001.test","id":"7"}}
@@ -1014,6 +1016,7 @@
 {"documentSymbol":{"testFile":"LSP_DocumentSymbol_Macro.test","id":"11"}}
 {"documentSymbol":{"testFile":"LSP_DocumentSymbol_MainDecl.test","id":"9"}}
 {"documentSymbol":{"testFile":"LSP_DocumentSymbol_2024011004667.test","id":"9"}}
+{"documentSymbol":{"testFile":"LSP_DocumentSymbol_DeriveSymbols.test","id":"9"}}
 
 {"signatureHelp":{"testFile":"LSP_SignatureHelp_pkg_001.test","id":"9"}}
 {"signatureHelp":{"testFile":"LSP_SignatureHelp_pkg_002.test","id":"9"}}
@@ -1214,6 +1217,7 @@
 {"codeAction":{"testFile":"IntroduceField_Constraint_001.test","id":"10"}}
 {"codeAction":{"testFile":"IntroduceField_Constraint_002.test","id":"10"}}
 {"codeAction":{"testFile":"IntroduceField_Constraint_003.test","id":"10"}}
+{"codeAction":{"testFile":"IntroduceField_Constraint_004.test","id":"10"}}
 {"codeAction":{"testFile":"IntroduceParameter_Constraint_001.test","id":"10"}}
 {"codeAction":{"testFile":"IntroduceParameter_Constraint_002.test","id":"10"}}
 
@@ -1239,6 +1243,7 @@
 {"applyEdit":{"testFile":"ExtractInterface_Apply_016.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"ExtractInterface_Apply_017.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"ExtractInterface_Apply_019.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"ExtractInterface_Apply_020.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceField_Apply_001.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceField_Apply_002.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceField_Apply_003.test","method":"workspace/applyEdit"}}
@@ -1248,6 +1253,10 @@
 {"applyEdit":{"testFile":"IntroduceField_Apply_007.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceField_Apply_008.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceField_Apply_009.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceField_Apply_010.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceField_Apply_011.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceField_Apply_012.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceField_Apply_013.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_001.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_002.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_003.test","method":"workspace/applyEdit"}}
@@ -1263,3 +1272,4 @@
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_012.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_013.test","method":"workspace/applyEdit"}}
 {"applyEdit":{"testFile":"IntroduceParameter_Apply_014.test","method":"workspace/applyEdit"}}
+{"applyEdit":{"testFile":"IntroduceParameter_Apply_015.test","method":"workspace/applyEdit"}}
