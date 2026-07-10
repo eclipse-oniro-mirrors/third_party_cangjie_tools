@@ -197,6 +197,13 @@ std::unordered_set<std::string> ParseSyscap(Ptr<JsonObject> deviceSysCapObj)
 }
 
 namespace ark {
+namespace {
+bool ShouldCheckSysCap()
+{
+    return MessageHeaderEndOfLine::GetIsDeveco();
+}
+}
+
 std::unordered_map<std::string, SysCapSet> SyscapCheck::module2SyscapsMap{};
 bool SyscapCheck::isChecked = false;
 
@@ -251,6 +258,9 @@ void SyscapCheck::ParseJsonFile(const std::vector<uint8_t>& in)
 
 bool SyscapCheck::CheckSysCap(Ptr<Cangjie::AST::Node> node)
 {
+    if (!ShouldCheckSysCap()) {
+        return true;
+    }
     if (!isChecked) {
         return true;
     }
@@ -263,6 +273,9 @@ bool SyscapCheck::CheckSysCap(Ptr<Cangjie::AST::Node> node)
 
 bool SyscapCheck::CheckSysCap(Ptr<Cangjie::AST::Node> node, bool& hasAPILevel) const
 {
+    if (!ShouldCheckSysCap()) {
+        return true;
+    }
     if (!isChecked) {
         return true;
     }
@@ -298,6 +311,9 @@ bool SyscapCheck::CheckSysCap(Ptr<Cangjie::AST::Node> node, bool& hasAPILevel) c
 
 bool SyscapCheck::CheckSysCap(Ptr<Cangjie::AST::Decl> decl) const
 {
+    if (!ShouldCheckSysCap()) {
+        return true;
+    }
     if (!isChecked) {
         return true;
     }
@@ -309,6 +325,9 @@ bool SyscapCheck::CheckSysCap(Ptr<Cangjie::AST::Decl> decl) const
 
 bool SyscapCheck::CheckSysCap(const Cangjie::AST::Decl& decl) const
 {
+    if (!ShouldCheckSysCap()) {
+        return true;
+    }
     if (!isChecked) {
         return true;
     }
@@ -339,6 +358,9 @@ bool SyscapCheck::CheckSysCap(const Cangjie::AST::Decl& decl) const
 
 bool SyscapCheck::CheckSysCap(const std::string& syscapName)
 {
+    if (!ShouldCheckSysCap()) {
+        return true;
+    }
     if (!isChecked) {
         return true;
     }
