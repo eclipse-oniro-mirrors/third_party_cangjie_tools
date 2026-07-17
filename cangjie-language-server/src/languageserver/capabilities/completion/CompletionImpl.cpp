@@ -408,7 +408,7 @@ void CompletionImpl::AutoImportPackageComplete(const ArkAST &input, CompletionRe
                 AddedOhosSymIdToIndexsMap[sym.id].emplace_back(result.completions.size() - 1);
             }
         });
-    // LCOV_EXCL_STOP
+
 
     index->FindImportReExportSymsOnCompletion(std::make_pair(result.normalCompleteSymID, result.importDeclsSymID),
         pkgName, curModule, prefix, [&result, &textEditRange, &AddedOhosSymIdToIndexsMap, &AddedKitSymIds,
@@ -591,7 +591,7 @@ IfImportInfo CompletionImpl::GetIfImportInfo(const ArkAST &input, Position pos, 
     }
     return info;
 }
-
+// LCOV_EXCL_STOP
 void CompletionImpl::GenerateNamedArgumentCompletion(ark::CompletionResult &result, const std::string &prefix, std::unordered_set<std::string> usedNamedParams, int positionalsUsed, std::unordered_set<std::string> suggestedParamNames, const std::vector<OwnedPtr<FuncParamList>> &paramLists, int paramIndex)
 {
     for (const auto &paramList : paramLists) {

@@ -10,13 +10,6 @@ package cjpm.config
 
 import std.collection.*
 
-import std.collection.{
-    collectString,
-    collectHashMap,
-    HashMap,
-    ArrayList
-}
-
 private enum Operation {
     | Prepend(String)
     | Append(String)

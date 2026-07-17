@@ -58,6 +58,7 @@ struct InterfaceInfo {
         bool isStatic = false;
         bool isMut = false;
         bool isOperator = false;
+        bool isOverride = false;
         std::string visibility;
     };
 
@@ -279,6 +280,11 @@ TEST(ExtractInterfaceTest, InterfaceMemberHeaderCoversMetaCombinations)
     mutOperatorMeta.isOperator = true;
     EXPECT_EQ(BuildInterfaceMemberHeader("+ (rhs: Person): Person", &mutOperatorMeta),
         "    mut operator func + (rhs: Person): Person");
+
+    InterfaceInfo::MemberMeta overrideMeta;
+    overrideMeta.isOverride = true;
+    EXPECT_EQ(BuildInterfaceMemberHeader("printName(): String", &overrideMeta),
+        "    override func printName(): String");
 }
 
 TEST(ExtractInterfaceTest, AppendCreateFileDocumentChangeAddsCreateAndEditEntries)

@@ -230,6 +230,7 @@ struct ReExportSymbol {
     AST::ASTKind kind;
     std::string signature;
     std::vector<CompletionItem> completionItems;
+    bool isCjoSym{false};
 };
 
 using ReExportSymbolSlab = std::vector<ReExportSymbol>;
