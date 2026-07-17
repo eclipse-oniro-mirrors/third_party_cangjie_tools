@@ -9,8 +9,6 @@
 package cjpm.implement
 import cjpm.config.*
 
-import cjpm.config.*
-
 public func supportLtoForTarget(compileTarget: String): Bool {
     compileTarget.contains("linux")
 }

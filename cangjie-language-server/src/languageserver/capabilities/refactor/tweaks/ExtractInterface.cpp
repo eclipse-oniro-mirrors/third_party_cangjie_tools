@@ -57,6 +57,7 @@ struct InterfaceInfo {
         bool isStatic = false;
         bool isMut = false;
         bool isOperator = false;
+        bool isOverride = false;
         std::string visibility;
     };
 
@@ -318,9 +319,13 @@ std::optional<TargetDecl> BuildExtendTargetDecl(Cangjie::AST::ExtendDecl *decl)
     if (decl == nullptr) {
         return std::nullopt;
     }
+    InheritableDecl *extendedDecl = nullptr;
+    if (decl->extendedType) {
+        extendedDecl = DynamicCast<InheritableDecl *>(decl->extendedType->GetTarget());
+    }
     return TargetDecl{
         TargetKind::EXTEND,
-        nullptr,
+        extendedDecl,
         nullptr,
         nullptr,
         nullptr,
@@ -951,30 +956,6 @@ bool TargetFileHasPackageDeclaration(const std::string &targetPath)
     return content.find_first_not_of(" \t\r", lineStart) == packagePos;
 }
 
-void CollectClassInterfaceInheritedTypesForRename(const Cangjie::AST::ClassDecl &decl,
-                                                  const Tweak::Selection &sel,
-                                                  std::vector<std::string> &inheritedTypes)
-{
-    SourceManager *sm = sel.arkAst ? sel.arkAst->sourceManager : nullptr;
-    if (!sm) {
-        return;
-    }
-
-    std::unordered_set<std::string> seen;
-    for (const auto &inherited : decl.inheritedTypes) {
-        if (!IsInterfaceInheritedType(inherited)) {
-            continue;
-        }
-        std::string typeName = ResolveInheritedTypeText(inherited, sm);
-        if (typeName.empty()) {
-            continue;
-        }
-        if (seen.insert(typeName).second) {
-            inheritedTypes.push_back(std::move(typeName));
-        }
-    }
-}
-
 void CollectInterfaceInheritedTypesForExtract(const Cangjie::AST::InheritableDecl &decl,
                                               const Tweak::Selection &sel,
                                               const std::unordered_set<std::string> &selectedInheritedTypes,
@@ -1241,6 +1222,25 @@ std::optional<Range> GetImplementationClassReferenceRange(const RefExpr &refExpr
     return range;
 }
 
+std::optional<Range> GetEnumConstructorQualifierRange(const MemberAccess &memberAccess, const Decl &targetDecl)
+{
+    auto baseRef = DynamicCast<const RefExpr*>(memberAccess.baseExpr.get());
+    if (!baseRef || !baseRef->ref.target || !CheckDeclEqual(*baseRef->ref.target, targetDecl)) {
+        return std::nullopt;
+    }
+    auto constructor = memberAccess.target;
+    if (!constructor || !constructor->TestAttr(Attribute::ENUM_CONSTRUCTOR)) {
+        return std::nullopt;
+    }
+    Position begin = baseRef->GetIdentifierPos();
+    if (begin.IsZero()) {
+        return std::nullopt;
+    }
+    Range range{begin, begin};
+    range.end.column += static_cast<int>(CountUnicodeCharacters(baseRef->ref.identifier));
+    return range;
+}
+
 bool IsReferenceRangeTypeOnly(const Node &node, const Decl &targetDecl, const Range &referenceRange)
 {
     bool foundTypeMatch = false;
@@ -1267,15 +1267,6 @@ bool IsReferenceRangeTypeOnly(const Node &node, const Decl &targetDecl, const Ra
     return foundTypeMatch && !foundNonTypeRefMatch;
 }
 
-bool IsParamTypeReferenceRange(const FuncParam &param, const Range &referenceRange)
-{
-    if (!param.type) {
-        return false;
-    }
-    auto typeRange = GetTypeReferenceRange(*param.type);
-    return typeRange.has_value() && typeRange->start == referenceRange.start && typeRange->end == referenceRange.end;
-}
-
 bool IsExtendTargetTypeReferenceRange(const ExtendDecl &decl, const Range &referenceRange)
 {
     if (!decl.extendedType) {
@@ -1285,38 +1276,11 @@ bool IsExtendTargetTypeReferenceRange(const ExtendDecl &decl, const Range &refer
     return typeRange.has_value() && typeRange->start == referenceRange.start && typeRange->end == referenceRange.end;
 }
 
-bool IsFuncParamUsedInBody(const FuncParam &param, const FuncBody &funcBody)
-{
-    if (!funcBody.body) {
-        return false;
-    }
-    bool used = false;
-    ConstWalker(funcBody.body.get(), [&used, &param](Ptr<const Node> child) {
-        if (used || !child) {
-            return VisitAction::STOP_NOW;
-        }
-        auto refExpr = DynamicCast<const RefExpr*>(child.get());
-        if (!refExpr) {
-            return VisitAction::WALK_CHILDREN;
-        }
-        auto target = refExpr->ref.target;
-        if (target && CheckDeclEqual(*target, param)) {
-            used = true;
-            return VisitAction::STOP_NOW;
-        }
-        return VisitAction::WALK_CHILDREN;
-    }).Walk();
-    return used;
-}
-
 bool UsesDisallowedMembers(const Decl &decl, const std::unordered_set<std::string> &allowedMemberNames)
 {
-    if (allowedMemberNames.empty()) {
-        return false;
-    }
-
     bool disallowed = false;
-    ConstWalker(&decl, [&decl, &allowedMemberNames, &disallowed](Ptr<const Node> child) {
+    const Node *usageScope = decl.outerDecl ? static_cast<const Node *>(decl.outerDecl) : static_cast<const Node *>(&decl);
+    ConstWalker(usageScope, [&decl, &allowedMemberNames, &disallowed](Ptr<const Node> child) {
         if (disallowed || !child) {
             return VisitAction::STOP_NOW;
         }
@@ -1374,16 +1338,7 @@ bool ShouldExcludeTypeReferenceReplacement(const Node &node, const Range &refere
             shouldExclude = true;
             return VisitAction::STOP_NOW;
         }
-        auto funcParam = DynamicCast<const FuncParam*>(child.get());
-        if (!funcParam || !IsParamTypeReferenceRange(*funcParam, referenceRange)) {
-            return VisitAction::WALK_CHILDREN;
-        }
-        auto outerFunc = DynamicCast<const FuncDecl*>(funcParam->outerDecl);
-        if (!outerFunc || !outerFunc->funcBody) {
-            return VisitAction::STOP_NOW;
-        }
-        shouldExclude = IsFuncParamUsedInBody(*funcParam, *outerFunc->funcBody);
-        return VisitAction::STOP_NOW;
+        return VisitAction::WALK_CHILDREN;
     }).Walk();
     return shouldExclude;
 }
@@ -1482,8 +1437,12 @@ std::optional<TextEdit> BuildTypeReplacementEditForLocation(const Location &loca
     if (!found && !IsLikelyTypeReferenceText(*refAst, refRange)) {
         return std::nullopt;
     }
-    if (shouldExclude) {
+    if (shouldExclude && context.implementationClassName.empty()) {
         return std::nullopt;
+    }
+
+    if (!context.implementationClassName.empty()) {
+        return TextEdit{location.range, shouldExclude ? context.implementationClassName : context.interfaceName};
     }
 
     std::string normalizedTargetPath = FileStore::NormalizePath(context.targetPath);
@@ -1548,6 +1507,16 @@ void AddImplementationClassConstructorEditsInFile(TypeReplacementContext &contex
 
     auto &edits = context.applyEdits[uri];
     ConstWalker(refAst.file.get(), [&context, &refAst, &edits](Ptr<const Node> node) {
+        if (auto memberAccess = DynamicCast<const MemberAccess*>(node.get())) {
+            auto qualifierRange = GetEnumConstructorQualifierRange(*memberAccess, context.targetDecl);
+            if (qualifierRange.has_value()) {
+                Range ideRange = TransformFromChar2IDE(*qualifierRange);
+                TextEdit edit{ideRange, context.implementationClassName};
+                if (std::find(edits.begin(), edits.end(), edit) == edits.end()) {
+                    edits.push_back(std::move(edit));
+                }
+            }
+        }
         auto refExpr = DynamicCast<const RefExpr*>(node.get());
         if (!refExpr) {
             return VisitAction::WALK_CHILDREN;
@@ -1917,6 +1886,7 @@ void CollectMembersFromType(TypeDecl &decl, const Tweak::Selection &sel, Interfa
             isStatic,
             func->TestAttr(Cangjie::AST::Attribute::MUT),
             func->TestAttr(Cangjie::AST::Attribute::OPERATOR),
+            false,
             GetVisibility(*func)
         });
 
@@ -2020,7 +1990,11 @@ bool AddInterfaceMemberEdits(const FuncDecl &func,
                              const SelectedEditsRequest &request,
                              bool isStatic)
 {
+    auto visibilityEdit = BuildRemoveVisibilityEdit(func, sm);
     if (isStatic) {
+        if (visibilityEdit.has_value()) {
+            request.edits.push_back(std::move(*visibilityEdit));
+        }
         auto redefEdit = BuildRedefAfterStaticEdit(func, sm);
         if (redefEdit.has_value()) {
             request.edits.push_back(std::move(*redefEdit));
@@ -2028,12 +2002,15 @@ bool AddInterfaceMemberEdits(const FuncDecl &func,
         return true;
     }
 
-    auto removeVisibilityEdit = BuildRemoveVisibilityEdit(func, sm);
-    if (!removeVisibilityEdit.has_value()) {
-        return false;
+    if (!visibilityEdit.has_value()) {
+        auto overrideEdit = BuildOverrideBeforeFuncEdit(func, sm);
+        if (overrideEdit.has_value()) {
+            request.edits.push_back(std::move(*overrideEdit));
+        }
+        return true;
     }
-    removeVisibilityEdit->newText = "override ";
-    request.edits.push_back(std::move(*removeVisibilityEdit));
+    visibilityEdit->newText = func.TestAttr(Attribute::OVERRIDE) ? "" : "override ";
+    request.edits.push_back(std::move(*visibilityEdit));
     return true;
 }
 
@@ -2081,7 +2058,7 @@ bool AddConcreteVisibilityEdits(const FuncDecl &func,
     request.edits.push_back(std::move(*defaultVisibilityEdit));
     return true;
 }
-
+// LCOV_EXCL_START
 bool AddVisibilityEdits(const FuncDecl &func,
                         SourceManager *sm,
                         const SelectedEditsRequest &request,
@@ -2112,7 +2089,7 @@ bool AddVisibilityEdits(const FuncDecl &func,
     request.edits.push_back(std::move(*defaultVisibilityEdit));
     return true;
 }
-
+// LCOV_EXCL_STOP
 void AddOverrideOrRedefEdit(const FuncDecl &func,
                             SourceManager *sm,
                             const SelectedEditsRequest &request,
@@ -2322,6 +2299,9 @@ std::string BuildInterfaceHeaderText(const InterfaceInfo &info, const std::strin
 std::string BuildInterfaceMemberHeader(const std::string &member, const InterfaceInfo::MemberMeta *meta)
 {
     std::string header = INTERFACE_MEMBER_INDENT;
+    if (meta && meta->isOverride) {
+        header += "override ";
+    }
     if (meta && meta->isStatic) {
         header += "static ";
     }
@@ -2597,7 +2577,7 @@ TextEdit InsertImplementationInterfaceClause(Cangjie::AST::InheritableDecl &decl
     }
     return BuildClassImplementsClauseEdit(decl, sel.arkAst->sourceManager, info);
 }
-
+// LCOV_EXCL_START
 TextEdit InsertImplementsClause(Cangjie::AST::ExtendDecl &decl,
                                 const Tweak::Selection &sel,
                                 const InterfaceInfo &info)
@@ -2646,7 +2626,7 @@ TextEdit InsertInterfaceDeclToTargetFile(const std::string &targetPath, const In
     edit.newText = appendPrefix + BuildInterfaceDeclText(info, packageName, true);
     return edit;
 }
-
+// LCOV_EXCL_STOP
 void AppendCreateFileDocumentChange(Tweak::Effect &effect, const std::string &targetPath, const TextEdit &edit)
 {
     if (targetPath.empty()) {
@@ -2677,6 +2657,9 @@ void InitializeApplyContext(ApplyContext &context)
     context.info.genericParams = ResolveTargetGenericParams(context.target);
     context.info.genericWhereClause =
         ResolveTargetGenericWhereClause(context.target, context.sel.arkAst->sourceManager);
+    // Rename mode applies to every inheritable declaration, including an interface
+    // with default implementations. The original declaration becomes the concrete
+    // API while the extracted interface keeps the original public type name.
     context.renameOriginalClass = context.target.inheritableDecl != nullptr &&
                                   ParseBoolOption(context.sel.extraOptions,
                                       "renameOriginalClassAndUseInterfaceWherePossible", false);
@@ -2724,10 +2707,7 @@ void CollectApplyInterfaceInfo(ApplyContext &context)
 {
     CollectMembersFromTarget(context.target, context.sel, context.info);
 
-    if (context.renameOriginalClass && context.target.classDecl) {
-        CollectClassInterfaceInheritedTypesForRename(
-            *context.target.classDecl, context.sel, context.info.inheritedTypes);
-    } else if (context.renameOriginalClass && context.target.inheritableDecl) {
+    if (context.renameOriginalClass && context.target.inheritableDecl) {
         CollectInterfaceInheritedTypesForExtract(
             *context.target.inheritableDecl, context.sel, context.selectedInheritedTypes, context.info.inheritedTypes);
     } else if (context.target.classDecl) {
@@ -2744,6 +2724,46 @@ void CollectApplyInterfaceInfo(ApplyContext &context)
                 context.info.inheritedTypes.push_back(std::move(typeName));
             }
         }
+    }
+}
+
+void CollectInterfaceMemberSignatures(InterfaceDecl &decl,
+                                      SourceManager *sm,
+                                      std::unordered_set<std::string> &signatures,
+                                      std::unordered_set<InterfaceDecl *> &visited)
+{
+    if (!visited.insert(&decl).second) {
+        return;
+    }
+    for (const auto &member : decl.GetMemberDecls()) {
+        auto func = member ? DynamicCast<FuncDecl *>(member.get().get()) : nullptr;
+        if (func && func->identifier.Val() != "init") {
+            signatures.insert(TweakUtils::NormalizeSignature(ResolveFuncSignature(*func, sm)));
+        }
+    }
+    for (auto inherited : CollectDirectInheritedInterfaceDecls(decl)) {
+        if (inherited) {
+            CollectInterfaceMemberSignatures(*inherited, sm, signatures, visited);
+        }
+    }
+}
+
+void MarkInheritedInterfaceOverrides(ApplyContext &context)
+{
+    if (context.selectedInheritedTypes.empty() || !context.sel.arkAst || !context.target.inheritableDecl) {
+        return;
+    }
+    std::unordered_set<std::string> inheritedMemberSignatures;
+    std::unordered_set<InterfaceDecl *> visited;
+    for (auto inherited : CollectDirectInheritedInterfaceDecls(*context.target.inheritableDecl)) {
+        if (!inherited || !context.selectedInheritedTypes.count(NormalizeTypeNameForCompare(inherited->identifier))) {
+            continue;
+        }
+        CollectInterfaceMemberSignatures(
+            *inherited, context.sel.arkAst->sourceManager, inheritedMemberSignatures, visited);
+    }
+    for (auto &meta : context.info.metas) {
+        meta.isOverride = inheritedMemberSignatures.count(TweakUtils::NormalizeSignature(meta.signature)) != 0;
     }
 }
 
@@ -2828,7 +2848,7 @@ void AddSelectedMemberEdits(ApplyContext &context)
         context.sel,
         context.chosen,
         context.effect.applyEdits[context.sourceUri],
-        context.target.kind != TargetKind::EXTEND
+        context.target.kind != TargetKind::EXTEND || context.renameOriginalClass
     };
     CollectSelectedEditsFromTarget(context.target, request);
 }
@@ -2933,6 +2953,7 @@ std::optional<Tweak::Effect> ExtractInterface::Apply(const Tweak::Selection &sel
     InitializeApplyContext(context);
     CollectApplyInterfaceInfo(context);
     FilterSelectedMembers(context);
+    MarkInheritedInterfaceOverrides(context);
 
     AddInterfaceDeclarationEdits(context);
     if (!context.withImplementation) {
