@@ -21,6 +21,7 @@ public class CliFailError <: Exception {
     }
 }
 
+@When[debug]
 private class AssertionError <: Exception {
     AssertionError(error: String) { super(error) }
 }
