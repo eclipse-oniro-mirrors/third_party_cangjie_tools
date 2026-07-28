@@ -161,7 +161,7 @@ int ArkAST::GetCurTokenByStartColumn(const Cangjie::Position &pos, int start, in
         int newIdx = GetCurToken(nextColumnPos, start, end);
         if (newIdx == -1) {
             return newIdx;
-        }        
+        }
         Token curToken = tokens[static_cast<unsigned int>(newIdx)];
         if (nextColumnPos >= curToken.Begin() && nextColumnPos <= curToken.End()) {
             return newIdx;
