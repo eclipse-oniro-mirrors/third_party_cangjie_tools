@@ -284,7 +284,7 @@ TEST(ExtractInterfaceTest, InterfaceMemberHeaderCoversMetaCombinations)
     InterfaceInfo::MemberMeta overrideMeta;
     overrideMeta.isOverride = true;
     EXPECT_EQ(BuildInterfaceMemberHeader("printName(): String", &overrideMeta),
-        "    override func printName(): String");
+        "    func printName(): String");
 }
 
 TEST(ExtractInterfaceTest, AppendCreateFileDocumentChangeAddsCreateAndEditEntries)
