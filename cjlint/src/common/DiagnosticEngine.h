@@ -147,7 +147,7 @@ public:
     {
     }
     ~CodeCheckDiagnosticEngine();
-    void DiagnosticToFile();
+    bool DiagnosticToFile();
     void SetReportToFile(const std::string& fileOfReport, const std::string& formatType)
     {
         this->reportFile = fileOfReport;
@@ -288,6 +288,7 @@ private:
     std::string reportFile;
     std::string format;
     bool reportToFile;
+    bool reportWriteAttempted = false;
     std::list<CodeCheckDiagnostic> diagnosticList;
     nlohmann::json jsonInfo;
     std::vector<CjlintIgnoreInfo> cjlintIgnoreInfos;

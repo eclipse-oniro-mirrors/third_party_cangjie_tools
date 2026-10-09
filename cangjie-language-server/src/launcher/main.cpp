@@ -72,7 +72,7 @@ ark::Environment StringifyEnvironmentPointer(const char *envp[])
 void WriteVersionInfo(const std::string &validFile)
 {
     std::ofstream versionInfo;
-    versionInfo.open(validFile);
+    versionInfo.open(ark::FileStore::NormalizePath(validFile));
     if (!versionInfo.is_open()) {
         Trace::Log("Create index version file failed");
     }
@@ -85,9 +85,13 @@ void WriteVersionInfo(const std::string &validFile)
 
 void ConfigByOptions(ark::Options &opts, std::string& cachePath) {
     if (opts.IsOptionSet("log-path")) {
-        ark::Logger::SetPath(opts.GetLongOption("log-path").value());
+        auto logPath = opts.GetLongOption("log-path");
+        if (logPath.has_value()) {
+            ark::Logger::SetPath(logPath.value());
+        }
     }
-    if (opts.IsOptionSet("enable-log") && opts.GetLongOption("enable-log").value() == "true") {
+    auto enableLog = opts.GetLongOption("enable-log");
+    if (opts.IsOptionSet("enable-log") && enableLog.has_value() && enableLog.value() == "true") {
         ark::Logger::SetLogEnable(true);
     }
     if (opts.IsOptionSet('V')) {
@@ -97,8 +101,11 @@ void ConfigByOptions(ark::Options &opts, std::string& cachePath) {
         ark::CompilerCangjieProject::SetIncrementalOptimize(false);
     }
     if (opts.IsOptionSet("cache-path")) {
-        cachePath = opts.GetLongOption("cache-path").value();
-        ark::CompilerCangjieProject::SetUseDB(!cachePath.empty());
+        auto cachePathOpt = opts.GetLongOption("cache-path");
+        if (cachePathOpt.has_value()) {
+            cachePath = cachePathOpt.value();
+            ark::CompilerCangjieProject::SetUseDB(!cachePath.empty());
+        }
     }
 }
 } // namespace

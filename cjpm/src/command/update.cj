@@ -10,6 +10,9 @@ package cjpm.command
 
 import cjpm.implement.*
 
+let UPDATE_SHORT_OPTION: String = ""
+let UPDATE_LONG_OPTION: Array<String> = ["skip-script"]
+
 // UpdateCommand represents the update command
 class UpdateCommand <: Handle {
     private let UPDATE_USAGE: String = """
@@ -25,6 +28,8 @@ Available options:
     init(args: Array<String>) {
         this.cmdName = args[0]
         this.arguments = args[1..] // remove update itself
+        this.shortOptionSpec = UPDATE_SHORT_OPTION
+        this.longOptionSpecs = UPDATE_LONG_OPTION
     }
 
     public override func printHelp(): Unit {
@@ -42,7 +47,7 @@ Available options:
 }
 
 public func parseSkipScript(arguments: Array<String>): Bool {
-    let (_, unparseArgs) = getParseOption(arguments, "", ["skip-script"])
+    let (_, unparseArgs) = getParseOption(arguments, UPDATE_SHORT_OPTION, UPDATE_LONG_OPTION)
     if (unparseArgs.size != 0) {
         eprintln("Error: unknown command '${unparseArgs[0]}' for cjpm update")
         return false

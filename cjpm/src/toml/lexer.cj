@@ -31,6 +31,8 @@ class Lexer {
     static let TOML_EOF: Rune = Rune(0)
 
     let input: Array<Byte>
+    // Physical byte offset where TOML content starts after an optional BOM.
+    let contentOffset: Int64
     public var start: Int64 = 0
     public var pos: Int64 = 0
     var line = 1
@@ -44,6 +46,14 @@ class Lexer {
 
     public init(input: Array<Byte>) {
         this.input = input
+        this.contentOffset = 0
+    }
+
+    public init(input: Array<Byte>, contentOffset: Int64) {
+        this.input = input
+        this.contentOffset = contentOffset
+        this.start = contentOffset
+        this.pos = contentOffset
     }
 
     func nextItem(): Item {
@@ -79,7 +89,7 @@ class Lexer {
         if (len <= 0) {
             len = 1
         }
-        return Position(line, start, len)
+        return Position(line, start - contentOffset, len)
     }
 
     func emit(typ: ITEMTYPE) {
@@ -184,7 +194,7 @@ class Lexer {
         var pos = getPos()
         pos.line--
         pos.len = 1
-        pos.start = this.pos - 1
+        pos.start = this.pos - contentOffset - 1
         let item = Item(ITEMTYPE.ERROR, pos, "", e)
         items.add(item)
         return LEXNIL
@@ -192,7 +202,7 @@ class Lexer {
 
     func errorPos(start: Int64, length: Int64, e: LexException): LEXSTATE {
         var pos = getPos()
-        pos.start = start
+        pos.start = start - contentOffset
         pos.len = length
         let item = Item(ITEMTYPE.ERROR, pos, "", e)
         items.add(item)
@@ -205,7 +215,7 @@ class Lexer {
             var pos = getPos()
             pos.line--
             pos.len = 1
-            pos.start = this.pos - 1
+            pos.start = this.pos - contentOffset - 1
             item = Item(ITEMTYPE.ERROR, pos, "", LexException(errStr))
         } else {
             item = Item(ITEMTYPE.ERROR, getPos(), "", LexException(errStr))

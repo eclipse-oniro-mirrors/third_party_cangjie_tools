@@ -6,6 +6,8 @@
 
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
+package ohos_app_cangjie_entry.ExtractInterface
+
 public interface Named {
     func name(): String
 }

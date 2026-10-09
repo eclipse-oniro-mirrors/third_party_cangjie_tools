@@ -7,7 +7,6 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "Format/CommentHandler.h"
-#include "Format/OptionContext.h"
 #include "Format/SimultaneousIterator.h"
 #include "cangjie/Basic/DiagnosticEngine.h"
 
@@ -19,12 +18,16 @@ using namespace Cangjie::AST;
 
 namespace {
 const int MAX_LINEBREAKS = 2;
-OptionContext& g_optionContext = OptionContext::GetInstance();
-const int INDENT = g_optionContext.GetConfigOptions().indentWidth; // XXX: take from configuration
 
 bool IsClosing(const Token &token)
 {
     return token.kind == TokenKind::RCURL || token.kind == TokenKind::RPAREN || token.kind == TokenKind::RSQUARE;
+}
+
+bool IsBlockContinuationKeyword(const Token &token)
+{
+    return token.kind == TokenKind::ELSE || token.kind == TokenKind::CATCH ||
+        token.kind == TokenKind::FINALLY || token.kind == TokenKind::WHILE;
 }
 
 bool IsMultilineComment(const Token &token)
@@ -46,8 +49,10 @@ struct InsertData {
 
 class CommentHandler : private SimultaneousIterator {
 public:
-    CommentHandler(const std::vector<Token> &originalTokens, const std::vector<Token> &outputTokens, SourceManager &sm)
-        : SimultaneousIterator(originalTokens, outputTokens), sm(sm)
+    // Formatting options are loaded per invocation, so the configured width must not be cached in a global value.
+    CommentHandler(const std::vector<Token> &originalTokens, const std::vector<Token> &outputTokens, SourceManager &sm,
+        int indentWidth)
+        : SimultaneousIterator(originalTokens, outputTokens), sm(sm), indentWidth(indentWidth)
     {
         this->outputText = "";
     }
@@ -104,6 +109,7 @@ public:
 
 private:
     SourceManager &sm;
+    int indentWidth;
     std::string outputText;
 
     void Insert(char character, int times)
@@ -171,7 +177,7 @@ private:
         }
         auto firstOnThisLine = FindFirstTokenOnThisLine(tokenToIndent);
         auto sameIndent = (firstOnThisLine->Begin().column - 1);
-        auto oneLevelIndented = sameIndent + INDENT;
+        auto oneLevelIndented = sameIndent + indentWidth;
 
         if (!isComment && tokenToIndent == firstOnThisLine) {
             return sameIndent;
@@ -192,6 +198,12 @@ private:
             return sameIndent;
         }
         if (!isFirstOnThisLine) {
+            // A comment can split "} else/catch/finally/while" across lines.
+            // Keep the continuation keyword aligned with the preceding block.
+            if (!isComment && std::prev(tokenToIndent)->kind == TokenKind::RCURL &&
+                IsBlockContinuationKeyword(*tokenToIndent)) {
+                return sameIndent;
+            }
             // pattern matching 'case' always creats indented region
             if (firstOnThisLine->kind == TokenKind::CASE) {
                 return oneLevelIndented;
@@ -347,9 +359,9 @@ private:
 }
 
 std::string InsertComments(const std::vector<Token> &originalTokens, const std::vector<Token> &formattedTokens,
-    SourceManager &sm)
+    SourceManager &sm, const FormattingOptions &options)
 {
-    auto commentHandler = CommentHandler(originalTokens, formattedTokens, sm);
+    auto commentHandler = CommentHandler(originalTokens, formattedTokens, sm, options.indentWidth);
     return commentHandler.DoInsert();
 }
 } // namespace Cangjie::Format
