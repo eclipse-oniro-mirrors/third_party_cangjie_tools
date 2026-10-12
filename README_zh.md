@@ -13,11 +13,13 @@
 如架构图所示，本仓库提供了下述的仓颉工具：
 
 - 仓颉项目管理工具 （简称 `cjpm`）：用于对仓颉项目模块系统进行管理，涵盖模块初始化、依赖检查与更新等操作，提供统一的编译入口，支持增量编译、并行编译等。
+- 仓颉兼容性检查工具（简称 `cjcompat`）：用于比较不同版本仓颉库的 `.cjo` 文件，检查 API 和 ABI 兼容性变化。
 - 仓颉格式化工具 （`cangjie formatter`，简称 `cjfmt`）：基于仓颉语言编程规范开发的代码自动格式化工具。
 - 仓颉多语言桥接工具 （`HyperlangExtension`，简称 `hle`）：仓颉调用ArkTS互操作代码的模板自动生成工具。
 - 仓颉语言服务工具 （`cangjie language server`，简称 `lsp`）：在DevEco Studio上提供仓颉语言服务的服务器后端，需要搭配DevEco Studio客户端使用。
 - 仓颉静态检查工具（简称 `cjlint`）：基于仓颉语言编程规范开发的静态检查工具，通过它可以识别代码中不符合编程规范的问题，帮助开发者发现代码中的漏洞，写出满足要求的仓颉代码。
 - 仓颉覆盖率工具（简称 `cjcov`）：基于仓颉语言编程规范开发的代码覆盖率工具。
+- 仓颉性能分析工具（`Cangjie Profile`，简称 `cjprof`）：对仓颉语言程序进行 CPU 热点函数采样并生成统计报告或火焰图，同时支持导出与分析堆内存，帮助开发者进行性能与内存问题分析。
 - 仓颉异常堆栈信息还原工具（简称 `cjtrace-recover`）：帮助开发者还原混淆过的异常堆栈信息，从而更好地定位和排查问题原因。
 
 仓颉语言命令行工具链当前支持在如下平台运行：Windows x86-64、Linux x86-64/AArch64、Mac x86/arm64，鸿蒙平台正在开发中。
@@ -30,12 +32,24 @@
 │   ├── build                 # 构建脚本
 │   ├── doc                   # 构建指南和使用指南
 │   └── src                   # 源码
+├── cjcompat
+│   ├── build                 # 构建脚本
+│   ├── doc                   # 开发者指南
+│   ├── figures               # 架构图
+│   ├── include               # 头文件
+│   └── src                   # 源码
 ├── cjcov
 │   ├── build                 # 构建脚本
-│   ├── doc                   # 构建指南和使用指南
+│   ├── doc                   # 开发者指南
 │   └── src                   # 源码
 ├── cjfmt
 │   ├── build    # 构建脚本
+│   ├── config   # 配置文件
+│   ├── doc      # 开发者指南
+│   ├── include  # 头文件
+│   └── src      # 源码
+|—— cjhead
+|   ├── build    # 构建脚本
 │   ├── config   # 配置文件
 │   ├── doc      # 构建指南和使用指南
 │   ├── include  # 头文件
@@ -43,12 +57,19 @@
 ├── cjlint
 │   ├── build    # 构建脚本
 │   ├── config   # 配置文件
-│   ├── doc      # 构建指南和使用指南
+│   ├── doc      # 开发者指南
 │   └── src      # 源码
 ├── cjpm
 │   ├── build    # 构建脚本
-│   ├── doc      # 构建指南和使用指南
+│   ├── doc      # 开发者指南
 │   └── src      # 源码
+├── cjprof
+│   ├── build    # 构建脚本
+│   ├── doc      # 开发者指南
+│   ├── figures  # 架构图
+│   ├── include  # 头文件
+│   ├── src      # 源码
+│   └── tests    # 测试用例
 ├── cjtrace-recover
 │   ├── build                 # 构建脚本
 │   ├── doc                   # 构建指南和使用指南
@@ -59,16 +80,28 @@
     └── src              # 源码
 ```
 
-若想获取工具的详细信息，请参阅各工具 `doc` 目录下的用户指南。
+若想获取工具的详细信息，请参阅以下用户指南：
+
+- [`cjpm` 用户手册](https://gitcode.com/Cangjie/cangjie_docs/blob/main/docs/tools/source_zh_cn/cmd-tools/cjpm_manual.md)
+- [`cjprof` 用户手册](https://gitcode.com/Cangjie/cangjie_docs/blob/main/docs/tools/source_zh_cn/cmd-tools/cjprof_manual.md)
+- [`cjcompat` 用户手册](https://gitcode.com/Cangjie/cangjie_docs/blob/main/docs/tools/source_zh_cn/cmd-tools/cjcompat_manual.md)
+- [`cjlint` 用户手册](https://gitcode.com/Cangjie/cangjie_docs/blob/main/docs/tools/source_zh_cn/cmd-tools/cjlint_manual.md)
+- [`cjfmt` 用户手册](https://gitcode.com/Cangjie/cangjie_docs/blob/main/docs/tools/source_zh_cn/cmd-tools/cjfmt_manual.md)
+- [`cjcov` 用户手册](https://gitcode.com/Cangjie/cangjie_docs/blob/main/docs/tools/source_zh_cn/cmd-tools/cjcov_manual.md)
+
+其他工具的用户指南请参阅各工具的 `doc` 目录。
 
 每个工具对应的软件架构图请参考：
 
 - [`cjpm` 软件架构图](./cjpm/doc/developer_guide_zh.md#开源项目介绍)
+- [`cjcompat` 软件架构图](./cjcompat/doc/developer_guide.md#开源项目介绍)
 - [`cjfmt` 软件架构图](./cjfmt/doc/developer_guide_zh.md#开源项目介绍)
+- [`cjhead` 软件架构图](./cjhead/doc/developer_guide.md#开源项目介绍)
 - [`hle` 软件架构图](./hyperlangExtension/doc/developer_guide_zh.md#开源项目介绍)
 - [`lsp` 系统架构图](./cangjie-language-server/doc/developer_guide_zh.md#开源项目介绍)
 - [`cjcov` 系统架构图](./cjcov/doc/developer_guide_zh.md#开源项目介绍)
 - [`cjlint` 系统架构图](./cjlint/doc/developer_guide_zh.md#开源项目介绍)
+- [`cjprof` 系统架构图](./cjprof/doc/developer_guide_zh.md#开源项目介绍)
 - [`cjtrace-recover` 系统架构图](./cjtrace-recover/doc/developer_guide_zh.md#开源项目介绍)
 
 ## 构建依赖
