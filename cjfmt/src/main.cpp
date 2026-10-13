@@ -134,7 +134,7 @@ void SetOptionIndentWidth(TomlParser& parser, FormattingOptions& options)
 {
     auto indentWidthOptional = parser.GetValue("indentWidth");
     if (!indentWidthOptional.has_value()) {
-        Warningln("Can't find configuration options: indentWidth, built-in options will be used: indentWidth = 4");
+        Warningln("Can't find configuration option: indentWidth, built-in options will be used: indentWidth = 4");
         return;
     }
     std::optional<int> indentWidth;
@@ -164,7 +164,7 @@ void SetOptionLineLength(TomlParser& parser, FormattingOptions& options)
 {
     auto lineLimitLengthOptional = parser.GetValue("linelimitLength");
     if (!lineLimitLengthOptional.has_value()) {
-        Warningln("Can't find configuration options: linelimitLength, "
+        Warningln("Can't find configuration option: linelimitLength, "
                   "built-in options will be used: linelimitLength = 120");
         return;
     }
@@ -195,7 +195,7 @@ void SetOptionLineBreakType(TomlParser& parser, FormattingOptions& options)
 {
     auto lineBreakTypeOptional = parser.GetValue("lineBreakType");
     if (!lineBreakTypeOptional.has_value()) {
-        Warningln("Can't find configuration options: lineBreakType, "
+        Warningln("Can't find configuration option: lineBreakType, "
                   "built-in options will be used: lineBreakType = \"LF\"");
         return;
     }
@@ -228,7 +228,7 @@ void SetOptionMethodChainning(TomlParser& parser, FormattingOptions& options)
 {
     auto methodChainningOptional = parser.GetValue("allowMultiLineMethodChain");
     if (!methodChainningOptional.has_value()) {
-        Warningln("Can't find configuration options: allowMultiLineMethodChain, "
+        Warningln("Can't find configuration option: allowMultiLineMethodChain, "
                   "built-in options will be used: allowMultiLineMethodChain = false");
         return;
     }
@@ -254,7 +254,7 @@ void SetOptionMethodChainLevel(TomlParser& parser, FormattingOptions& options)
 {
     auto methodChainningOptional = parser.GetValue("multipleLineMethodChainLevel");
     if (!methodChainningOptional.has_value()) {
-        Warningln("Can't find configuration options: multipleLineMethodChainLevel, "
+        Warningln("Can't find configuration option: multipleLineMethodChainLevel, "
                   "built-in options will be used: multipleLineMethodChainLevel = 5");
         return;
     }
@@ -286,7 +286,7 @@ void SetOptionMultipleLineMethodChainOverLineLength(TomlParser& parser, Formatti
 {
     auto methodChainningOptional = parser.GetValue("multipleLineMethodChainOverLineLength");
     if (!methodChainningOptional.has_value()) {
-        Warningln("Can't find configuration options: multipleLineMethodChainOverLineLength, "
+        Warningln("Can't find configuration option: multipleLineMethodChainOverLineLength, "
                   "built-in options will be used: multipleLineMethodChainOverLineLength = true");
         return;
     }

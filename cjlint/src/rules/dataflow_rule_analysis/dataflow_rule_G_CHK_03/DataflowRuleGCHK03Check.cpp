@@ -182,7 +182,7 @@ void CHK03VerifyAnalysis::PropagateExpressionEffect(CHK03VerifyDomain& state, co
 }
 
 std::optional<Block*> CHK03VerifyAnalysis::PropagateTerminatorEffect(
-    CHK03VerifyDomain&, const Terminator*)
+    CHK03VerifyDomain&, const Expression*)
 {
     return std::nullopt;
 }
@@ -256,7 +256,7 @@ void CHK03CanonicalizeAnalysis::PropagateExpressionEffect(CHK03CanonicalizeDomai
 }
 
 std::optional<Block*> CHK03CanonicalizeAnalysis::PropagateTerminatorEffect(
-    CHK03CanonicalizeDomain&, const Terminator*)
+    CHK03CanonicalizeDomain&, const Expression*)
 {
     return std::nullopt;
 }
@@ -301,7 +301,7 @@ void DataflowRuleGCHK03Check::IsPathCanonicalized(CHIR::Function* func)
         }
     };
     const auto actionAfterVisitExpr = [](const CHK03CanonicalizeDomain&, Expression*, size_t) {};
-    const auto actionOnTerminator = [](const CHK03CanonicalizeDomain&, const Terminator*, std::optional<Block*>) {};
+    const auto actionOnTerminator = [](const CHK03CanonicalizeDomain&, const Expression*, std::optional<Block*>) {};
     result->VisitWith(actionBeforeVisitExpr, actionAfterVisitExpr, actionOnTerminator);
 }
 
@@ -341,7 +341,7 @@ void DataflowRuleGCHK03Check::IsPathVerified(CHIR::Function* func)
         }
     };
     const auto actionAfterVisitExpr = [](const CHK03VerifyDomain&, Expression*, size_t) {};
-    const auto actionOnTerminator = [](const CHK03VerifyDomain&, const Terminator*, std::optional<Block*>) {};
+    const auto actionOnTerminator = [](const CHK03VerifyDomain&, const Expression*, std::optional<Block*>) {};
     result->VisitWith(actionBeforeVisitExpr, actionAfterVisitExpr, actionOnTerminator);
 }
 

@@ -31,6 +31,7 @@ struct ModuleInfo {
     // common root path -> specific root path
     std::pair<std::string, std::vector<std::string>> commonSpecificPaths = {};
     std::vector<std::string> sourceSetNames;
+    std::unordered_map<std::string, std::string> sourceSetNameByPath;
 };
 
 std::string GetLSPServerDir();

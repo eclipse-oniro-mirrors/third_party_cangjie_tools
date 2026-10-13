@@ -78,10 +78,16 @@ class InlineFunctionNoRecursiveRule : public TweakRule {
     bool Check(const Tweak::Selection &sel, std::map<std::string, std::string> &extraOptions) const override
     {
         auto root = sel.selectionTree.root();
+        if (root == nullptr || !root->node) {
+            return false;
+        }
 
         auto toBeInline = root->node;
         if (root->node->astKind == ASTKind::FUNC_ARG) {
             auto funcArg = DynamicCast<FuncArg*>(root->node.get());
+            if (funcArg == nullptr || !funcArg->expr) {
+                return false;
+            }
             toBeInline = funcArg->expr;
         }
 
@@ -128,10 +134,16 @@ class InlineFunctionNoPrivateAccessRule : public TweakRule {
     bool Check(const Tweak::Selection &sel, std::map<std::string, std::string> &extraOptions) const override
     {
         auto root = sel.selectionTree.root();
+        if (root == nullptr || !root->node) {
+            return false;
+        }
 
         auto toBeInline = root->node;
         if (root->node->astKind == ASTKind::FUNC_ARG) {
             auto funcArg = DynamicCast<FuncArg*>(root->node.get());
+            if (funcArg == nullptr || !funcArg->expr) {
+                return false;
+            }
             toBeInline = funcArg->expr;
         }
 
@@ -179,10 +191,16 @@ class InlineFunctionSimpleTypeRule : public TweakRule {
     bool Check(const Tweak::Selection &sel, std::map<std::string, std::string> &extraOptions) const override
     {
         auto root = sel.selectionTree.root();
+        if (root == nullptr || !root->node) {
+            return false;
+        }
 
         auto toBeInline = root->node;
         if (root->node->astKind == ASTKind::FUNC_ARG) {
             auto funcArg = DynamicCast<FuncArg*>(root->node.get());
+            if (funcArg == nullptr || !funcArg->expr) {
+                return false;
+            }
             toBeInline = funcArg->expr;
         }
 
@@ -646,7 +664,7 @@ std::string InlineFunction::RegexReplaceN(const std::string& input, const std::r
         const std::smatch& match = *it;
         result += input.substr(lastPos, match.position() - lastPos);
         result += replacement;
-        lastPos = match.position() + match.length();
+        lastPos = static_cast<size_t>(match.position() + match.length());
         ++count;
         ++it;
     }

@@ -329,7 +329,7 @@ void DataflowRuleVAR01Check::CheckMemberVar(const CHIR::Store* store, ClassMembe
     TRY_GET_EXPR(store->GetLocation(), expr);
     if (expr->GetExprKind() == CHIR::ExprKind::GET_ELEMENT_REF) {
         auto getElementRef = StaticCast<CHIR::GetElementRef*>(expr);
-        auto baseTy = GetBaseTy(getElementRef->GetLocation()->GetType());
+        auto baseTy = GetBaseTy(getElementRef->GetBase()->GetType());
         auto customTy = DynamicCast<CHIR::CustomType*>(baseTy);
         auto path = getElementRef->GetPath();
         CheckMemberVarHelper(customTy, path, memberVarMap);
@@ -339,7 +339,7 @@ void DataflowRuleVAR01Check::CheckMemberVar(const CHIR::Store* store, ClassMembe
 void DataflowRuleVAR01Check::CheckMemberVar(
     const CHIR::StoreElementRef* storeElementRef, ClassMemberVarsMap& memberVarMap)
 {
-    auto baseTy = GetBaseTy(storeElementRef->GetLocation()->GetType());
+    auto baseTy = GetBaseTy(storeElementRef->GetBase()->GetType());
     auto customTy = DynamicCast<CHIR::CustomType*>(baseTy);
     auto path = storeElementRef->GetPath();
     CheckMemberVarHelper(customTy, path, memberVarMap);
@@ -362,7 +362,7 @@ Ptr<CHIR::Value> DataflowRuleVAR01Check::ResolveBaseVar(Ptr<CHIR::Value> value)
     }
     if (expr->GetExprKind() == CHIR::ExprKind::GET_ELEMENT_REF) {
         auto getElementRef = StaticCast<CHIR::GetElementRef*>(expr);
-        return ResolveBaseVar(getElementRef->GetLocation());
+        return ResolveBaseVar(getElementRef->GetBase());
     }
     return value;
 }
@@ -444,7 +444,7 @@ void DataflowRuleVAR01Check::CheckBasedOnCHIRFunc(CHIR::BlockGroup& body, ClassM
         if (expr.GetExprKind() == CHIR::ExprKind::STORE_ELEMENT_REF) {
             auto storeElementRef = StaticCast<CHIR::StoreElementRef*>(&expr);
             CheckMemberVar(storeElementRef, memberVarMap);
-	        IncreaseAssignCountByLocation(storeElementRef->GetLocation(), localVarAssignCountMap);
+            IncreaseAssignCountByLocation(storeElementRef->GetBase(), localVarAssignCountMap);
         }
         return CHIR::VisitResult::CONTINUE;
     });

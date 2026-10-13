@@ -46,7 +46,7 @@ public:
     void InitializeFuncEntryState(FIO01Domain& state) override;
     void PropagateExpressionEffect(FIO01Domain& state, const Cangjie::CHIR::Expression* expression) override;
     std::optional<Cangjie::CHIR::Block*> PropagateTerminatorEffect(
-        FIO01Domain& state, const Cangjie::CHIR::Terminator* terminator) override;
+        FIO01Domain& state, const Cangjie::CHIR::Expression* terminator) override;
     FIO01Domain Bottom() override;
 
 private:
