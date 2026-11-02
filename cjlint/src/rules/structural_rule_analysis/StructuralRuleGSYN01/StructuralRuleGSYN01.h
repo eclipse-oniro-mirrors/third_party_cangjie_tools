@@ -48,7 +48,7 @@ private:
         // Identify implicit let variables
         auto pos = varDecl->keywordPos;
         bool isImplict = pos.fileID == 0 && pos.line == 0 && pos.column == 0;
-        if (!isImplict && !varDecl->isVar) {
+        if (!isImplict && !varDecl->isVar && !varDecl->isConst) {
             Diagnose(
                 node.begin, node.end, CodeCheckDiagKind::G_SYN_01_disable_syntax_information_01, syntaxNameMap[syntax]);
         }
@@ -110,10 +110,16 @@ private:
     };
     /* @brief Check whether conditional compilation is used */
     NodeHandler handleWhen = [this](const AST::Node& node, const std::string& syntax) {
+        const std::vector<OwnedPtr<AST::Annotation>>* annotations = nullptr;
         if (auto decl = dynamic_cast<const AST::Decl*>(&node); decl) {
-            auto it = std::find_if(decl->annotations.begin(), decl->annotations.end(),
+            annotations = &decl->annotations;
+        } else if (auto importSpec = dynamic_cast<const AST::ImportSpec*>(&node); importSpec) {
+            annotations = &importSpec->annotations;
+        }
+        if (annotations != nullptr) {
+            auto it = std::find_if(annotations->begin(), annotations->end(),
                 [](const auto& anno) { return anno->kind == AST::AnnotationKind::WHEN; });
-            if (it != decl->annotations.end()) {
+            if (it != annotations->end()) {
                 Diagnose(node.begin, node.end, CodeCheckDiagKind::G_SYN_01_disable_syntax_information_01,
                     syntaxNameMap[syntax]);
             }

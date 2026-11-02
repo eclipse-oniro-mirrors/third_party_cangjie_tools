@@ -9,11 +9,14 @@
 #include "Format/FormatCodeProcessor.h"
 #include <regex>
 #include "Format/CommentHandler.h"
+#include "Format/CommentLayout.h"
 #include "Format/DocProcessor/ArgsProcessor.h"
+#include "Format/DocProcessor/ChoiceProcessor.h"
 #include "Format/DocProcessor/BreakParentTypeProcessor.h"
 #include "Format/DocProcessor/ConcatTypeProcessor.h"
 #include "Format/DocProcessor/DotProcessor.h"
 #include "Format/DocProcessor/FuncArgProcessor.h"
+#include "Format/DocProcessor/FillTypeProcessor.h"
 #include "Format/DocProcessor/GroupProcessor.h"
 #include "Format/DocProcessor/LambdaBodyProcessor.h"
 #include "Format/DocProcessor/LambdaProcessor.h"
@@ -292,7 +295,13 @@ void RegisterTypeNode(ASTToFormatSource& toSourceManager, FormattingOptions& opt
 void RegisterDocProcessors(ASTToFormatSource& toSourceManager, FormattingOptions& options)
 {
     toSourceManager.RegisterDocProcessors<StringTypeProcessor>(DocType::STRING, options);
+    toSourceManager.RegisterDocProcessors<ChoiceProcessor>(DocType::CHOICE, options);
     toSourceManager.RegisterDocProcessors<ConcatTypeProcessor>(DocType::CONCAT, options);
+    toSourceManager.RegisterDocProcessors<ConcatTypeProcessor>(DocType::ALIGN, options);
+    toSourceManager.RegisterDocProcessors<ConcatTypeProcessor>(DocType::LINE_SUFFIX, options);
+    toSourceManager.RegisterDocProcessors<ConcatTypeProcessor>(DocType::LINE_SUFFIX_BOUNDARY, options);
+    // Fill plans complete chunks and nested syntax breaks with a deterministic cost comparison.
+    toSourceManager.RegisterDocProcessors<FillTypeProcessor>(DocType::FILL, options);
     toSourceManager.RegisterDocProcessors<LineProcessor>(DocType::LINE, options);
     toSourceManager.RegisterDocProcessors<ArgsProcessor>(DocType::ARGS, options);
     toSourceManager.RegisterDocProcessors<FuncArgProcessor>(DocType::FUNC_ARG, options);
@@ -338,12 +347,15 @@ public:
         }
 
         std::string result;
-        auto formatted = TransformAstToText(file);
+        auto formatted = TransformAstToText(file, inputTokens);
         if (tracker.actuallyFormattedStart.has_value() && tracker.actuallyFormattedEnd.has_value()) {
             result = ConstructResultingText(file, inputTokens, formatted);
         } else {
             // couldn't find any ast nodes to format, should report this to user?
             result = rawCode;
+            if (!regionToFormat.isWholeFile) {
+                FormatSelectedCommentsInText(inputTokens, result);
+            }
         }
 
         if (result.back() != '\n') {
@@ -361,11 +373,12 @@ private:
     RegionFormattingTracker tracker;
     FormattingOptions options;
 
-    std::string TransformAstToText(const OwnedPtr<File>& file)
+    std::string TransformAstToText(const OwnedPtr<File>& file, const std::vector<Token>& tokens)
     {
         ASTToFormatSource astTransformer(tracker, sm);
         SetupTranformer(astTransformer);
         Doc doc = astTransformer.ASTToDoc(file.get());
+        AddCommentBudgets(doc, tokens);
         return astTransformer.DocToString(doc);
     }
 
@@ -419,6 +432,11 @@ private:
         auto formattedEnd = tracker.actuallyFormattedEnd.value();
         auto originalFragmentTokens = GetTokensBetweenPositions(originalFileAllTokens, formattedBegin, formattedEnd);
         auto formattedFragmentTokens = formattedTextTokens;
+        if (originalFragmentTokens.empty() || formattedFragmentTokens.empty()) {
+            auto result = rawCode;
+            FormatSelectedCommentsInText(originalFileAllTokens, result);
+            return result;
+        }
         auto preciseFragmentBounds = tracker.GetPreciseFragmentBounds(sm);
         if (preciseFragmentBounds.has_value()) {
             auto smallerFragments = ExtractTokensBetweenPositions(originalFragmentTokens, formattedFragmentTokens,
@@ -428,11 +446,20 @@ private:
             }
         }
 
-        auto fragmentText = InsertComments(originalFragmentTokens, formattedFragmentTokens, sm, options);
+        auto fragmentText = InsertComments(originalFragmentTokens, formattedFragmentTokens, sm, options,
+            std::make_pair(regionToFormat.startLine, regionToFormat.endLine));
         auto contentBefore =
             sm.GetContentBetween(originalFileAllTokens.front().Begin(), originalFragmentTokens.front().Begin());
         auto contentAfter =
             sm.GetContentBetween(originalFragmentTokens.back().End(), originalFileAllTokens.back().End());
+
+        // These pieces still have their original source positions. Comments inside
+        // fragmentText have already been handled by InsertComments.
+        const auto &source = sm.GetSource(originalFileAllTokens.front().Begin().fileID);
+        FormatSelectedCommentsInText(originalFileAllTokens, contentBefore,
+            source.PosToOffset(originalFileAllTokens.front().Begin()));
+        FormatSelectedCommentsInText(originalFileAllTokens, contentAfter,
+            source.PosToOffset(originalFragmentTokens.back().End()));
 
         (void)contentBefore.erase(contentBefore.find_last_not_of(" \t") + 1);
 
@@ -455,12 +482,45 @@ private:
         return contentBefore + fragmentText + contentAfter;
     }
 
+    void FormatSelectedCommentsInText(
+        const std::vector<Token> &inputTokens, std::string &text, size_t sourceOffset = 0)
+    {
+        const auto sourceEnd = sourceOffset + text.size();
+        // Only pass unchanged source slices here. Applying edits from right to left
+        // keeps every remaining token's original byte offset valid.
+        for (auto it = inputTokens.rbegin(); it != inputTokens.rend(); ++it) {
+            const auto &token = *it;
+            if (token.kind != TokenKind::COMMENT || token.Value().find("\n") == std::string::npos) {
+                continue;
+            }
+            auto commentEndLine = token.Begin().line +
+                static_cast<int>(std::count(token.Value().begin(), token.Value().end(), '\n'));
+            if (token.Begin().line > regionToFormat.endLine || commentEndLine < regionToFormat.startLine) {
+                continue;
+            }
+            const auto begin = sm.GetSource(token.Begin().fileID).PosToOffset(token.Begin());
+            if (begin < sourceOffset || begin > sourceEnd || token.Value().size() > sourceEnd - begin) {
+                continue;
+            }
+            const auto indent = token.Begin().column - 1;
+            auto replacement = FormatCommentToken(token, indent);
+            // Preserve the first line's existing prefix, whether indentation or code.
+            replacement.erase(0, static_cast<size_t>(indent));
+            text.replace(begin - sourceOffset, token.Value().size(), replacement);
+        }
+    }
+
     std::string ConstructResultingText(OwnedPtr<File>&, const std::vector<Token>& inputTokens, std::string& formatted)
     {
         (void)formatted.erase(0, formatted.find_first_not_of(" \t\n"));
         (void)formatted.erase(formatted.find_last_not_of(" \t\n") + 1);
         auto formattedTokens = RunLexer(formatted, "___formattedSnippet.cj");
         if (!regionToFormat.isWholeFile) {
+            if (!tracker.actuallyFormattedStart.has_value() || !tracker.actuallyFormattedEnd.has_value()) {
+                auto result = rawCode;
+                FormatSelectedCommentsInText(inputTokens, result);
+                return result;
+            }
             return ConstructTextForCodeFragment(inputTokens, formattedTokens);
         } else {
             return InsertComments(inputTokens, formattedTokens, sm, options);
@@ -527,6 +587,26 @@ private:
 } // namespace
 
 namespace {
+constexpr char UTF8_BOM[] = "\xEF\xBB\xBF";
+
+bool HasUtf8Bom(const std::string& text)
+{
+    return text.size() >= sizeof(UTF8_BOM) - 1 && text.compare(0, sizeof(UTF8_BOM) - 1, UTF8_BOM) == 0;
+}
+
+std::string StripUtf8Bom(const std::string& text)
+{
+    return HasUtf8Bom(text) ? text.substr(sizeof(UTF8_BOM) - 1) : text;
+}
+
+std::string RestoreUtf8Bom(std::string text, bool hasBom)
+{
+    if (hasBom) {
+        text.insert(0, UTF8_BOM, sizeof(UTF8_BOM) - 1);
+    }
+    return text;
+}
+
 size_t GetLineStartOffset(const std::string& text, int line)
 {
     if (line <= 1) {
@@ -618,14 +698,18 @@ ByteRange MapRange(const ByteRange& range, const TextEdit& edit)
 std::optional<FormatResult> FormatTextWithEdits(
     const std::string& rawCode, const std::string& filepath, const Region region)
 {
-    auto formatCode = FormatCodeProcessor(rawCode, filepath, region);
+    // UTF-8 BOM is a file signature, not source text. Keep it outside the lexer/parser pipeline and restore it
+    // on the complete formatted result, as formatters such as Prettier do.
+    bool hasBom = HasUtf8Bom(rawCode);
+    auto sourceCode = StripUtf8Bom(rawCode);
+    auto formatCode = FormatCodeProcessor(sourceCode, filepath, region);
     auto formatted = formatCode.Run();
     if (!formatted) {
         return std::nullopt;
     }
 
     FormatResult result;
-    result.formattedText = std::move(formatted.value());
+    result.formattedText = RestoreUtf8Bom(std::move(formatted.value()), hasBom);
     result.requestedRange = GetRequestedByteRange(rawCode, region);
     result.formattedRange = result.requestedRange;
     if (result.formattedText != rawCode) {

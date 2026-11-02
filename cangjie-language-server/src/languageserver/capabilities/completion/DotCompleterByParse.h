@@ -125,6 +125,8 @@ private:
 
     void FindVarPattern(Ptr<Node> node, const Position &pos, std::string &scopeName, bool &isInclude);
 
+    void FindParenExpr(Ptr<Node> node, const Position &pos, std::string &scopeName, bool &isInclude);
+
     void FindBinaryExpr(Ptr<Node> node, const Position &pos, std::string & /* scopeName */, bool &isInclude);
 
     void FindOptionalChainExpr(Ptr<Node> node, const Position &pos, std::string & /* scopeName */, bool &isInclude);
