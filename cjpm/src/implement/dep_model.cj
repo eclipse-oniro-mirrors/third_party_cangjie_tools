@@ -115,22 +115,17 @@ class DepModel {
 
         // move repo-deps from cjpm.lock into engine
         this.depAnalysisEngine.recordLock(locked)
+        this.lockedMap = locked
 
-        // first process locked dependencies as if they are directly required.
         this.globalConfig.scriptList = ArrayList<ScriptConfig>()
 
         if (!COMMON_INFO.inWorkspace) {
             this.globalConfig.modulePath = this.globalConfig.rootPath
-            this.lockedMap = locked
             if (this.depCheck(path, "", "", None, rootTomlDocument: rootTomlDocument) == FAILED_BUILD_CHECK_RESULT) {
                 return FAILED_BUILD_CHECK_RESULT
             }
         } else {
             this.replaceMap = COMMON_INFO.replaceDeps
-            let (flag, _) = this.processDependencyModule(locked, "", "", true)
-            if (!flag) {
-                return FAILED_BUILD_CHECK_RESULT
-            }
         }
 
         if (!COMMON_INFO.memberModule.isEmpty()) {
@@ -307,10 +302,6 @@ class DepModel {
             }
 
             if (!checkProjectCombineAtDepResolve(this.globalConfig, tomlInfo)) {
-                return FAILED_BUILD_CHECK_RESULT
-            }
-            let (flag, _) = this.processDependencyModule(this.lockedMap, "", "", true)
-            if (!flag) {
                 return FAILED_BUILD_CHECK_RESULT
             }
         }
@@ -888,22 +879,28 @@ class DepModel {
         let triple = Triple.fromString(target).getOrThrow { err =>
             CliFailError("Error: invalid target '${target}': ${err}")
         }
-        for (name in this.depAnalysisEngine.finalDepMap.keys()) {
-            let alwaysEnabledFeatures = verifiedModuleMap[name].alwaysEnabledFeatures
-            let mapping = verifiedModuleMap[name].mapping
-            let features = FeatureDeducer(enabled: !this.globalConfig.noFeatureDeduce)
-                .addFeature(this.globalConfig.verifiedEnabledFeatures)
-                .addFeature(alwaysEnabledFeatures)
-                .deduceTargetFeatures(triple)
-                .setFeatureMapping(mapping)
-                .collect()
+        var changed = true
+        while (changed) {
+            changed = false
+            for (name in this.depAnalysisEngine.finalDepMap.keys()) {
+                let alwaysEnabledFeatures = verifiedModuleMap[name].alwaysEnabledFeatures
+                let mapping = verifiedModuleMap[name].mapping
+                let features = FeatureDeducer(enabled: !this.globalConfig.noFeatureDeduce)
+                    .addFeature(this.globalConfig.verifiedEnabledFeatures)
+                    .addFeature(alwaysEnabledFeatures)
+                    .addFeature(propagatedFeatures[name].toArray())
+                    .deduceTargetFeatures(triple)
+                    .setFeatureMapping(mapping)
+                    .collect()
 
-            propagatedFeatures[name].add(all: features)
-            for (feature in features) {
-                if (
-                    let Some(fname) <- feature.depName &&
-                    let Some(featureset) <- propagatedFeatures.get(fname)
-                ) { featureset.add(feature) }
+                propagatedFeatures[name].add(all: features)
+                for (feature in features) {
+                    if (
+                        let Some(fname) <- feature.depName &&
+                        let Some(featureSet) <- propagatedFeatures.get(fname) &&
+                        featureSet.add(feature)
+                    ) { changed = true }
+                }
             }
         }
     }
@@ -1027,6 +1024,17 @@ class DepModel {
         var buildCheckFlag = true
         var mockUsed = false
         for ((name, v) in requires) {
+            // Apply pins only to dependencies reached in this resolution scope.
+            if (v.isGitDep() && let Some(locked) <- this.lockedMap.get(name)) {
+                let (_, error) = locked.isAlternative(v)
+                if (error.isEmpty()) {
+                    v.commitId = locked.commitId
+                    v.outputType = v.outputType ?? locked.outputType
+                } else {
+                    eprintln("Error: locked dependency '${name}' changed; run 'cjpm update'")
+                    return FAILED_BUILD_CHECK_RESULT
+                }
+            }
             // convert to absolute path for future comparisons
             if (let Some(vpath) <- v.path) {
                 v.path = getPath(prePath, vpath)
@@ -1041,7 +1049,7 @@ class DepModel {
             }
 
             var finalDepInfo: DepInfo = v
-            if (let Some(version) <- finalDepInfo.version) {
+            if (finalDepInfo.isCenterRepoDep()) {
                 // continue if replaced
                 if (this.replaceMap.contains(name)) {
                     finalDepInfo = this.replaceMap[name]
@@ -1479,7 +1487,7 @@ func constructSource(modulePath: String, srcDir: String, sourceSets: SourceLocat
     if (sourceSets.isEmpty) {
         return Ok((CJMPSource(modulePath, srcDir), localFeatures))
     } else {
-        return sourceSets.selectSourceSets(modulePath, localFeatures, globalFeatures).map { it => (it, localFeatures) }
+        return sourceSets.selectSourceSets(modulePath, globalFeatures).map { it => (it, localFeatures) }
     }
 }
 

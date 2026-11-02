@@ -7,6 +7,7 @@
 // The Cangjie API is in Beta. For details on its capabilities and limitations, please refer to the README file.
 
 #include "Format/ASTToFormatSource.h"
+#include "Format/NodeFormatter/ListLayout.h"
 #include "Format/SimultaneousIterator.h"
 #include "cangjie/Lex/Lexer.h"
 
@@ -40,10 +41,31 @@ Cangjie::Position GetBegin(Ptr<Node> n)
     }
     return begin;
 }
+
+bool IsVariableDecl(Ptr<Node> node)
+{
+    return node->astKind == ASTKind::VAR_DECL || node->astKind == ASTKind::VAR_WITH_PATTERN_DECL;
+}
+
+bool ASTToFormatSource::ShouldAddEmptyLineBetween(Ptr<Node> previous, Ptr<Node> current) const
+{
+    auto begin = GetBegin(current);
+    if (begin.line <= previous->end.line + 1) {
+        return false;
+    }
+
+    // Comments are restored with their original spacing by CommentHandler. Do not treat a comment line as
+    // an empty-line separator here: doing so makes the AST formatter and comment restoration add the same
+    // line break independently.
+    auto between = sm.GetContentBetween(previous->end, begin);
+    if (between.find("//") != std::string::npos || between.find("/*") != std::string::npos) {
+        return false;
+    }
+    return true;
+}
 } // namespace Cangjie::Format
 
 namespace {
-const int MIN_MUL_MEMBERS = 2;
 
 inline Cangjie::Position GetEnd(Ptr<Node> n)
 {
@@ -226,13 +248,41 @@ void ASTToFormatSource::AddBreakLineParam(
     doc.members.emplace_back(DocType::STRING, level, ")");
 }
 
+void ASTToFormatSource::AddAssignment(Doc& doc, Doc right, int level, const std::string& op)
+{
+    doc.members.emplace_back(DocType::STRING, level, " " + op + " ");
+    doc.choiceBreakAt = doc.members.size();
+    doc.members.emplace_back(std::move(right));
+    doc.type = DocType::CHOICE;
+}
+
+void ASTToFormatSource::AddTypeArguments(Doc& doc, const std::vector<OwnedPtr<AST::Type>>& types, int level)
+{
+    if (types.empty()) {
+        return;
+    }
+    doc.members.emplace_back(DocType::STRING, level, "<");
+    Doc items(DocType::ARGS, level, "");
+    for (const auto& type : types) {
+        items.members.emplace_back(ASTToDoc(type.get(), level));
+        if (type != types.back()) {
+            items.members.emplace_back(DocType::STRING, level, ",");
+            Doc separator(DocType::SOFTLINE_WITH_SPACE, level + 1, "");
+            separator.breakKind = BreakKind::LIST;
+            items.members.emplace_back(std::move(separator));
+        }
+    }
+    doc.members.emplace_back(std::move(items));
+    doc.members.emplace_back(DocType::STRING, level, ">");
+}
+
 void ASTToFormatSource::AddGenericParams(Doc& doc, const Cangjie::AST::Generic& generic, int level)
 {
     if (generic.typeParameters.empty()) {
         return;
     }
     doc.members.emplace_back(DocType::STRING, level, "<");
-    Doc group(DocType::GROUP, level + 1, "");
+    Doc group(DocType::ARGS, level + 1, "");
     for (auto& typeParam : generic.typeParameters) {
         auto typeParamDoc = ASTToDoc(typeParam.get(), level + 1);
         if (typeParam->commaPos != INVALID_POSITION) {
@@ -240,7 +290,9 @@ void ASTToFormatSource::AddGenericParams(Doc& doc, const Cangjie::AST::Generic& 
         }
         group.members.emplace_back(typeParamDoc);
         if (typeParam != generic.typeParameters.back()) {
-            group.members.emplace_back(DocType::SOFTLINE_WITH_SPACE, level + 1, " ");
+            Doc separator(DocType::SOFTLINE_WITH_SPACE, level + 1, "");
+            separator.breakKind = BreakKind::LIST;
+            group.members.emplace_back(std::move(separator));
         }
     }
     doc.members.emplace_back(group);
@@ -252,7 +304,7 @@ void ASTToFormatSource::AddGenericBound(Doc& doc, const Cangjie::AST::Generic& g
     if (generic.genericConstraints.empty()) {
         return;
     }
-    Doc group(DocType::GROUP, level + 1, "");
+    Doc group(DocType::ARGS, level + 1, "");
     for (auto& genericCons : generic.genericConstraints) {
         group.members.emplace_back(ASTToDoc(genericCons.get(), level + 1));
         if (genericCons != generic.genericConstraints.back()) {
@@ -480,28 +532,13 @@ bool ASTToFormatSource::IsMultipleLine(const OwnedPtr<Cangjie::AST::Expr>& expr)
 
 bool ASTToFormatSource::ShouldPreserveMultilineCallLayout(const Cangjie::AST::CallExpr& callExpr) const
 {
-    if (callExpr.args.size() < MIN_MUL_MEMBERS) {
-        return false;
-    }
-
-    if (callExpr.rightParenPos.line == callExpr.args.back()->end.line) {
-        return false;
-    }
-
-    return true;
+    return PreserveExpandedList(callExpr.rightParenPos.line, callExpr.args);
 }
 
 bool ASTToFormatSource::ShouldPreserveMultilineArrayLayout(const int& rightSquarePosLine,
     const std::vector<OwnedPtr<Expr>>& children) const
 {
-    if (children.size() < MIN_MUL_MEMBERS) {
-        return false;
-    }
-
-    if (rightSquarePosLine == children.back()->end.line) {
-        return false;
-    }
-    return true;
+    return PreserveExpandedList(rightSquarePosLine, children);
 }
 
 int ASTToFormatSource::DepthInMultipleMethodChain(const MemberAccess& memberAccess)

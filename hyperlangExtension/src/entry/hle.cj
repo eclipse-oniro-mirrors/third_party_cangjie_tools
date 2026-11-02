@@ -22,6 +22,7 @@ let fileHead = """
 // with Runtime Library Exception.
 //
 // See https://cangjie-lang.cn/pages/LICENSE for license information.
+${disclaimer}
 """
 let mtx = Mutex()
 
